@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#005A9C">
   <title>{{ title }} · Agenda Integrada</title>
-  <link rel="stylesheet" href="/static/styles.css?v=govbr-9">
+  <link rel="stylesheet" href="/static/styles.css?v=govbr-11">
 </head>
 <body data-page="{{ page }}"{% if entity_id %} data-entity-id="{{ entity_id }}"{% endif %}>
   <svg aria-hidden="true" class="svg-sprite">
@@ -64,6 +64,7 @@
     <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4zM12 12a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></symbol>
     <symbol id="i-check-circle" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM8 12l3 3 5-6"/></symbol>
     <symbol id="i-kanban" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM9 4v16M15 4v16M6.5 8v5M11.5 8v9M17.5 8v3"/></symbol>
+    <symbol id="i-textsize" viewBox="0 0 24 24"><path d="M3 17 5.5 8 8 17M3.9 14h3.2M12 17 16.5 3 21 17M13.7 12h5.6"/></symbol>
   </svg>
 
   <!-- Menu lateral no padrão visual adotado pela Prefeitura -->
@@ -123,7 +124,7 @@
         <a href="https://portal.transparencia.itaguai.rj.gov.br/" target="_blank" rel="noopener noreferrer" class="header-link hide-on-small" title="Portal da Transparência">Transparência</a>
         <div class="actions-separator hide-on-small"></div>
         <button class="header-icon-btn" id="darkModeToggle" data-tooltip="Modo noturno" aria-label="Alternar modo noturno"><svg><use href="#i-eye"></use></svg></button>
-        <button class="header-icon-btn" id="accessibilityToggle" data-tooltip="Acessibilidade: ampliar textos" aria-label="Ampliar textos"><svg><use href="#i-info"></use></svg></button>
+        <button class="header-icon-btn" id="accessibilityToggle" data-tooltip="Acessibilidade: ampliar textos" aria-label="Ampliar textos"><svg><use href="#i-textsize"></use></svg></button>
         <button class="header-icon-btn" id="notificationButton" data-tooltip="Notificações" aria-label="Notificações"><svg><use href="#i-bell"></use></svg><span class="notification-dot" id="notificationDot"></span></button>
       </div>
     </div>
@@ -175,6 +176,6 @@
   <script>
     window.APP_CONTEXT = {{ {'page': page, 'entityId': entity_id if entity_id else None, 'user': user, 'priorities': priorities, 'statuses': statuses, 'categories': categories, 'categoryMeta': category_meta, 'kanbanStages': kanban_stages}|tojson }};
   </script>
-  <script src="/static/app.js?v=govbr-9"></script>
+  <script src="/static/app.js?v=govbr-11"></script>
 </body>
 </html>

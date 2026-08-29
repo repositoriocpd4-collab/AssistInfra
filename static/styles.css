@@ -36,8 +36,8 @@
 }
 html{background:var(--govbr-light-gray)}
 body{font-family:'Alexandria-Light','Segoe UI',Arial,sans-serif;background:var(--govbr-light-gray);color:var(--govbr-text);font-weight:300;min-height:100vh}
-body.text-large{font-size:17px}
-body.text-large .page-header p,body.text-large .stat-note,body.text-large .panel-header p,body.text-large .data-table{font-size:1em}
+/* Acessibilidade — "Aumentar texto": amplia toda a página (texto, ícones, botões), não só algumas fontes */
+body.text-large{zoom:1.18}
 
 /* CABEÇALHO */
 .govbr-header{background:#fff;color:var(--govbr-text);box-shadow:0 2px 4px rgba(0,0,0,.1);border-bottom:1px solid var(--govbr-border);position:sticky;top:0;z-index:45}
@@ -378,6 +378,7 @@ body.dark-mode .data-table tbody tr.row-done{background:rgba(26,124,68,.16)}
 body.dark-mode .th-filter-menu{background:#1e1e1e;border-color:#333}
 body.dark-mode .th-filter-menu button{color:#eee}
 body.dark-mode .th-filter-menu button:hover{background:#292929}
+.btn-secondary.active{border-color:var(--teal);background:var(--teal-soft);color:var(--teal-2)}
 
 /* Administração — cadastros e parâmetros (categorias, prioridades, colunas do Kanban, unidades, perfis, usuários) */
 .color-dot{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:6px;vertical-align:middle;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
@@ -396,3 +397,49 @@ body.dark-mode .th-filter-menu button:hover{background:#292929}
 body.dark-mode .icon-pick{background:#1e1e1e;border-color:#333;color:#b4b4b4}
 body.dark-mode .icon-pick.active{border-color:var(--teal);background:#123c3a;color:#7fe2df}
 body.dark-mode .color-pick.active{border-color:#e0e0e0;box-shadow:0 0 0 2px #1e1e1e,0 0 0 4px #e0e0e0}
+
+/* ============================================================
+   USABILIDADE PARA O USUÁRIO LEIGO — reforço de acessibilidade
+   Piso mínimo de leitura, alvos de toque maiores, foco visível
+   e tabelas que viram cartões no celular.
+   ============================================================ */
+
+/* Piso mínimo de tamanho de texto: nada de rótulo/legenda ilegível */
+.stat-note,.kv span,.metric span,.school-card p,.school-stat span,.badge,.status-badge,
+.data-table th,.data-table td,.kc-meta,.kc-foot,.kc-code,.side-menu-title span,
+.config-item small,.file-row small,.notification-item small,.demo-credentials small,
+.timeline-item .timeline-meta,.deadline,.step,.department-info span,.stat-card .stat-note{
+  font-size:max(12px,1em);
+}
+.badge,.status-badge{font-weight:700}
+.kanban-card .kc-title{font-size:13px}
+.kanban-col-head p{font-size:11.5px}
+
+/* Alvos de toque maiores — mais fáceis de acertar no celular/tablet */
+.kc-edit{width:34px;height:34px}
+.close-btn{width:40px;height:40px}
+.icon-btn{min-width:40px;min-height:40px}
+.header-icon-btn{width:40px;height:40px}
+.chip,.tab{min-height:38px}
+
+/* Foco de teclado sempre visível, em qualquer elemento interativo */
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,
+textarea:focus-visible,.nav-item:focus-visible,.stat-card:focus-visible,
+.school-card:focus-visible,.chip:focus-visible,.tab:focus-visible{
+  outline:2.5px solid var(--govbr-blue,#005A9C);outline-offset:2px;
+}
+
+/* Tabelas no celular: em vez de rolar de lado, cada linha vira um cartão legível */
+@media(max-width:680px){
+  .data-table,.data-table thead,.data-table tbody,.data-table th,.data-table td,.data-table tr{display:block;width:100%;min-width:0}
+  .data-table thead{position:absolute;left:-9999px;top:-9999px}
+  .data-table{border:0}
+  .data-table tbody tr{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,.05)}
+  .data-table tbody tr:hover{background:var(--surface)}
+  .data-table td{border-bottom:1px solid var(--line);padding:9px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:right}
+  .data-table td:last-child{border-bottom:0}
+  .data-table td[data-label]::before{content:attr(data-label);font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);text-align:left;flex:0 0 auto}
+  .data-table td.cell-title{flex-direction:column;align-items:flex-start;text-align:left}
+  .data-table td.cell-title::before{margin-bottom:4px}
+  body.dark-mode .data-table tbody tr{background:#1e1e1e;border-color:#333}
+}
