@@ -6,6 +6,36 @@
   const content = $('#pageContent');
   let schoolsCache = null;
 
+  // Ícones e linguagem simples por categoria, usados no assistente de registro de demanda.
+  const CATEGORY_ICONS = {
+    'Elétrica':'bolt','Hidráulica':'drop','Cobertura/Telhado':'roof','Pintura':'paint','Climatização':'wind',
+    'Serralheria':'wrench','Alvenaria':'brick','Acessibilidade':'wheelchair','Mobiliário':'chair','Equipamentos':'monitor',
+    'Segurança':'shield','Saneamento':'drain','Estrutura':'column','Área externa':'tree','Iluminação':'bulb',
+    'Portas e janelas':'door','Reforma':'hammer','Obra':'crane','Aquisição':'cart','Outros':'dots'
+  };
+  const CATEGORY_HINTS = {
+    'Elétrica':'Fiação, tomada, quadro de força, curto-circuito','Hidráulica':'Vazamento, entupimento, cano estourado',
+    'Cobertura/Telhado':'Goteira, infiltração, telha quebrada','Pintura':'Parede descascando, mofo, pintura antiga',
+    'Climatização':'Ventilador ou ar-condicionado com problema','Serralheria':'Portão, grade ou trava com defeito',
+    'Alvenaria':'Rachadura, muro ou parede danificada','Acessibilidade':'Rampa, corrimão, piso tátil',
+    'Mobiliário':'Mesa, cadeira, armário quebrado','Equipamentos':'Computador, projetor, equipamento com defeito',
+    'Segurança':'Câmera, alarme, iluminação de segurança','Saneamento':'Esgoto, caixa de gordura, fossa',
+    'Estrutura':'Coluna, viga, laje ou base comprometida','Área externa':'Quadra, pátio, jardim, área externa',
+    'Iluminação':'Lâmpada queimada, poste ou luminária','Portas e janelas':'Porta ou janela emperrada, vidro quebrado',
+    'Reforma':'Melhoria ou reparo de maior porte','Obra':'Construção ou ampliação',
+    'Aquisição':'Compra de material ou equipamento novo','Outros':'Não se encaixa nas opções acima'
+  };
+  const URGENCY_CHOICES = [
+    {value:'P3', title:'Pode esperar', hint:'Não atrapalha o dia a dia agora', icon:'clock'},
+    {value:'P2', title:'Precisa de atenção logo', hint:'Já incomoda a rotina da escola', icon:'warning'},
+    {value:'P1', title:'É urgente', hint:'Risco agora ou impede a aula', icon:'bolt'}
+  ];
+  const REACH_CHOICES = [
+    {value:5, title:'Poucas pessoas', hint:'Uma sala ou um pequeno grupo'},
+    {value:30, title:'Muitas pessoas', hint:'Vários alunos e funcionários'},
+    {value:150, title:'Quase todo mundo', hint:'A escola inteira é afetada'}
+  ];
+
   const icon = name => `<svg aria-hidden="true"><use href="#i-${name}"></use></svg>`;
   const esc = (v='') => String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
   const money = v => Number(v || 0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
@@ -95,69 +125,178 @@
     const schoolOptions = ctx.user.role==='escola'
       ? `<option value="${ctx.user.school_id}">${esc(ctx.user.school_name||'Minha unidade')}</option>`
       : schools.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('');
+    const state = {category:'', location:'', title:'', description:'',
+      priority:'P3', reach:30, customReach:false, blocks_activity:false, risk:false, photo:null};
+
     modal({
-      title:'Nova Demanda',
-      subtitle:'Registre a necessidade de forma objetiva. Você poderá acompanhar todo o histórico depois.',
+      title:'Registrar uma demanda',
+      subtitle:'Conte pra gente o que está acontecendo. São só 4 passos rápidos.',
       mode:'drawer',
       body:`<div class="stepper">
-        <div class="step active" data-step-ind="1"><span class="step-num">1</span><span>Identificação</span></div>
-        <div class="step" data-step-ind="2"><span class="step-num">2</span><span>Impacto</span></div>
-        <div class="step" data-step-ind="3"><span class="step-num">3</span><span>Revisão</span></div>
+        <div class="step active" data-step-ind="1"><span class="step-num">1</span><span>O que houve</span></div>
+        <div class="step" data-step-ind="2"><span class="step-num">2</span><span>Detalhes</span></div>
+        <div class="step" data-step-ind="3"><span class="step-num">3</span><span>Impacto</span></div>
+        <div class="step" data-step-ind="4"><span class="step-num">4</span><span>Enviar</span></div>
       </div>
       <form id="demandForm">
         <section data-step="1" class="form-step">
-          <div class="form-grid">
-            <div class="field span-2"><label>Unidade Escolar *</label><select class="select" name="school_id" required>${schoolOptions}</select></div>
-            <div class="field span-2"><label>Título da demanda *</label><input class="input" name="title" maxlength="140" placeholder="Ex.: Infiltração no telhado da sala 3" required></div>
-            <div class="field"><label>Categoria *</label><select class="select" name="category" required><option value="">Selecione...</option>${ctx.categories.map(c=>`<option>${esc(c)}</option>`).join('')}</select></div>
-            <div class="field"><label>Local / ambiente</label><input class="input" name="location" placeholder="Ex.: Sala 3 · Bloco B"></div>
-            <div class="field span-2"><label>Descrição detalhada *</label><textarea class="textarea" name="description" placeholder="Descreva o problema, quando foi percebido e o que está acontecendo atualmente." required></textarea></div>
+          ${ctx.user.role!=='escola'?`<div class="field span-2 mb-16"><label>Unidade Escolar *</label><select class="select" name="school_id" required>${schoolOptions}</select></div>`:''}
+          <p class="wizard-question">Qual é o tipo de problema?</p>
+          <p class="wizard-hint">Toque na opção que mais se parece com o que você está vendo.</p>
+          <div class="category-grid" id="categoryGrid" role="radiogroup" aria-label="Tipo de problema">
+            ${ctx.categories.map(c=>`<button type="button" class="category-card" data-category="${esc(c)}" data-tooltip="${esc(CATEGORY_HINTS[c]||c)}"><span class="category-icon">${icon(CATEGORY_ICONS[c]||'clipboard')}</span><strong>${esc(c)}</strong></button>`).join('')}
           </div>
+          <input type="hidden" name="category" required>
         </section>
+
         <section data-step="2" class="form-step hidden">
-          <div class="form-grid">
-            <div class="field span-2"><label>Impacto causado</label><textarea class="textarea" name="impact" placeholder="Ex.: impossibilita o uso da sala em dias de chuva e pode danificar equipamentos."></textarea></div>
-            <div class="field"><label>Pessoas afetadas</label><input class="input" type="number" min="0" name="affected_people" placeholder="0"></div>
-            <div class="field"><label>Prioridade sugerida</label><select class="select" name="priority"><option value="P3">P3 · Programada</option><option value="P2">P2 · Alta</option><option value="P1">P1 · Urgente</option><option value="P4">P4 · Planejamento/Projeto</option></select></div>
-            <div class="field span-2"><label>Sinais de impacto</label><div class="check-grid">
-              <label class="check"><input type="checkbox" name="risk"> Há risco à comunidade escolar</label>
-              <label class="check"><input type="checkbox" name="blocks_activity"> Impede atividade escolar</label>
-            </div></div>
-          </div>
-          <div class="alert info mt-16">A prioridade final poderá ser ajustada após a análise técnica da Infraestrutura.</div>
+          <p class="wizard-question">Onde isso está acontecendo?</p>
+          <div class="field span-2"><input class="input" name="location" placeholder="Ex.: Sala 3, banheiro do pátio, cozinha..." autocomplete="off"></div>
+          <p class="wizard-question mt-16">Descreva com suas palavras</p>
+          <p class="wizard-hint">O que está acontecendo, desde quando e o que você já percebeu.</p>
+          <div class="field span-2"><textarea class="textarea" name="description" placeholder="Ex.: Está caindo água do teto da sala 3 sempre que chove, desde a semana passada." required></textarea></div>
+          <div class="field span-2 mt-16"><label>Nome curto para essa demanda</label><input class="input" name="title" maxlength="140" placeholder="Preenchemos pra você — pode ajustar se quiser" required></div>
+          <p class="wizard-question mt-16">Tem uma foto? <span class="wizard-optional">(opcional, mas ajuda muito)</span></p>
+          <label class="upload-zone upload-zone-compact" id="photoZone">${icon('camera')}<strong>Toque para escolher uma foto</strong><small id="photoName">Nenhuma foto selecionada</small><input type="file" id="photoInput" accept="image/*,.pdf" hidden></label>
         </section>
-        <section data-step="3" class="form-step hidden"><div id="demandReview"></div></section>
+
+        <section data-step="3" class="form-step hidden">
+          <p class="wizard-question">Isso é urgente?</p>
+          <div class="choice-grid" id="urgencyGrid" role="radiogroup" aria-label="Nível de urgência">
+            ${URGENCY_CHOICES.map(u=>`<button type="button" class="choice-card ${u.value==='P3'?'active':''}" data-priority="${u.value}"><span class="choice-icon">${icon(u.icon)}</span><strong>${esc(u.title)}</strong><small>${esc(u.hint)}</small></button>`).join('')}
+          </div>
+          <p class="wizard-question mt-16">Quantas pessoas isso afeta, mais ou menos?</p>
+          <div class="choice-grid choice-grid-3" id="reachGrid" role="radiogroup" aria-label="Pessoas afetadas">
+            ${REACH_CHOICES.map(r=>`<button type="button" class="choice-card ${r.value===30?'active':''}" data-reach="${r.value}"><strong>${esc(r.title)}</strong><small>${esc(r.hint)}</small></button>`).join('')}
+          </div>
+          <button type="button" class="link-btn mt-12" id="toggleCustomReach">Prefiro informar um número exato</button>
+          <div class="field mt-12 hidden" id="customReachField"><label>Número aproximado de pessoas</label><input class="input" type="number" min="0" name="affected_people_custom" placeholder="0"></div>
+          <p class="wizard-question mt-16">Isso impede alguma atividade da escola?</p>
+          <div class="toggle-row"><button type="button" class="toggle-btn" data-toggle="blocks_activity" data-val="0">Não</button><button type="button" class="toggle-btn" data-toggle="blocks_activity" data-val="1">Sim</button></div>
+          <p class="wizard-question mt-16">Alguém pode se machucar por causa disso?</p>
+          <div class="toggle-row"><button type="button" class="toggle-btn" data-toggle="risk" data-val="0">Não</button><button type="button" class="toggle-btn" data-toggle="risk" data-val="1">Sim</button></div>
+        </section>
+
+        <section data-step="4" class="form-step hidden"><div id="demandReview"></div></section>
       </form>`,
-      footer:`<button class="btn btn-secondary hidden" id="prevStep">Voltar</button><button class="btn btn-primary" id="nextStep">Continuar</button>`,
+      footer:`<button class="btn btn-secondary hidden" id="prevStep">Voltar</button><button class="btn btn-primary" id="nextStep" disabled>Continuar</button>`,
       onOpen(root){
         let step=1;
         const form=$('#demandForm',root), next=$('#nextStep'), prev=$('#prevStep');
+        const totalSteps=4;
+
+        const syncNextEnabled=()=>{
+          if(step===1) next.disabled = !state.category || (ctx.user.role!=='escola' && !form.elements.school_id.value);
+          else if(step===2) next.disabled = !$('[name=description]',form).value.trim();
+          else next.disabled=false;
+        };
+
+        // Passo 1 — categoria em cards visuais
+        $$('.category-card',root).forEach(b=>b.addEventListener('click',()=>{
+          $$('.category-card',root).forEach(x=>x.classList.remove('selected'));
+          b.classList.add('selected');
+          state.category=b.dataset.category;
+          form.elements.category.value=state.category;
+          suggestTitle();
+          syncNextEnabled();
+        }));
+        form.elements.school_id?.addEventListener('change',syncNextEnabled);
+
+        // Passo 2 — sugestão automática de título
+        const suggestTitle=()=>{
+          const loc=$('[name=location]',form).value.trim();
+          const suggestion=[state.category, loc].filter(Boolean).join(' — ') || state.category || '';
+          const titleInput=$('[name=title]',form);
+          if(!titleInput.value || titleInput.dataset.auto==='1'){ titleInput.value=suggestion; titleInput.dataset.auto='1'; }
+        };
+        $('[name=location]',root)?.addEventListener('input',suggestTitle);
+        $('[name=title]',root)?.addEventListener('input',e=>{ e.target.dataset.auto='0'; });
+        $('[name=description]',root)?.addEventListener('input',syncNextEnabled);
+        $('#photoInput',root)?.addEventListener('change',e=>{
+          const f=e.target.files[0]; state.photo=f||null;
+          $('#photoName').textContent = f ? `${f.name} · ${Math.max(1,Math.round(f.size/1024))} KB` : 'Nenhuma foto selecionada';
+          $('#photoZone').classList.toggle('has-file', !!f);
+        });
+
+        // Passo 3 — urgência, alcance e alternâncias sim/não
+        $$('#urgencyGrid .choice-card',root).forEach(b=>b.addEventListener('click',()=>{
+          $$('#urgencyGrid .choice-card',root).forEach(x=>x.classList.remove('active'));
+          b.classList.add('active'); state.priority=b.dataset.priority;
+        }));
+        $$('#reachGrid .choice-card',root).forEach(b=>b.addEventListener('click',()=>{
+          $$('#reachGrid .choice-card',root).forEach(x=>x.classList.remove('active'));
+          b.classList.add('active'); state.reach=Number(b.dataset.reach); state.customReach=false;
+          $('#customReachField').classList.add('hidden');
+        }));
+        $('#toggleCustomReach',root)?.addEventListener('click',()=>{
+          state.customReach=true;
+          $$('#reachGrid .choice-card',root).forEach(x=>x.classList.remove('active'));
+          $('#customReachField').classList.remove('hidden');
+          $('[name=affected_people_custom]',form).focus();
+        });
+        $$('.toggle-btn',root).forEach(b=>b.addEventListener('click',()=>{
+          const key=b.dataset.toggle;
+          $$(`.toggle-btn[data-toggle="${key}"]`,root).forEach(x=>x.classList.remove('active'));
+          b.classList.add('active'); state[key]=b.dataset.val==='1';
+        }));
+        // valores padrão visuais
+        $(`.toggle-btn[data-toggle="blocks_activity"][data-val="0"]`,root).classList.add('active');
+        $(`.toggle-btn[data-toggle="risk"][data-val="0"]`,root).classList.add('active');
+
+        const priorityLabelFriendly = p => URGENCY_CHOICES.find(u=>u.value===p)?.title || priorityLabel(p);
+
         const updateStep=()=>{
           $$('[data-step]',root).forEach(s=>s.classList.toggle('hidden', Number(s.dataset.step)!==step));
           $$('[data-step-ind]',root).forEach(s=>{const n=Number(s.dataset.stepInd);s.classList.toggle('active',n===step);s.classList.toggle('done',n<step);});
           prev.classList.toggle('hidden',step===1);
-          next.textContent=step===3?'Registrar demanda':'Continuar';
-          if(step===3){
-            const fd=new FormData(form); const s=schools.find(x=>String(x.id)===fd.get('school_id'));
-            $('#demandReview').innerHTML=`<div class="info-card accent"><h3>${icon('clipboard')}Revise antes de registrar</h3><div class="key-value">
+          next.textContent=step===totalSteps?'Enviar demanda':'Continuar';
+          syncNextEnabled();
+          if(step===totalSteps){
+            const selectedSchoolId = ctx.user.role==='escola' ? ctx.user.school_id : form.elements.school_id?.value;
+            const s=schools.find(x=>String(x.id)===String(selectedSchoolId));
+            const reach = state.customReach ? (Number($('[name=affected_people_custom]',form).value)||0) : state.reach;
+            $('#demandReview').innerHTML=`<div class="info-card accent"><h3>${icon('check-circle')}Confira antes de enviar</h3><div class="key-value">
               <div class="kv"><span>Unidade Escolar</span><strong>${esc(s?.name||ctx.user.school_name||'—')}</strong></div>
-              <div class="kv"><span>Demanda</span><strong>${esc(fd.get('title'))}</strong></div>
-              <div class="kv"><span>Categoria · Local</span><strong>${esc(fd.get('category'))} · ${esc(fd.get('location')||'Não informado')}</strong></div>
-              <div class="kv"><span>Prioridade sugerida</span><strong>${esc(fd.get('priority'))} · ${priorityLabel(fd.get('priority'))}</strong></div>
-            </div></div><div class="alert info">Após o registro, a demanda receberá um código único e ficará disponível para acompanhamento.</div>`;
+              <div class="kv"><span>Nome da demanda</span><strong>${esc($('[name=title]',form).value)}</strong></div>
+              <div class="kv"><span>Tipo de problema</span><strong>${esc(state.category)}${$('[name=location]',form).value?` · ${esc($('[name=location]',form).value)}`:''}</strong></div>
+              <div class="kv"><span>Descrição</span><strong>${esc($('[name=description]',form).value)}</strong></div>
+              <div class="kv"><span>Urgência</span><strong>${esc(priorityLabelFriendly(state.priority))}</strong></div>
+              <div class="kv"><span>Pessoas afetadas (aprox.)</span><strong>${num(reach)}</strong></div>
+              <div class="kv"><span>Impede atividade escolar?</span><strong>${state.blocks_activity?'Sim':'Não'}</strong></div>
+              <div class="kv"><span>Risco de acidente?</span><strong>${state.risk?'Sim':'Não'}</strong></div>
+              <div class="kv"><span>Foto anexada</span><strong>${state.photo?esc(state.photo.name):'Nenhuma'}</strong></div>
+            </div></div><div class="alert info">Depois de enviada, a demanda recebe um código único e você poderá acompanhar todo o andamento.</div>`;
           }
         };
         prev.addEventListener('click',()=>{step--;updateStep();});
         next.addEventListener('click', async()=>{
-          if(step<3){
-            const active=$(`[data-step="${step}"]`,root); let valid=true;
-            $$('[required]',active).forEach(i=>{if(!i.reportValidity()) valid=false;});
-            if(!valid)return; step++;updateStep();return;
-          }
-          const fd=new FormData(form); const payload=Object.fromEntries(fd.entries());
-          payload.risk=form.elements.risk.checked; payload.blocks_activity=form.elements.blocks_activity.checked;
-          try{next.disabled=true;next.textContent='Registrando...';const res=await api('/api/demands',{method:'POST',body:payload});closeModal();toast('Demanda registrada',res.code);location.href=`/demandas/${res.id}`;}catch(e){toast('Erro ao registrar',e.message,'error');next.disabled=false;next.textContent='Registrar demanda';}
+          if(step===1 && !state.category) return;
+          if(step<totalSteps){ step++; updateStep(); return; }
+          const reach = state.customReach ? (Number($('[name=affected_people_custom]',form).value)||0) : state.reach;
+          const payload = {
+            school_id: ctx.user.role==='escola' ? ctx.user.school_id : form.elements.school_id.value,
+            title: $('[name=title]',form).value || state.category,
+            description: $('[name=description]',form).value,
+            category: state.category,
+            location: $('[name=location]',form).value,
+            priority: state.priority,
+            affected_people: reach,
+            blocks_activity: state.blocks_activity,
+            risk: state.risk,
+          };
+          try{
+            next.disabled=true; next.textContent='Enviando...';
+            const res=await api('/api/demands',{method:'POST',body:payload});
+            if(state.photo){
+              const fd=new FormData(); fd.append('file', state.photo);
+              try{ await api(`/api/demands/${res.id}/attachments`,{method:'POST',body:fd}); }catch(err){ toast('Demanda registrada, mas a foto não pôde ser enviada', err.message, 'error'); }
+            }
+            closeModal();
+            toast('Demanda registrada com sucesso!', `Código ${res.code} — acompanhe o andamento a qualquer momento.`);
+            location.href=`/demandas/${res.id}`;
+          }catch(e){toast('Não foi possível enviar',e.message,'error');next.disabled=false;next.textContent='Enviar demanda';}
         });
+        updateStep();
       }
     });
   }
@@ -169,17 +308,25 @@
     const cards=[
       ['total','Total de demandas',s.total,'Registro consolidado','primary','clipboard','Todos os registros',''],
       ['P1','Urgentes (P1)',s.urgent,'Ação imediata necessária','red','warning','Demandas com risco ou impacto crítico','priority=P1'],
+      ['P2','Alta prioridade (P2)',s.high,'Já incomoda a rotina, sem risco imediato','orange','bolt','Demandas de prioridade alta em aberto','priority=P2'],
       ['analysis','Em análise',s.analysis,'Triagem e avaliação técnica','orange','search','Demandas aguardando decisão técnica','status=Em análise técnica'],
       ['progress','Em andamento',s.progress,'Serviços programados ou em execução','teal','trend','Atendimentos atualmente mobilizados','status=Em execução'],
       ['contract','Aguardando contratação',s.contract,'Dependência administrativa','violet','file','Aquisição, empresa ou licitação necessária','status=Aguardando contratação'],
       ['overdue','Prazo vencido',s.overdue,'Requer atenção da gestão','red','clock','Demandas com prazo ultrapassado','overdue=1'],
+      ['due_soon','Vence em 7 dias',s.due_soon,'Ainda dá tempo de agir','orange','clock','Prazo dentro dos próximos 7 dias, ainda não vencido','due_soon=1'],
       ['completed','Concluídas',s.completed,'Atendimentos finalizados','green','arrow','Demandas encerradas com registro de conclusão','status=Concluída'],
-      ['future','Planejamento futuro',s.future,'Exercícios seguintes','blue','calendar','Necessidades previstas para planejamento futuro','status=Planejamento futuro']
+      ['future','Planejamento futuro',s.future,'Exercícios seguintes','blue','calendar','Necessidades previstas para planejamento futuro','status=Planejamento futuro'],
+      ['unassigned','Sem responsável',s.unassigned,'Falta indicar quem vai cuidar disso','violet','user','Demandas em aberto sem responsável definido','unassigned=1'],
+      ['open_cost','Custo em aberto',s.open_cost,'Estimativa do que ainda não foi concluído','blue','money','Soma do custo estimado de tudo que está em aberto','','money']
     ];
     const maxCat=Math.max(1,...data.categories.map(x=>x.qty));
+    const heroCopy = ctx.user.role==='escola'
+      ? {eyebrow:'PRECISOU DE ALGO?', title:'Viu um problema na escola? Conte pra gente.', text:'Leva menos de 2 minutos. Escolha o tipo de problema, descreva com suas palavras e, se quiser, envie uma foto.'}
+      : {eyebrow:'REGISTRO RÁPIDO', title:'Uma escola reportou algo? Registre em segundos.', text:'Use o assistente guiado para abrir uma demanda com categoria, urgência e impacto já organizados.'};
     content.innerHTML = pageHeader('Visão Geral', ctx.user.role==='escola' ? `Acompanhe as demandas de ${ctx.user.school_name}.` : 'Status atual das demandas de infraestrutura em toda a Rede Municipal.',
-      `<a class="btn btn-secondary" href="/api/export/demands.csv">${icon('download')}Exportar</a><button class="btn btn-primary" data-open-demand>${icon('plus')}Nova Demanda</button>`)+
-      `<div class="stats-grid">${cards.map(c=>`<article class="stat-card ${c[4]}" data-dashboard-filter="${esc(c[7])}" data-tooltip="${esc(c[6])}"><div class="stat-label">${esc(c[1])}</div><div class="stat-value mono">${num(c[2])}</div><div class="stat-note">${icon(c[5])}${esc(c[3])}</div><div class="stat-icon">${icon(c[5])}</div></article>`).join('')}</div>`+
+      `<a class="btn btn-secondary" href="/api/export/demands.csv" data-tooltip="Baixar a lista completa em CSV">${icon('download')}Exportar</a>`)+
+      `<section class="report-hero"><div class="report-hero-copy"><span class="eyebrow">${heroCopy.eyebrow}</span><h2>${heroCopy.title}</h2><p>${heroCopy.text}</p></div><button class="btn-report" data-open-demand data-tooltip="Abrir o assistente de registro em 4 passos">${icon('plus')}Registrar uma demanda</button></section>`+
+      `<div class="stats-grid">${cards.map(c=>`<article class="stat-card ${c[4]}" data-dashboard-filter="${esc(c[7])}" data-tooltip="${esc(c[6])}"><div class="stat-label">${esc(c[1])}</div><div class="stat-value mono">${c[8]==='money'?money(c[2]):num(c[2])}</div><div class="stat-note">${icon(c[5])}${esc(c[3])}</div><div class="stat-icon">${icon(c[5])}</div></article>`).join('')}</div>`+
       `<div class="content-grid">
         <section class="panel"><div class="panel-header"><div><h2>Precisa de atenção</h2><p>Priorizado por criticidade e prazo.</p></div><a class="link-btn" href="/demandas">Ver todas</a></div>
           <div class="attention-list">${data.attention.length?data.attention.map(d=>{const due=dueInfo(d);return `<a class="attention-item" href="/demandas/${d.id}"><span class="priority-dot ${d.priority}"></span><div><strong>${esc(d.title)}</strong><small>${esc(d.school_name)} · ${d.code}</small></div><span class="deadline ${due.cls}">${esc(due.text)}</span></a>`}).join(''):empty('Tudo em dia','Não há demandas críticas neste momento.')}</div>
@@ -205,8 +352,8 @@
     setLoading();
     const query=new URLSearchParams(location.search);
     const schools=await loadSchools();
-    const filters={q:query.get('q')||'',status:query.get('status')||'',priority:query.get('priority')||'',category:query.get('category')||'',year:query.get('year')||'2026',overdue:query.get('overdue')==='1'};
-    content.innerHTML = pageHeader('Demandas Escolares','Gerencie, filtre e acompanhe todas as solicitações de infraestrutura.',`<a class="btn btn-secondary" href="/api/export/demands.csv">${icon('download')}Exportar CSV</a><button class="btn btn-primary" data-open-demand>${icon('plus')}Criar Demanda</button>`)+
+    const filters={q:query.get('q')||'',status:query.get('status')||'',priority:query.get('priority')||'',category:query.get('category')||'',year:query.get('year')||'2026',overdue:query.get('overdue')==='1',due_soon:query.get('due_soon')==='1',unassigned:query.get('unassigned')==='1'};
+    content.innerHTML = pageHeader('Demandas Escolares','Gerencie, filtre e acompanhe todas as solicitações de infraestrutura.',`<a class="btn btn-secondary" href="/api/export/demands.csv" data-tooltip="Baixar a lista filtrada em CSV">${icon('download')}Exportar CSV</a><button class="btn btn-primary" data-open-demand data-tooltip="Abrir o assistente de registro">${icon('plus')}Registrar demanda</button>`)+
       `<section class="filters-card">
         <div class="field"><label>Buscar</label><div class="search-field">${icon('search')}<input class="input" id="fQ" value="${esc(filters.q)}" placeholder="Código, demanda ou escola..."></div></div>
         <div class="field"><label>Ano</label><select class="select" id="fYear"><option value="">Todos</option>${[2026,2025,2024].map(y=>`<option ${String(y)===filters.year?'selected':''}>${y}</option>`).join('')}</select></div>
@@ -215,13 +362,20 @@
         <div class="field"><label>Categoria</label><select class="select" id="fCategory"><option value="">Todas</option>${ctx.categories.map(x=>`<option ${x===filters.category?'selected':''}>${esc(x)}</option>`).join('')}</select></div>
         <button class="btn btn-secondary" id="clearFilters">${icon('filter')}Limpar</button>
       </section>
-      <div class="filter-chips">${filters.overdue?'<button class="chip active" id="overdueChip">Prazo vencido ×</button>':''}<button class="chip" data-chip-priority="P1">P1 Urgentes</button><button class="chip" data-chip-status="Aguardando contratação">Aguardando contratação</button><button class="chip" data-chip-status="Em execução">Em execução</button><button class="chip" data-chip-status="Planejamento futuro">Planejamento futuro</button><button class="chip" data-chip-status="Concluída">Concluídas</button></div>
+      <div class="filter-chips">${[
+        filters.overdue?['overdueChip','Prazo vencido']:null,
+        filters.due_soon?['dueSoonChip','Vence em 7 dias']:null,
+        filters.unassigned?['unassignedChip','Sem responsável']:null,
+      ].filter(Boolean).map(([id,label])=>`<button class="chip active" id="${id}">${esc(label)} ×</button>`).join('')}<button class="chip" data-chip-priority="P1">P1 Urgentes</button><button class="chip" data-chip-status="Aguardando contratação">Aguardando contratação</button><button class="chip" data-chip-status="Em execução">Em execução</button><button class="chip" data-chip-status="Planejamento futuro">Planejamento futuro</button><button class="chip" data-chip-status="Concluída">Concluídas</button></div>
       <section class="panel"><div class="panel-header"><div><h2>Carteira de demandas</h2><p id="demandCount">Carregando...</p></div></div><div id="demandTable"></div></section>`;
     $('[data-open-demand]',content).addEventListener('click',openDemandForm);
     const load=async()=>{
       const params=new URLSearchParams();
       const map={q:$('#fQ').value,status:$('#fStatus').value,priority:$('#fPriority').value,category:$('#fCategory').value,year:$('#fYear').value};
-      Object.entries(map).forEach(([k,v])=>{if(v)params.set(k,v)}); if(filters.overdue) params.set('overdue','1');
+      Object.entries(map).forEach(([k,v])=>{if(v)params.set(k,v)});
+      if(filters.overdue) params.set('overdue','1');
+      if(filters.due_soon) params.set('due_soon','1');
+      if(filters.unassigned) params.set('unassigned','1');
       $('#demandTable').innerHTML=`<div class="empty-state"><p>Atualizando lista...</p></div>`;
       const rows=await api('/api/demands?'+params.toString());
       $('#demandCount').textContent=`${rows.length} registro${rows.length===1?'':'s'} encontrado${rows.length===1?'':'s'}`;
@@ -229,9 +383,12 @@
     };
     let timer; $('#fQ').addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(load,250)});
     ['#fYear','#fStatus','#fPriority','#fCategory'].forEach(id=>$(id).addEventListener('change',load));
-    $('#clearFilters').addEventListener('click',()=>{filters.overdue=false;['#fQ','#fStatus','#fPriority','#fCategory'].forEach(id=>$(id).value='');$('#fYear').value='2026';load();});
+    $('#clearFilters').addEventListener('click',()=>{filters.overdue=false;filters.due_soon=false;filters.unassigned=false;['#fQ','#fStatus','#fPriority','#fCategory'].forEach(id=>$(id).value='');$('#fYear').value='2026';$('#overdueChip')?.remove();$('#dueSoonChip')?.remove();$('#unassignedChip')?.remove();load();});
     $$('[data-chip-status]').forEach(b=>b.addEventListener('click',()=>{$('#fStatus').value=b.dataset.chipStatus;load()}));
-    $$('[data-chip-priority]').forEach(b=>b.addEventListener('click',()=>{$('#fPriority').value=b.dataset.chipPriority;load()})); $('#overdueChip')?.addEventListener('click',()=>{filters.overdue=false;$('#overdueChip').remove();load()});
+    $$('[data-chip-priority]').forEach(b=>b.addEventListener('click',()=>{$('#fPriority').value=b.dataset.chipPriority;load()}));
+    $('#overdueChip')?.addEventListener('click',()=>{filters.overdue=false;$('#overdueChip').remove();load()});
+    $('#dueSoonChip')?.addEventListener('click',()=>{filters.due_soon=false;$('#dueSoonChip').remove();load()});
+    $('#unassignedChip')?.addEventListener('click',()=>{filters.unassigned=false;$('#unassignedChip').remove();load()});
     await load();
   }
 
@@ -447,7 +604,7 @@
           </section>
         </div>
       </div>`;
-    $('#aboutHelp')?.addEventListener('click',()=>$('[data-help]')?.click());
+    $('#aboutHelp')?.addEventListener('click',openShortcutsHelp);
   }
 
   // Global interactions
@@ -456,9 +613,18 @@
   $('#sideClose')?.addEventListener('click',()=>{$('#sidebar').classList.remove('open');showBackdrop(false)});
   $('#backdrop')?.addEventListener('click',()=>$('#sidebar').classList.remove('open'));
   $$('.side-menu .nav-item').forEach(a=>a.addEventListener('click',()=>{
-    if (a.hasAttribute('data-help')) return;
     $('#sidebar')?.classList.remove('open');
   }));
+  $('#navBack')?.addEventListener('click',()=>history.back());
+
+  // Mantém a régua --header-h atualizada para o menu lateral fixo (desktop) começar exatamente abaixo do cabeçalho.
+  const syncHeaderHeight = () => {
+    const h = $('.govbr-header')?.offsetHeight || 0;
+    document.documentElement.style.setProperty('--header-h', h + 'px');
+  };
+  syncHeaderHeight();
+  window.addEventListener('resize', syncHeaderHeight);
+  window.addEventListener('load', syncHeaderHeight);
 
   // Preferências visuais inspiradas no padrão Gov.br/Cidades fornecido pela Prefeitura.
   const applyTheme = dark => {
@@ -480,7 +646,37 @@
   });
   $('#userMenuButton')?.addEventListener('click',()=>{const m=$('#userMenu');m.hidden=!m.hidden;$('#notificationPanel').hidden=true});
   $('#notificationButton')?.addEventListener('click',async()=>{const p=$('#notificationPanel');p.hidden=!p.hidden;$('#userMenu').hidden=true;if(!p.hidden){const d=await api('/api/dashboard');const n=[];if(d.stats.urgent)n.push([`${d.stats.urgent} demanda(s) urgente(s)`,`Prioridade P1 requer acompanhamento imediato.`]);if(d.stats.overdue)n.push([`${d.stats.overdue} prazo(s) vencido(s)`,`Revise prazos e registre reprogramações quando necessário.`]);if(d.stats.contract)n.push([`${d.stats.contract} aguardando contratação`,`Itens dependem de encaminhamento administrativo.`]);if(!n.length)n.push(['Nenhuma pendência crítica','Os principais indicadores estão sob controle.']);p.innerHTML=`<div class="notification-head"><strong>Notificações</strong><small class="text-muted">Agora</small></div>${n.map(x=>`<div class="notification-item"><span class="n-dot"></span><div><strong>${esc(x[0])}</strong><small>${esc(x[1])}</small></div></div>`).join('')}`;$('#notificationDot').hidden=true;}});
-  $('[data-help]')?.addEventListener('click',e=>{e.preventDefault();modal({title:'Central de Ajuda',mode:'center',body:`<div class="info-card accent"><h3>${icon('help')}Como usar a Agenda Integrada</h3><p><strong>1.</strong> Registre a demanda com clareza e impacto.<br><strong>2.</strong> A Infraestrutura classifica prioridade, ação, responsável e prazo.<br><strong>3.</strong> Toda devolutiva fica registrada na linha do tempo.<br><strong>4.</strong> Necessidades que dependem de projeto, aquisição ou contratação podem seguir para Planejamento Futuro.</p></div>`})});
+  const SHORTCUTS = [
+    {key:'N', label:'Registrar uma demanda', action:()=>openDemandForm()},
+    {key:'P', label:'Ir para o Painel', href:'/'},
+    {key:'D', label:'Ir para Demandas', href:'/demandas'},
+    {key:'F', label:'Ir para Planejamento Futuro', href:'/planejamento'},
+    {key:'E', label:'Ir para Unidades Escolares', href:'/escolas'},
+    ...(ctx.user.role!=='escola' ? [
+      {key:'R', label:'Ir para Relatórios', href:'/relatorios'},
+      {key:'A', label:'Ir para Administração', href:'/administracao'},
+    ] : []),
+    {key:'S', label:'Ir para Sobre o Sistema', href:'/sobre'},
+    {key:'B', label:'Voltar para a página anterior', action:()=>history.back()},
+    {key:'Esc', label:'Fechar uma janela aberta', action:()=>closeModal()},
+    {key:'?', label:'Abrir esta lista de atalhos', action:()=>openShortcutsHelp()},
+  ];
+  function openShortcutsHelp(){
+    modal({title:'Central de Ajuda',mode:'center',body:`<div class="info-card accent"><h3>${icon('help')}Como usar a Agenda Integrada</h3><p><strong>1.</strong> Registre a demanda com clareza e impacto.<br><strong>2.</strong> A Infraestrutura classifica prioridade, ação, responsável e prazo.<br><strong>3.</strong> Toda devolutiva fica registrada na linha do tempo.<br><strong>4.</strong> Necessidades que dependem de projeto, aquisição ou contratação podem seguir para Planejamento Futuro.</p></div>
+      <section class="info-card mt-16"><h3>${icon('grid')}Atalhos de teclado</h3><div class="shortcut-list">${SHORTCUTS.map(s=>`<div class="shortcut-row"><kbd class="key-hint">${esc(s.key)}</kbd><span>${esc(s.label)}</span></div>`).join('')}</div><p class="wizard-hint mt-12">Os atalhos não funcionam enquanto você estiver digitando em um campo.</p></section>`});
+  }
+  document.addEventListener('keydown', e=>{
+    const tag=(e.target.tagName||'').toLowerCase();
+    if(tag==='input'||tag==='textarea'||tag==='select'||e.target.isContentEditable) return;
+    if(!$('#backdrop').hidden) return;
+    if(e.metaKey||e.ctrlKey||e.altKey) return;
+    if(e.key==='?'){ e.preventDefault(); openShortcutsHelp(); return; }
+    const match=SHORTCUTS.find(s=>s.key.toLowerCase()===e.key.toLowerCase() && s.key!=='?' && s.key!=='Esc');
+    if(!match) return;
+    e.preventDefault();
+    if(match.action) match.action(); else if(match.href) location.href=match.href;
+  });
+  $('#shortcutsHelp')?.addEventListener('click',openShortcutsHelp);
 
   // Global search
   const gs=$('#globalSearch'), gr=$('#globalSearchResults'); let gst;

@@ -3,8 +3,8 @@ setlocal
 cd /d "%~dp0"
 
 echo ======================================================
-echo   PUBLICAR NO GITHUB - Agenda Integrada
-echo   Repositorio: https://github.com/2026Ficai/Assistencia
+echo   PUBLICAR NO GITHUB - Agenda Integrada (AssistInfra)
+echo   Repositorio: https://github.com/repositoriocpd4-collab/AssistInfra
 echo ======================================================
 echo.
 
@@ -36,7 +36,7 @@ if errorlevel 1 (
 echo.
 echo Configurando o remoto "origin"...
 git remote remove origin >nul 2>nul
-git remote add origin https://github.com/2026Ficai/Assistencia.git
+git remote add origin https://github.com/repositoriocpd4-collab/AssistInfra.git
 
 echo.
 echo Enviando a branch principal (main)...
@@ -53,13 +53,8 @@ if errorlevel 1 (
 )
 
 echo.
-echo Criando e enviando a branch "DevAssis"...
-git checkout -b DevAssis
-git push -u origin DevAssis
-
-echo.
 echo ======================================================
 echo Concluido. Confira em:
-echo https://github.com/2026Ficai/Assistencia/tree/DevAssis
+echo https://github.com/repositoriocpd4-collab/AssistInfra
 echo ======================================================
 pause

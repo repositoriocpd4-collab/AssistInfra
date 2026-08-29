@@ -170,3 +170,167 @@ body.dark-mode .govbr-footer{background:#0c0c0c}body.dark-mode .modal{background
 
 @media(max-width:600px){.header-top{padding:.65rem 1rem!important}.header-bottom{padding:.65rem 1rem!important}.stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:.75rem!important}.stat-card{min-height:120px!important;padding:1rem!important}.stat-card .stat-value{font-size:1.8rem!important}.stat-card .stat-label{font-size:.9rem!important}}
 @media(max-width:380px){.stats-grid{grid-template-columns:1fr 1fr!important}.stat-card .stat-note{display:none!important}}
+
+/* ===== Reformulação UX — assistente de registro, hero e componentes de escolha ===== */
+.wizard-question{font-size:15px;font-weight:800;color:var(--ink);margin:0 0 4px;letter-spacing:-.01em}
+.wizard-hint{font-size:12.5px;color:var(--muted);margin:0 0 12px}
+.wizard-optional{font-weight:500;color:var(--muted);font-size:12px}
+.category-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.category-card{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:14px 8px;cursor:pointer;transition:.15s ease;min-height:96px}.category-order{position:absolute;top:6px;right:6px;width:18px;height:18px;border-radius:50%;background:var(--orange);color:#fff;font-size:10px;font-weight:800;display:grid;place-items:center;line-height:1}
+.category-card:hover{border-color:#f0b877;background:#fffaf3;transform:translateY(-2px)}
+.category-card .category-icon{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;background:var(--surface-blue);color:var(--primary-2);transition:.15s ease}
+.category-card .category-icon svg{width:20px;height:20px}
+.category-card strong{font-size:11.5px;line-height:1.25;font-weight:750}
+.category-card.selected{border-color:var(--orange);background:var(--orange-soft);box-shadow:0 0 0 3px rgba(201,103,7,.12)}
+.category-card.selected .category-icon{background:var(--orange);color:#fff}
+.choice-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.choice-grid-3{grid-template-columns:repeat(3,1fr)}
+.choice-card{background:var(--surface);border:1.5px solid var(--line);border-radius:13px;padding:14px 12px;text-align:left;cursor:pointer;transition:.15s ease;display:flex;flex-direction:column;gap:4px}
+.choice-card:hover{border-color:#f0b877}
+.choice-card .choice-icon{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--surface-blue);color:var(--primary-2);margin-bottom:2px}
+.choice-card .choice-icon svg{width:16px;height:16px}
+.choice-card strong{font-size:13px;font-weight:800}
+.choice-card small{font-size:11px;color:var(--muted);line-height:1.3}
+.choice-card.active{border-color:var(--orange);background:var(--orange-soft);box-shadow:0 0 0 3px rgba(201,103,7,.12)}
+.choice-card.active .choice-icon{background:var(--orange);color:#fff}
+.toggle-row{display:flex;gap:10px}
+.toggle-btn{flex:1;border:1.5px solid var(--line);background:var(--surface);border-radius:11px;padding:12px;font-weight:800;font-size:13px;cursor:pointer;color:var(--muted);transition:.15s ease}
+.toggle-btn:hover{border-color:#a9bacf}
+.toggle-btn.active{border-color:var(--teal);background:var(--teal-soft);color:var(--teal-2)}
+.upload-zone-compact{padding:16px;display:flex;flex-direction:row;align-items:center;gap:12px;text-align:left}
+.upload-zone-compact svg{width:26px;height:26px;flex:0 0 auto;margin:0}
+.upload-zone-compact strong{font-size:12.5px}
+.upload-zone-compact small{margin-top:2px}
+.upload-zone-compact.has-file{border-color:var(--teal);background:#f0fbfa}
+.mb-16{margin-bottom:16px}
+
+/* Cabeçalho de assistente — barra de progresso mais amigável que a numeração técnica */
+.stepper{gap:2px}
+.step{font-size:9.5px}
+.step-num{width:23px;height:23px;font-size:11px;font-weight:800}
+
+/* Hero de registro rápido no Painel — a ação mais importante do sistema, em destaque */
+.report-hero{background:linear-gradient(120deg,#062a55 0%,#0d3c75 55%,#0f7b79 130%);border-radius:20px;padding:28px 30px;display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:22px;color:#fff;position:relative;overflow:hidden}
+.report-hero::after{content:"";position:absolute;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.07);right:-90px;top:-120px}
+.report-hero::before{content:"";position:absolute;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,.05);left:-60px;bottom:-90px}
+.report-hero-copy{position:relative;max-width:520px}
+.report-hero-copy span.eyebrow{color:#ffd9ad}
+.report-hero-copy h2{margin:0 0 8px;font-size:24px;letter-spacing:-.03em;line-height:1.25}
+.report-hero-copy p{margin:0;color:#dbe8f5;font-size:13.5px;line-height:1.5}
+.report-hero .btn-report{position:relative;background:var(--orange);color:#fff;border:0;padding:15px 22px;border-radius:13px;font-weight:800;font-size:14.5px;display:inline-flex;align-items:center;gap:10px;cursor:pointer;box-shadow:0 10px 26px rgba(201,103,7,.35);transition:transform .15s ease,box-shadow .15s ease;white-space:nowrap}
+.report-hero .btn-report:hover{transform:translateY(-2px);box-shadow:0 14px 32px rgba(201,103,7,.42)}
+.report-hero .btn-report svg{width:20px;height:20px}
+@media (max-width:860px){.report-hero{flex-direction:column;align-items:flex-start}.report-hero .btn-report{width:100%;justify-content:center}}
+
+@media (max-width:640px){
+  .category-grid{grid-template-columns:repeat(2,1fr)}
+  .choice-grid,.choice-grid-3{grid-template-columns:1fr}
+}
+
+/* ===== Menu lateral sempre visível no desktop + conteúdo centralizado + atalhos de teclado ===== */
+:root{--sidebar-fixed:264px}
+kbd.key-hint{font-family:inherit;font-size:10px;font-weight:800;line-height:1;padding:3px 6px;border-radius:5px;background:rgba(6,42,85,.07);color:var(--muted);border:1px solid var(--line-strong);margin-left:auto}
+.btn-new kbd.key-hint{background:rgba(255,255,255,.18);color:#fff;border-color:rgba(255,255,255,.3)}
+.btn-new{justify-content:flex-start!important}
+.nav-item{display:flex;align-items:center}
+.nav-back{width:100%;border:0;background:transparent;cursor:pointer;font:inherit;text-align:left;margin-bottom:8px}
+.shortcut-list{display:flex;flex-direction:column;gap:8px}
+.shortcut-row{display:flex;align-items:center;gap:12px;font-size:12.5px;color:#33445a}
+.shortcut-row kbd.key-hint{margin-left:0;min-width:26px;text-align:center}
+
+@media(min-width:981px){
+  #sidebar.side-menu{transform:translateX(0)!important;position:fixed!important;left:0!important;top:var(--header-h,124px)!important;bottom:0!important;width:var(--sidebar-fixed)!important;max-width:var(--sidebar-fixed)!important;box-shadow:none!important;border-right:1px solid var(--line)!important;z-index:40!important}
+  .side-close{display:none!important}
+  .menu-icon-button{display:none!important}
+  #backdrop{display:none!important}
+  .main-content{margin-left:calc(var(--sidebar-fixed) + max(0px,(100vw - var(--sidebar-fixed) - 1500px)/2))!important;margin-right:max(0px,(100vw - var(--sidebar-fixed) - 1500px)/2)!important}
+  .govbr-footer{margin-left:var(--sidebar-fixed)!important}
+}
+
+
+/* ============================================================
+   QUADRO KANBAN — visão por etapa/prioridade das demandas,
+   com arrastar-e-soltar (adicionado nesta versão).
+   ============================================================ */
+.kanban-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.kanban-metrics .km{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-sm);border-left:4px solid var(--primary);padding:12px 14px}
+.kanban-metrics .km span{display:block;font-size:22px;font-weight:850;letter-spacing:-.03em}
+.kanban-metrics .km small{display:block;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-top:2px}
+.kanban-metrics .km-red{border-left-color:var(--red)}
+.kanban-metrics .km-red span{color:var(--red)}
+.kanban-metrics .km-orange{border-left-color:var(--orange)}
+.kanban-metrics .km-orange span{color:var(--orange)}
+.kanban-metrics .km-blue{border-left-color:var(--blue)}
+
+.kanban-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:-6px 0 14px}
+.kanban-toolbar .hint{font-size:11.5px;color:var(--muted)}
+.kanban-toolbar .chip{display:inline-flex;align-items:center;gap:6px}
+.kanban-toolbar .chip svg{width:14px;height:14px}
+
+.kanban-board{display:flex;gap:14px;align-items:flex-start;overflow-x:auto;padding-bottom:10px;scroll-snap-type:x proximity}
+.kanban-board::-webkit-scrollbar{height:9px}
+.kanban-board::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:99px}
+.kanban-column{flex:0 0 296px;width:296px;background:var(--surface-soft);border:1px solid var(--line);border-top:4px solid var(--primary);border-radius:var(--radius);display:flex;flex-direction:column;max-height:calc(100vh - 340px);min-height:240px;scroll-snap-align:start}
+.kanban-column[data-accent=red]{border-top-color:var(--red)}
+.kanban-column[data-accent=orange]{border-top-color:var(--orange)}
+.kanban-column[data-accent=violet]{border-top-color:var(--violet)}
+.kanban-column[data-accent=teal]{border-top-color:var(--teal)}
+.kanban-column[data-accent=blue]{border-top-color:var(--blue)}
+.kanban-column[data-accent=green]{border-top-color:var(--green)}
+.kanban-col-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:14px 14px 6px}
+.kanban-col-head h3{margin:0;font-size:13px;letter-spacing:-.01em}
+.kanban-col-head p{margin:3px 0 0;font-size:10.5px;color:var(--muted);line-height:1.35}
+.kanban-count{background:var(--surface);border:1px solid var(--line);border-radius:999px;min-width:24px;height:24px;display:grid;place-items:center;font-size:11px;font-weight:800;padding:0 6px;flex:0 0 auto}
+.kanban-col-cost{margin:0 14px 10px;font-size:10.5px;font-weight:800;color:var(--muted)}
+.kanban-col-body{flex:1;overflow-y:auto;padding:2px 10px 12px;display:flex;flex-direction:column;gap:9px;min-height:90px;border-radius:10px;transition:background .12s ease,box-shadow .12s ease}
+.kanban-col-body.drag-over{background:var(--surface-blue);box-shadow:inset 0 0 0 2px var(--teal)}
+.kanban-empty{border:1.5px dashed var(--line-strong);border-radius:10px;padding:20px 10px;text-align:center;font-size:11px;color:var(--muted)}
+
+.kanban-card{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:11px 12px;cursor:pointer;transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease,opacity .12s ease}
+.kanban-card:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:#aebfd2}
+.kanban-card:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.kanban-card.dragging{opacity:.4}
+.kc-top{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.kc-top .deadline{margin-left:auto;font-size:10px;white-space:nowrap}
+.kc-edit{width:26px;height:26px;border:0;background:transparent;border-radius:8px;display:grid;place-items:center;color:var(--muted);cursor:pointer;flex:0 0 auto}
+.kc-top .deadline+.kc-edit{margin-left:2px}
+.kc-top .badge+.kc-edit{margin-left:auto}
+.kc-edit:hover{background:var(--surface-blue);color:var(--primary)}
+.kc-edit svg{width:15px;height:15px}
+.kanban-card .kc-title{margin:0 0 8px;font-size:12.5px;line-height:1.4;font-weight:700;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.kc-meta{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);margin-bottom:8px}
+.kc-meta svg{width:14px;height:14px}
+.kc-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:var(--muted)}
+.kc-school{display:flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.kc-school svg{width:13px;height:13px;flex:0 0 auto}
+.kc-cost{font-weight:800;color:#33455a;white-space:nowrap;flex:0 0 auto}
+.kc-owner{display:flex;align-items:center;gap:6px;margin-top:9px;padding-top:9px;border-top:1px solid var(--line)}
+.avatar.sm{width:22px;height:22px;font-size:10px;border-radius:7px}
+.kc-owner small{font-size:10.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kc-code{margin-top:8px;font-size:9.5px;color:#9aa7b6;letter-spacing:.02em}
+
+body.dark-mode .kanban-column{background:#181818;border-color:#333}
+body.dark-mode .kanban-metrics .km,body.dark-mode .kanban-card{background:#1e1e1e;border-color:#333;color:#e0e0e0}
+body.dark-mode .kanban-col-cost,body.dark-mode .kc-foot,body.dark-mode .kc-meta,body.dark-mode .kc-code{color:#b4b4b4}
+body.dark-mode .kanban-empty{border-color:#444;color:#999}
+body.dark-mode .kanban-col-body.drag-over{background:#1c3146}
+body.dark-mode .kanban-count{background:#222;border-color:#444}
+body.dark-mode .kc-cost{color:#e0e0e0}
+
+@media(max-width:1200px){
+  .kanban-metrics{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:620px){
+  .kanban-column{flex:0 0 80vw;width:80vw}
+  .kanban-metrics{grid-template-columns:repeat(2,1fr)}
+}
+.detail-block{border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px;background:var(--surface-2,#f8f9fb);position:relative}
+.detail-block:last-child{margin-bottom:0}
+.detail-block-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-weight:700;font-size:13px;color:var(--text)}
+.detail-block-badge{width:22px;height:22px;border-radius:50%;background:var(--orange);color:#fff;font-size:11px;font-weight:800;display:grid;place-items:center;flex:0 0 auto}
+.detail-block-cat{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.detail-block-single{border:none;padding:0;margin-bottom:0;background:transparent}
+.detail-block-single .detail-block-head{display:none}
+body.dark-mode .detail-block{background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.08)}
+body.dark-mode .detail-block-single{background:transparent}
+@media(max-width:600px){.detail-block{padding:12px}}

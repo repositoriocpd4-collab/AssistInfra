@@ -89,7 +89,9 @@ def init_db() -> None:
             director TEXT,
             address TEXT,
             phone TEXT,
-            email TEXT
+            email TEXT,
+            code TEXT,
+            external_id TEXT
         );
 
         CREATE TABLE IF NOT EXISTS users (
@@ -192,16 +194,82 @@ def init_db() -> None:
         """
     )
 
+    # Migração leve para bancos criados antes das colunas code/external_id (importação de escolas reais).
+    school_cols = {r["name"] for r in conn.execute("PRAGMA table_info(schools)").fetchall()}
+    if "code" not in school_cols:
+        conn.execute("ALTER TABLE schools ADD COLUMN code TEXT")
+    if "external_id" not in school_cols:
+        conn.execute("ALTER TABLE schools ADD COLUMN external_id TEXT")
+
     if conn.execute("SELECT COUNT(*) c FROM schools").fetchone()["c"] == 0:
         schools = [
-            ("E.M. Prefeito Otoni Rocha", "Mariana Oliveira", "Itaguaí - RJ", "(21) 3782-1001", "otoni@edu.itaguai.rj.gov.br"),
-            ("C.M. Senador Teotônio Vilella", "Carlos Menezes", "Itaguaí - RJ", "(21) 3782-1002", "teotonio@edu.itaguai.rj.gov.br"),
-            ("E.M. João Vicente Soares", "Patrícia Lima", "Itaguaí - RJ", "(21) 3782-1003", "joaovicente@edu.itaguai.rj.gov.br"),
-            ("E.M. Oscar José de Souza", "Erika Francisca Ferreira Silva de Matos", "Itaguaí - RJ", "(21) 3782-1004", "oscar@edu.itaguai.rj.gov.br"),
-            ("E.M. Vereador Prof. Artur Bittó de Castro", "Renata Alves", "Itaguaí - RJ", "(21) 3782-1005", "arturbitto@edu.itaguai.rj.gov.br"),
-            ("C.M. Teresinha de Jesus Campos de Farias", "Luciana Rocha", "Itaguaí - RJ", "(21) 3782-1006", "teresinha@edu.itaguai.rj.gov.br"),
+            ('CEMAEE Centro Municipal de Atendimento Educacional Especializado', 'CRISTIANO VITOR SOUZA', 'Rua José Bonifácio, s/n - Centro - Itaguaí/RJ - CEP: 23815-650', '21 99192-4296', 'cemaee@edu.itaguai.rj.gov.br', None, '7d044cda-ad4d-4466-8e68-856754057278'),
+            ('CESMI-Centro Municipal de Estudos Supletivos de Itaguaí', 'LENIEDJA DA SILVA BRANDÃO BARBOSA', 'Rua João Rosa Gonzales, nº 1242 - Engenho - Itaguaí/RJ - CEP: 23820-380', '21 99370-9845', 'cesmi@edu.itaguai.rj.gov.br', None, '7fc75500-9132-4d61-8160-adb8ca6c6caf'),
+            ('CIEP 300 Munic. Prefeito Vicente Cicarino', 'Cleiton Magalhães Pereira dos Santos', 'Rua Professor Chico, s/n - Santana - Itaguaí/RJ - CEP: 23810-085', '(21) 96435-8547', 'ciep300@edu.itaguai.rj.gov.br', None, '79b7d5f7-1746-4b0d-80aa-7758ce5c1e1e'),
+            ('CIEP 496 Munic. Maestro Francisco Mignone', 'RAFAEL RIBEIRO MENEZES', 'Itaguaí/RJ - endereço cadastrado da unidade', '21 97003-0018', 'ciep496@itaguai.rj.gov.br', None, '58046c75-b5a5-46e5-ba7f-b38c489ba2d7'),
+            ('CIEP 497 Munic. Prof.ª Sílvia Tupinambá', 'FLAVIA MOTTA DA SILVEIRA SALGADO', 'R Manoel Soares da Costa, s/n - Engenho - Itaguaí/RJ - CEP: 23821-740', '21 97036-3871', 'ciep497@edu.itaguai.rj.gov.br', None, 'e06c2f23-f966-4ba9-b75d-ea799bf95ed8'),
+            ('C.M. Aparecida Azêdo', 'Luciana Lisboa', 'Estrada do Teixeira, nº 2 - Vista Alegre - Itaguaí/RJ - CEP: 23820-275', '(21) 99323-3809', 'cm.aparecidaazedo@edu.itaguai.rj.gov.br', '33228019', 'fbe4db60-c40d-43c7-9fdb-3e1f2e740658'),
+            ('C.M. Danielle Batista da Silva', 'NINAH DE FREITAS RIBEIRO', 'Rua A, s/n (Qd 06, Lt 26) - Vila Ibirapitanga - Itaguaí/RJ - CEP: 23811-703', '(21) 96487-8016', 'cm.daniellebatistadasilva@edu.itaguai.rj.gov.br', None, '651e49dc-f172-4428-a44f-272a4d2b156e'),
+            ('C.M. Edson Cruz Amado', 'Bianca Gonçalves da Silva', 'Rua Argentina, s/n (esquina com a Rua Bolívia, Qd. 16) - Jardim América - Itaguaí/RJ - CEP: 23810-130', '(21) 96930-7327', 'cm.edsoncruzamado@edu.itaguai.rj.gov.br', '33439290', '18eb69f3-7226-4c1d-b875-94a5a03a91f1'),
+            ('C.M. Euclydes José Borges', 'Denise Spoliante Salutti', 'Rua Salim Francisco do Nascimento, nº (Antiga Rua 41) - Engenho - Itaguaí/RJ - CEP: 23820-100', '(21) 96468-9552', 'cm.euclydesjoseborges@edu.itaguai.rj.gov.br', None, '0180b6c6-c49b-43fc-b70d-f4807151b32c'),
+            ('C.M. Florentino Elias', 'MARIA ROZINETE MOREIRA DE OLIVEIRA', 'Rua das Tulipas, s/n - Parque Primavera - Itaguaí/RJ - CEP: 23830-400', '(21) 97572-8405', 'cm.florentinoelias@edu.itaguai.rj.gov.br', None, 'a28076db-4a53-459d-8ef8-978dc7acc7dd'),
+            ('C.M. Francisco Xavier de Moura Brito (Chico Pitanga)', 'Veronice Felix (21) 986805418', 'Rua Manoel Soares da Costa, s/n - Engenho - Itaguaí/RJ - CEP: 23821-740', '(21) 98680-5418', 'cm.franciscoxavierdemourabrito@edu.itaguai.rj.gov.br', None, 'cf3282c0-cd0e-41fc-a040-a93ec0cfeb59'),
+            ('C.M. Maria Eduviges do Rosario Silva', 'ADRIANA CHAVES PIRES', 'Rua Madalena Tortorrele, nº 20 (Qd. 62) - Brisamar - Itaguaí/RJ - CEP: 23825-590', '(21) 98374-7329', 'cm.mariaeduvigesdorosariosilva@edu.itaguai.rj.gov.br', None, '9ace17a3-764d-47d7-a9ab-2275d5434daf'),
+            ('C.M. Maria Rosa Gomes do Nascimento', 'JANILZA MARIA BISPO', 'Rua Genecildo Aguiar Vieira Teixeira, s/n - Teixeira - Itaguaí/RJ', '21 97206-8628', 'cm.mariarosagomesdonascimento@edu.itaguai.rj.gov.br', None, '4882aaf0-cd12-429f-8727-694a1d1d281e'),
+            ('C.M. Prof.ª Eliane Lopes Barbosa (Vila Geni)', 'INGRID CARVALHO COSTA', 'Rua Odilon Penolon Fialho, s/n - Vila Geny - Itaguaí/RJ - CEP: 23825-160', '(21) 97177-4700', 'cm.elianelopesbarbosa@edu.itaguai.rj.gov.br', None, 'b8fe1f4d-9fa8-464a-b403-443b54ffd127'),
+            ('C.M. Prof.º Goethe Coutinho Madruga', 'ANDREZA AZEVEDO DOS SANTOS', 'Rua dos Coqueiros, s/n (Qd. 39) - Jardim Mar - Itaguaí/RJ - CEP: 23823-120', '(21) 97990-5973', 'cm.jardimmar@edu.itaguai.rj.gov.br', None, 'e9680a99-5867-4252-a9b1-0117f5b98ceb'),
+            ('C.M. Prof.º Joaquim Inouê', 'ROSANGELA NASCIMENTO DA SILVA', 'Rua Dezoito, s/n (Qd. 22, Gleba A) - Chaperó - Itaguaí/RJ - CEP: 23815-000', '21 99261-9889', 'cm.joaquiminoue@edu.itaguai.rj.gov.br', None, 'b15ce9fa-0288-405f-be14-307d0b58176c'),
+            ('C.M. Prof.ª Maria de Lurdes S. Garcia', 'ELISABETE ALVES DE OLIVEIRA RAMOS', 'Rua Machado de Assis, s/n - Vila Ibirapitanga - Itaguaí/RJ - CEP: 23811-820', '21 97145-3594', 'cm.mariadelurdessgarcia@edu.itaguai.rj.gov.br', None, 'eebe50f4-2abc-4437-9e51-68283ef3da5d'),
+            ('C.M. Prof.ª M.ª Cristina Padela Cabral da Silva', 'RENATA MENDES VALVERDE DE OLIVEIRA GONCALVES', 'Rua Pref. José de Moraes Dias, s/n (Lote 18) - Parque Paraíso - Itaguaí/RJ - CEP: 23810-211', '(21) 96437-7241', 'cm.mariacristinapadelacabraldasilva@edu.itaguai.rj.gov.br', None, '03d5a82b-ef2f-4614-a020-5259bfafa502'),
+            ('C.M. Prof.º Renato Barbosa Ladislau', 'Caroline Pedrazzi de Almeida Vieira', 'Estrada do Mazomba, s/n - Leandro - Itaguaí/RJ - CEP: 23830-000', '(21) 99422-5843', 'cm.renatobarbosaladislau@edu.itaguai.rj.gov.br', None, '608c43e0-f2ba-444d-953f-6748c14cf64c'),
+            ('C.M. Prof.ª Tania Mara Mota de Menezes', 'ERICA CRISTINA OLIVEIRA DA SILVA', 'Rua Antônio Batista Ramos, s/n (Lt 39, Qd 18) - Brisamar - Itaguaí/RJ - CEP: 23826-155', '21 96855-3018', 'cm.taniamaramottademenezes@edu.itaguai.rj.gov.br', None, 'a6c18879-5445-4156-9778-aa05a039fdcc'),
+            ('C.M. Profª Teresinha de Jesus Campos de Farias', 'Lucia Sayuri Yokoyama Sagava', 'R. Antônio M Pereira, nº 149 - Itaguaí/RJ', '21 985232368', 'cm.teresinhadejesuscamposdefarias@edu.itaguai.rj.gov.br', None, '55c3c54c-82d3-437c-acd0-98b5cc97781a'),
+            ('C.M. Rita Ferreira Feijó', 'CAROLINA MONTEIRO DO NASCIMENTO PEDRO', 'Av. Guilherme Serrano, s/n (Lotes 8, Quadra C) - Vila Geny - Itaguaí/RJ - CEP: 23825-480', '21 99326-2233', 'cm.ritaferreirafeijo@edu.itaguai.rj.gov.br/', None, '558c9613-d276-4ebc-b9e0-95aa0d597912'),
+            ('C.M. Vereador José Antônio Carrasco', 'ANA CRISTINA BELMONTE LIMA PINHA', 'Rua Eduardo de Oliveira Júnior, s/n - Estrela do Geny - Itaguaí/RJ - CEP: 23811-480', '21 98573-6422', 'cm.estreladoceu@edu.itaguai.rj.gov.br', None, '2db1d115-97ba-46d7-917b-55267e801798'),
+            ('Colégio M. Senador Teotônio Vilella', 'Cássia Regina R. da Silva', 'Rua Ivete Lino Ribeiro, nº 22 - Centro - Itaguaí/RJ - CEP: 23810-540', '(21) 97026-4258', 'cm.senadorteotoniovilella@edu.itaguai.rj.gov.br', None, 'afaf97d9-fa67-4b61-b580-5d88911f1ca0'),
+            ('CRECHE M. PROF. TERESINHA DE JESUS CAMPOS DE FARIAS', 'LUCIA SAYURI YOKOYAMA SAGAVA', 'Itaguaí - RJ', '21 98523-2368', None, None, 'bd5ca15e-0c9e-4428-8c02-138596b34dca'),
+            ('E. E. M. Camilo Cuquejo', 'NATALINA ALVES BATISTA', 'Estr. Jair Pereira Nascimento, s/n - Ma Geny - Itaguaí/RJ - CEP: 23830-330', '21 96476-3838', 'eem.camilocuquejo@edu.itaguai.rj.gov.br/ eemcamilocuquejo@gmail.com', None, '19b35c4f-28d4-487f-8c60-37717385a41e'),
+            ('E. E. M. Carmem Menezes Direito', 'CLAUDIA REGINA DE LIMA SANTIAGO', 'Rua Manoel Araújo dos Santos, nº 1043 - Brisamar - Itaguaí/RJ - CEP: 23825-435', '21 96425-1829', 'eem.carmemmenezesdireito@edu.itaguai.rj.gov.br carmem.menezes.adm@gmail.com', None, 'df6272f1-4cfa-42af-b9aa-f61dcbcbbe1a'),
+            ('E. E. M. Chaperó', 'THAIS SILVA DE SOUZA', 'Rua Dezesseis, s/n (Gleba B) - Chaperó - Itaguaí/RJ - CEP: 23835-000', '21 99499-1646', 'eem.chapero@edu.itaguai.rj.gov.br', None, '536e89e8-ea1c-4a30-83e7-006490a5c304'),
+            ('E. E. M. Fazenda Santa Cândida', 'ANA CRISTINA BORGES DE SANTANA', 'Rua Altamiro Domiciano da Cruz, s/n - Santa Cândida - Itaguaí/RJ - CEP: 23830-640', '21 96573-1339', 'eem.fazsantacandida@edu.itaguai.rj.gov.br', None, '8c2ed8c0-0e78-43ba-bb4f-a7859805cc20'),
+            ('E. E. M. Mazomba - Dr. Jorge Abrahão', 'FERNANDA LIMA FELICIANO PINTO', 'Estrada do Mazomba, nº 22 - Mazomba - Itaguaí/RJ - CEP: 23830-250', '21 96436-0626', 'eem.drjorgeabrahao@edu.itaguai.rj.gov.br', None, '56d9b8b3-48bf-4c58-beb9-f247c14cea5e'),
+            ('E. E. M. Santa Rosa', 'MARLI DOS SANTOS FERNANDES', 'Estrada Santa Rosa, nº 2587 - Santa Rosa - Itaguaí/RJ - CEP: 23855-205', '21 99690-6262', 'eem.santarosa@edu.itaguai.rj.gov.br', None, 'a0b20bb8-a32a-43a8-be6a-23c28fb0506f'),
+            ('E. E. M. Taciano Basílio', 'DAYSE ADRIANA SODRE GONCALVES', 'Estr.Bom Jardim, nº 953 ((Estr. Caçador)) - Saco da Prata - Itaguaí/RJ - CEP: 23835-700', '21 97471-8656', 'eem.tacianobasilio@edu.itaguai.rj.gov.br', None, '13a13a48-b76b-4235-87d2-b825917dac3a'),
+            ('E. M. Alexandre Ignácio', 'SANDRA DIAS PIMENTA DA SILVA', 'Estrada do Caçador, s/n - Ibituporanga - Itaguaí/RJ - CEP: 23835-090', '21 97060-1512', 'em.alexandreignacio@edu.itaguai.rj.gov.br', None, '073ab9da-0276-45ff-8ab6-072c8dce1567'),
+            ('E. M. Amauri Ferreira', 'ILONIA MARCIA DE MIRANDA PAULO', 'Rua Guilherme Serrano, s/n - Vila Geny - Itaguaí/RJ - CEP: 23825-480', '21 97360-1960', 'em.amauriferreira@edu.itaguai.rj.gov.br', None, 'a2d22cfe-e258-43de-bf95-7d1626db9a7a'),
+            ('E. M. Antônio Tupinambá', 'MONICA DE LIMA DRUMOND', 'Rua Júlio Verne,, s/n - Vila Margarida - Itaguaí/RJ - CEP: 23820-770', '(21) 99101-6799', 'em.antoniotupinamba@edu.itaguai.rj.gov.br', None, '65a98c71-580e-45dc-b5c2-08a9940b4cdc'),
+            ('E. M. Argentina Coutinho', 'JULIANA AVILEZ', 'Rua Pedro Pacheco, s/n - Brisamar - Itaguaí/RJ - CEP: 23825-205', '21 98063-3998', 'em.argentinacoutinho@edu.itaguai.rj.gov.br', None, '0022776c-f85f-4b2b-b6a1-e95dca34c2aa'),
+            ('E. M. Coronel Alziro Santiago', 'ROBERTA OLIVEIRA DA SILVA GALDINO', 'Estrada do Mazomba, s/n - Mazomba - Itaguaí/RJ - CEP: 23830-250', '21 97012-4395', 'em.celalzirosantiago@edu.itaguai.rj.gov.br', None, '15ac96a0-1a7b-40cf-ad46-a8380dc60a78'),
+            ('E. M. das Acácias', 'CAMILA LOPES SABINO FONSECA', 'Rua das Camélias,, s/n (Qd 131) - Parque Primavera - Itaguaí/RJ - CEP: 23830-395', '21 99295-4593', 'em.acacias@edu.itaguai.rj.gov.br', None, 'b8590fd5-1050-4a04-8632-c4db93d8ddd3'),
+            ('E. M. de Educação Infantil Hypolito Vieira de Carvalho', 'SONIA ISABEL VALENTIM COSTA MACHADO', 'Rua Estados Unidos, nº 66 - Jardim América - Itaguaí/RJ - CEP: 23810-100', '21 97633-6683', 'emei.hypolitovieradecarvalho@edu.itaguai.rj.gov.br', None, '61345a18-800e-49d3-8395-e0be1f6d4853'),
+            ('E. M. de Educação Infantil Monteiro Lobato', 'DÉBORA DOMINGOS CARNEIRO', 'Rua Kaisser Abraão, nº 9 - Mont Serrat - Itaguaí/RJ - CEP: 23810-560', '21 98062-0658', 'emei.monteirolobato@edu.itaguai.rj.gov.br', None, 'a4bcd7be-709f-41f4-8884-cf5b8f2279df'),
+            ('E. M. de Educação Infantil Pref. Isoldackson Cruz de Brito', 'Marinalda de Lima Lemes', 'Rua Dezesseis, nº 180 (Bleba B) - Gleba B - Chaperó - Itaguaí/RJ - CEP: 23812-285', '(21) 99226-8412', 'emei.prefisoldacksoncruzdebrito@edu.itaguai.rj.gov.br', None, '73f6df36-8765-40c3-acc5-dbdbd7c27aca'),
+            ('E. M. Eider Ribeiro Dantas', 'JOSENI DE SOUZA BARRETO BARBOSA', 'Rua Argentina da Silva Coutinho, s/n (Lote 11 - Qd 52) - Brisamar - Itaguaí/RJ - CEP: 23825-210', '21 96667-0417', 'em.eiderribeirodantas@edu.itaguai.rj.gov.br', None, 'bd92c0ea-d8ec-4e8f-9d5d-33016e3e940f'),
+            ('E. M. Elmira Figueira', 'SONIA REGINA SILVA DE OLIVEIRA BARBOSA', 'Rua Tocantins, s/n - Estrela do Céu - Itaguaí/RJ - CEP: 23815-180', '21 96465-2372', 'em.elmirafigueira@edu.itaguai.rj.gov.br', None, '13501024-7e2f-4272-aa62-b83142002314'),
+            ('E. M. Elmo Baptista Coelho', 'DANNUBIA', 'Est Joaquim Fernandes, nº 407/409 - Ilha da Madeira - Itaguaí/RJ - CEP: 23821-450', '(21) 98228-8351', 'em.elmobaptistacoelho@edu.itaguai.rj.gov.br', None, 'a5d3e651-627b-4503-b55f-f55a73a334d1'),
+            ('E. M. Fusao Fukamati', 'KILSA CRISTINA ARANTES GONCALVES SILVA', 'Rua Dezoito, s/n (Quadra 18, Gleba A) - Chaperó - Itaguaí/RJ - CEP: 23835-000', '21 99359-1145', 'em.fusaofukmati@edu.itaguai.gov.br', None, '65a45236-8c51-4d8f-9eae-d8e97de66950'),
+            ('E. M. João Vicente Soares', 'LUCIANA KARLA DE OLIVEIRA CICARINO', 'Av. Machado de Assis c/ a Rua Cesar Lattes, s/n - Vila Ibirapitanga - Itaguaí/RJ - CEP: 23811-140', '21 96424-5859', 'em.joaovicentesoares@edu.itaguai.rj.gov.br', None, '6d2574af-9599-4027-acaf-fb088dca7d20'),
+            ('E. M. Jorge Flores da Silva', 'LEANDRO FERREIRA', 'Rua Ary Parreira esquina com Estrada do Tronco, s/n - Weda - Itaguaí/RJ - CEP: 23820-303', '21 98711-9622', 'em.jorgefloresdasilva@edu.itaguai.rj.gov.br', None, '7083e4b9-43e5-48b2-9664-0255d9d5528d'),
+            ('E. M. Oscar José de Souza', 'ERIKA FRANCISCA FERREIRA SILVA DE MATOS', 'Rua Lucia Tieme Hara, s/n - Santana - Itaguaí/RJ - CEP: 23810-170', '21 97133-0378', 'em.oscarjosedesouza@edu.itaguai.rj.gov.br', None, '6a4f5b1b-0745-4a5d-a5e3-47227c91beb2'),
+            ('E. M. Padre Rafael Scarfó', 'LILIAN KELLY AMARAL DE SOUZA EUGENIO', 'Rua Elvira Ciuffo Cicarino, nº 40 - Vila Margarida - Itaguaí/RJ - CEP: 23821-135', '21 96415-3882', 'em.padrerafaelscarfo@edu.itaguai.rj.gov.br', None, '1a585773-7d2d-439f-88d9-0b8fd1b23b75'),
+            ('E. M. Prefeito Abeilard Goulart de Souza', 'DAYANE LIMA FELICIANO PINTO', 'R. Jonas Costa Pereira, s/n - Parque Paraíso - Itaguaí/RJ - CEP: 23815-100', '21 98657-6449', 'em.prefalbeilardgoulartdesouza@edu.itaguai.rj.gov.br', None, 'd44b44d7-503b-4e38-94cf-d8b3f44f3b06'),
+            ('E. M. Prefeito Otoni Rocha', 'TANIA MARIA DA SILVA MEDEIROS', 'RuaTravessa Pedro Augusto, s/n - Centro - Itaguaí/RJ - CEP: 23821-210', '21 98414-8338', 'em.prefotonirocha@edu.itaguai.rj.gov.br', None, '1cefd2ff-55ea-449d-a94e-6b7dcea4453a'),
+            ('E. M. Prefeito Wilson Pedro Francisco', 'IVANETE FERREIRA DE SIQUEIRA', 'Estrada do Teixeira, s/n (lote 25, Quadra 06) - Vista Alegre - Itaguaí/RJ - CEP: 23820-275', '21 98288-3163', 'em.prefwilsonpedrofrancisco@edu.itaguai.rj.gov.br', None, '6be9001d-16d8-4249-8bb8-77eefbc6b788'),
+            ('E. M. Prof.ª Maria Guilhermina de Souza Farias', 'THAIS RIBEIRO CORREA PINTO', 'Estrada Engenheiro Ivan Mundin, s/n - Leandro - Itaguaí/RJ - CEP: 23830-250', '21 96474-6039', 'em.mariaguilherminadesouzafreire@edu.itaguai.rj.gov.br', None, '4e4fb381-5582-4f04-8a09-6f7e27e446d1'),
+            ('E. M. Profª. Marianilde Siqueira Gonçalves', 'SANDRO CORRÊA', 'Rua Capitao Landulfo Alves de Almeida, s/n (Qd39) - Jardim Mar - Itaguaí/RJ - CEP: 23823-000', '21 97033-4403', 'em.jardimmar@edu.itaguai.rj.gov.br', None, '0f5c41ee-9227-4cea-89d8-b8eb6310c61c'),
+            ('E. M. Prof.ª Severina dos Ramos de Sousa', 'FLAVIO COSME ROCHA DE LIMA', 'Rua Evelina Reis e Geny Reis, s/n (Lotes 25, 26 e 27) - Vila Geny - Itaguaí/RJ - CEP: 23825-350', '21 96467-1717', 'em.severinadosramosdesousa@edu.itaguai.rj.gov.br', None, '1e348461-0da0-4b59-a14f-db42af063503'),
+            ('E. M. Prof.ª Yolanda Rangel Pereira', 'MARGARETH FERREIRA', 'Rua Francisco Costa Pereira, s/n - Engenho - Itaguaí/RJ - CEP: 23820-240', '21 98650-4463', 'em.yolandarangelpereira@edu.itaguai.rj.gov.br', None, 'a2c2a3e9-97d5-4466-8f40-f92a10bc4d09'),
+            ('E. M. Renato Gonçalves Martins', 'Lusmar Moraes Barbosa', 'Est. Jose Paulo Andrade, nº 2584 - Chaperó - Itaguaí/RJ - CEP: 23855-120', '(21) 97581-1877', 'em.renatogoncalvesmartins@edu.itaguai.rj.gov.br', None, '0f1883eb-8814-42d5-8d50-51476a67dd14'),
+            ('E. M. Severino Salustiano de Freitas', 'INA DANIELA DE OLIVEIRA TAMAKI', 'Rua Genecildo A Vieira, s/n (esquina com Rua 2) - Teixeira - Itaguaí/RJ - CEP: 23820-270', '21 97579-5737', 'em.severinosalustianodefrarias@edu.itaguai.rj.gov.br', None, '5be3e450-d3a7-4763-b191-83f5629ec59f'),
+            ('E. M. São Sebastião', 'MARINALVA DOS SANTOS CONDE', 'Estr. Zeferino Goulart, s/n - Raiz da Serra - Itaguaí/RJ - CEP: 23830-000', '21 98819-5235', 'em.saosebastiao@edu.itaguai.rj.gov.br', None, '5a7eaffb-e3e0-4772-8b1e-ecdec8d3c146'),
+            ('E. M. Sylvia Souza Siquineli', 'ROGERIA TAVARES', 'Estr. Décio Muniz da Silva Filho, nº 1006 (, Lagoa Nova, Gleba B) - Chaperó - Itaguaí/RJ - CEP: 23831-300', '21 99103-3333', None, None, 'f4d35649-c605-42f1-8ead-59255f76d752'),
+            ('E. M. Tereza de Araújo Sagário', 'DAYANE RODRIGUES DA CONCEIÇÃO MOURA', 'Av. Tabajara, s/n - Ibirapitanga - Itaguaí/RJ - CEP: 23812-150', '21 97514-0994', 'em.terezadearaujosagario@edu.itaguai.rj.gov.br', None, '928521e6-e869-425f-88fb-0e4d939767fd'),
+            ('E. M. Vereador Américo Rodrigues de Amorim', 'Luciane Leal do Valle', 'R Sebastião Bruno de Oliveira, s/n - Itimirim - Itaguaí/RJ - CEP: 23826-320', '(21) 99228-3003', 'em.veramericorodriguesdeamorim@edu.itaguai.rj.gov.br', None, '8782b024-8651-4a01-85af-9118a2d8f488'),
+            ('E. M. Vereador José Galliaço Prata', 'MARCELO DONIZETE DE BARROS', 'Estrada do Teixeira, s/n - Amendoeira - Itaguaí/RJ - CEP: 23820-275', '21 99374-4482', 'em.vereadorgalliacoprata@edu.itaguai.rj.gov.br', None, 'a3622b18-9a09-4536-b9c1-0a1d3d79c010'),
+            ('E. M. Vereador Taciano Fernandes Nunes', 'ROSINEIA ALVES BATISTA', 'Av. Gov. Mario Covas, nº 36 - Brisamar - Itaguaí/RJ - CEP: 23826-240', '21 96415-4572', 'em.vertaianofernandesnunes@edu.itaguai.rj.gov.br', None, 'c51e906f-a897-4134-8918-eb4183875c1e'),
+            ('E. M. VER. PROFESSOR ARTHUR BRITO DE CASTRO', 'MARIA JOSE DE ANDRADE MARIANO', 'Itaguaí/RJ', '21 96931-0516', 'em.verprofessorarthurbritodecastro@edu.itaguai.rj.gov.br', None, 'aff3d54e-e671-4f6f-9248-a4197f49dd3a'),
         ]
-        conn.executemany("INSERT INTO schools(name,director,address,phone,email) VALUES(?,?,?,?,?)", schools)
+        conn.executemany("INSERT INTO schools(name,director,address,phone,email,code,external_id) VALUES(?,?,?,?,?,?,?)", schools)
 
     if conn.execute("SELECT COUNT(*) c FROM users").fetchone()["c"] == 0:
         school_id = conn.execute("SELECT id FROM schools ORDER BY id LIMIT 1").fetchone()["id"]
@@ -338,6 +406,11 @@ def demand_detail_page(request: Request, demand_id: int):
     return render(request, "index.html", page="demand-detail", title=row["title"], entity_id=demand_id)
 
 
+@app.get("/kanban", response_class=HTMLResponse)
+def kanban_page(request: Request):
+    return render(request, "index.html", page="kanban", title="Quadro Kanban")
+
+
 @app.get("/planejamento", response_class=HTMLResponse)
 def planning_page(request: Request):
     return render(request, "index.html", page="planning", title="Planejamento Futuro")
@@ -408,15 +481,21 @@ def api_dashboard(request: Request):
     total = len(data)
     completed = sum(1 for d in data if d["status"] == "Concluída")
     overdue = sum(1 for d in data if d["due_date"] and d["status"] not in ("Concluída", "Cancelada") and date.fromisoformat(d["due_date"]) < today)
+    due_soon = sum(1 for d in data if d["due_date"] and d["status"] not in ("Concluída", "Cancelada") and today <= date.fromisoformat(d["due_date"]) <= today + timedelta(days=7))
+    open_data = [d for d in data if d["status"] not in ("Concluída", "Cancelada")]
     stats = {
         "total": total,
         "urgent": sum(1 for d in data if d["priority"] == "P1" and d["status"] != "Concluída"),
+        "high": sum(1 for d in open_data if d["priority"] == "P2"),
         "analysis": sum(1 for d in data if d["status"] in ("Em triagem", "Em análise técnica", "Recebida")),
         "progress": sum(1 for d in data if d["status"] in ("Em execução", "Parcialmente executada", "Serviço programado")),
         "contract": sum(1 for d in data if d["status"] in ("Aguardando contratação", "Aguardando empresa")),
         "overdue": overdue,
+        "due_soon": due_soon,
         "completed": completed,
         "future": sum(1 for d in data if d["status"] == "Planejamento futuro" or d["future_year"]),
+        "unassigned": sum(1 for d in open_data if not (d["responsible"] or "").strip()),
+        "open_cost": sum(d["cost_estimate"] or 0 for d in open_data),
         "execution": round((completed / total * 100), 1) if total else 0,
     }
     recent = conn.execute(f"""SELECT d.*, s.name school_name FROM demands d JOIN schools s ON s.id=d.school_id
@@ -432,7 +511,7 @@ def api_dashboard(request: Request):
 
 
 @app.get("/api/demands")
-def api_demands(request: Request, q: str = "", status: str = "", priority: str = "", category: str = "", year: str = "", overdue: int = 0):
+def api_demands(request: Request, q: str = "", status: str = "", priority: str = "", category: str = "", year: str = "", overdue: int = 0, due_soon: int = 0, unassigned: int = 0):
     user = require_user(request)
     where = ["1=1"]
     params: list = []
@@ -453,6 +532,10 @@ def api_demands(request: Request, q: str = "", status: str = "", priority: str =
         where.append("substr(d.created_at,1,4)=?"); params.append(str(year))
     if overdue:
         where.append("d.due_date IS NOT NULL AND date(d.due_date) < date('now','localtime') AND d.status NOT IN ('Concluída','Cancelada')")
+    if due_soon:
+        where.append("d.due_date IS NOT NULL AND date(d.due_date) BETWEEN date('now','localtime') AND date('now','localtime','+7 days') AND d.status NOT IN ('Concluída','Cancelada')")
+    if unassigned:
+        where.append("(d.responsible IS NULL OR trim(d.responsible)='') AND d.status NOT IN ('Concluída','Cancelada')")
     conn = db()
     rows = conn.execute(f"""SELECT d.*, s.name school_name, s.director FROM demands d JOIN schools s ON s.id=d.school_id
                             WHERE {' AND '.join(where)}

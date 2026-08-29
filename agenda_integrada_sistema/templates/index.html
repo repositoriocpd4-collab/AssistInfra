@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#005A9C">
+  <title>{{ title }} · Agenda Integrada</title>
+  <link rel="stylesheet" href="/static/styles.css?v=govbr-6-stats">
+</head>
+<body data-page="{{ page }}"{% if entity_id %} data-entity-id="{{ entity_id }}"{% endif %}>
+  <svg aria-hidden="true" class="svg-sprite">
+    <symbol id="i-grid" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></symbol>
+    <symbol id="i-clipboard" viewBox="0 0 24 24"><path d="M9 4h6l1 2h3v15H5V6h3l1-2Zm0 5h6M9 13h6M9 17h4"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><path d="M6 3v3M18 3v3M4 8h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Zm3 7h3v3H8z"/></symbol>
+    <symbol id="i-school" viewBox="0 0 24 24"><path d="m3 10 9-5 9 5-9 5-9-5Zm4 3v5c3 2 7 2 10 0v-5M20 11v6"/></symbol>
+    <symbol id="i-report" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 12h6M9 16h6"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8 4 2-1-2-4-2 1a8 8 0 0 0-2-2l1-2-4-2-1 2h-3L8 2 4 4l1 2a8 8 0 0 0-2 2L1 7l-1 4 2 1v3l-2 1 1 4 2-1a8 8 0 0 0 2 2l-1 2 4 2 1-2h3l1 2 4-2-1-2a8 8 0 0 0 2-2l2 1 2-4-2-1v-3Z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><path d="m20 20-4-4m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0Z"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7ZM9 20h6"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm-3-13a3 3 0 1 1 5 2c-2 1-2 2-2 3M12 18h.01"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M10 5H4v14h6M14 8l4 4-4 4M8 12h10"/></symbol>
+    <symbol id="i-filter" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M5 19h14"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Zm10 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="m4 20 4-1 10-10-3-3L5 16l-1 4ZM14 7l3 3"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></symbol>
+    <symbol id="i-warning" viewBox="0 0 24 24"><path d="M12 3 2 21h20L12 3Zm0 6v5m0 3h.01"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-15v6l4 2"/></symbol>
+    <symbol id="i-trend" viewBox="0 0 24 24"><path d="m4 17 6-6 4 4 6-8M16 7h4v4"/></symbol>
+    <symbol id="i-money" viewBox="0 0 24 24"><path d="M4 6h16v12H4zM7 9h.01M17 15h.01M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></symbol>
+    <symbol id="i-paperclip" viewBox="0 0 24 24"><path d="m9 17 7-7a3 3 0 0 0-4-4l-8 8a5 5 0 1 0 7 7l8-8"/></symbol>
+    <symbol id="i-message" viewBox="0 0 24 24"><path d="M4 5h16v12H8l-4 4V5Z"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Zm6-3v15m6-12v15"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-11v6m0-10h.01"/></symbol>
+    <symbol id="i-building" viewBox="0 0 24 24"><path d="M4 21V5l8-3v19m0-13 8-3v16M7 8h2M7 12h2M7 16h2M15 9h2M15 13h2M15 17h2"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM14 3v5h5"/></symbol>
+    <!-- Ícones de categoria e do assistente de registro (adicionados na reformulação de UX) -->
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></symbol>
+    <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3c4 5 7 8.5 7 12a7 7 0 1 1-14 0c0-3.5 3-7 7-12Z"/></symbol>
+    <symbol id="i-roof" viewBox="0 0 24 24"><path d="M3 12 12 4l9 8M6 11v9h12v-9"/></symbol>
+    <symbol id="i-paint" viewBox="0 0 24 24"><path d="M4 4h10v4H4zM9 8v3M6 11h6v4a3 3 0 0 1-3 3 3 3 0 0 1-3-3v-4Z"/></symbol>
+    <symbol id="i-wind" viewBox="0 0 24 24"><path d="M3 8h11a3 3 0 1 0-3-3M3 12h15a3 3 0 1 1-3 3M3 16h9a2 2 0 1 0-2-2"/></symbol>
+    <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M21 3a5 5 0 0 1-6.32 4.82L7 15.5 4.5 18 3 20l2-1.5 2.5-2.5 7.68-7.68A5 5 0 0 1 21 3Z"/></symbol>
+    <symbol id="i-brick" viewBox="0 0 24 24"><path d="M3 8h8v4H3zM11 8h10v4H11zM3 12h6v4H3zM9 12h8v4H9zM17 12h4v4h-4z"/></symbol>
+    <symbol id="i-wheelchair" viewBox="0 0 24 24"><path d="M11 4a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3ZM11 7v6l5 3M4 12h7M9 13a5 5 0 1 0 5 6"/></symbol>
+    <symbol id="i-chair" viewBox="0 0 24 24"><path d="M6 4v9a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4M6 15v5M18 15v5M6 9h12"/></symbol>
+    <symbol id="i-monitor" viewBox="0 0 24 24"><path d="M4 5h16v10H4zM9 20h6M12 15v5"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 19 6v6c0 5-3 8-7 9-4-1-7-4-7-9V6l7-3Z"/></symbol>
+    <symbol id="i-drain" viewBox="0 0 24 24"><path d="M12 3v4M5 9h14M7 9v6a5 5 0 0 0 10 0V9M12 13v4"/></symbol>
+    <symbol id="i-column" viewBox="0 0 24 24"><path d="M6 4h12M6 20h12M8 4v16M16 4v16"/></symbol>
+    <symbol id="i-tree" viewBox="0 0 24 24"><path d="M12 3 7 10h3l-4 6h4v5h4v-5h4l-4-6h3L12 3Z"/></symbol>
+    <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3 11c1 1 1 2 1 3h4c0-1 0-2 1-3a6 6 0 0 0-3-11Z"/></symbol>
+    <symbol id="i-door" viewBox="0 0 24 24"><path d="M5 21V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v17M5 21h11M15 21h4M9 12h.01"/></symbol>
+    <symbol id="i-hammer" viewBox="0 0 24 24"><path d="m15 12 6 6-3 3-6-6M9 9 4 4 6.5 1.5 12 7 9 9ZM13 7l4-4 3 3-4 4"/></symbol>
+    <symbol id="i-crane" viewBox="0 0 24 24"><path d="M4 21V9l8-6v6h8M8 9v12M16 9l4 4h-8"/></symbol>
+    <symbol id="i-cart" viewBox="0 0 24 24"><path d="M3 4h2l2 11h11l2-7H6M9 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM17 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24"><path d="M6 12h.01M12 12h.01M18 12h.01" stroke-width="3"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4zM12 12a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z"/></symbol>
+    <symbol id="i-check-circle" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM8 12l3 3 5-6"/></symbol>
+  </svg>
+
+  <!-- Menu lateral no padrão visual adotado pela Prefeitura -->
+  <aside class="sidebar side-menu" id="sidebar" aria-label="Navegação principal">
+    <div class="side-menu-header">
+      <div class="side-menu-title">
+        <div class="municipal-mark" aria-hidden="true">AI</div>
+        <div><strong>Agenda Integrada</strong><span>Infraestrutura e Gestão Escolar</span></div>
+      </div>
+      <button class="side-close" id="sideClose" aria-label="Fechar menu"><svg><use href="#i-x"></use></svg></button>
+    </div>
+    <div class="side-menu-content">
+      <button class="btn btn-primary btn-new" data-open-demand aria-label="Registrar uma nova demanda ou intercorrência" data-tooltip="Contar o que está acontecendo na escola · tecla N"><svg><use href="#i-plus"></use></svg><span>Registrar uma demanda</span><kbd class="key-hint">N</kbd></button>
+      <button class="nav-item nav-back" id="navBack" type="button" data-tooltip="Voltar para a página anterior · tecla B"><svg style="transform:rotate(180deg)"><use href="#i-chevron"></use></svg><span>Voltar</span><kbd class="key-hint">B</kbd></button>
+      <nav class="nav-list">
+        <a class="nav-item {% if page == 'dashboard' %}active{% endif %}" href="/" data-tooltip="Visão geral, alertas e indicadores · tecla P"><svg><use href="#i-grid"></use></svg><span>Painel</span><kbd class="key-hint">P</kbd></a>
+        <a class="nav-item {% if page in ['demands','demand-detail'] %}active{% endif %}" href="/demandas" data-tooltip="Demandas atuais de todas as unidades permitidas · tecla D"><svg><use href="#i-clipboard"></use></svg><span>Demandas</span><kbd class="key-hint">D</kbd></a>
+        <a class="nav-item {% if page == 'planning' %}active{% endif %}" href="/planejamento" data-tooltip="Demandas futuras, consolidação, aquisição e licitação · tecla F"><svg><use href="#i-calendar"></use></svg><span>Planejamento Futuro</span><kbd class="key-hint">F</kbd></a>
+        <a class="nav-item {% if page == 'schools' %}active{% endif %}" href="/escolas" data-tooltip="Visão 360° e histórico por Unidade Escolar · tecla E"><svg><use href="#i-school"></use></svg><span>Unidades Escolares</span><kbd class="key-hint">E</kbd></a>
+        {% if user.role != 'escola' %}
+        <div class="side-divider"></div>
+        <a class="nav-item {% if page == 'reports' %}active{% endif %}" href="/relatorios" data-tooltip="Relatórios operacionais e exportações · tecla R"><svg><use href="#i-report"></use></svg><span>Relatórios</span><kbd class="key-hint">R</kbd></a>
+        <a class="nav-item {% if page == 'admin' %}active{% endif %}" href="/administracao" data-tooltip="Cadastros-base e parâmetros do ambiente · tecla A"><svg><use href="#i-settings"></use></svg><span>Administração</span><kbd class="key-hint">A</kbd></a>
+        {% endif %}
+        <div class="side-divider"></div>
+        <a class="nav-item {% if page == 'about' %}active{% endif %}" href="/sobre" data-tooltip="Versão, tecnologia, perfis e roteiro do sistema · tecla S"><svg><use href="#i-info"></use></svg><span>Sobre o Sistema</span><kbd class="key-hint">S</kbd></a>
+        <button class="nav-item" id="shortcutsHelp" type="button" data-tooltip="Ver todos os atalhos de teclado · tecla ?"><svg><use href="#i-help"></use></svg><span>Central de Ajuda</span><kbd class="key-hint">?</kbd></button>
+        <a class="nav-item" href="/logout" data-tooltip="Encerrar a sessão atual"><svg><use href="#i-logout"></use></svg><span>Sair</span></a>
+      </nav>
+    </div>
+    <div class="side-menu-footer"><a href="/sobre" data-tooltip="Ver versão e detalhes do sistema">SMEDU · Prefeitura Municipal de Itaguaí</a></div>
+  </aside>
+
+  <div class="backdrop" id="backdrop" hidden></div>
+
+  <!-- Cabeçalho inspirado no padrão Cidades/Gov.br fornecido pela Prefeitura -->
+  <header class="govbr-header">
+    <div class="header-top">
+      <div class="header-logo-area">
+        <div class="prefeitura-brand" aria-label="Prefeitura Municipal de Itaguaí">
+          <img class="header-logo" src="https://novoportal.itaguai.rj.gov.br/@@obter_logo_portal/logo25.png" alt="Prefeitura de Itaguaí" onerror="this.hidden=true;this.nextElementSibling.hidden=false">
+          <div class="prefeitura-wordmark" hidden><span>ITAGUAÍ</span><small>PREFEITURA</small></div>
+        </div>
+        <div class="logo-separator"></div>
+        <span class="state-name hide-on-medium">Estado do Rio de Janeiro</span>
+      </div>
+      <div class="header-actions">
+        <a href="https://novoportal.itaguai.rj.gov.br/" target="_blank" rel="noopener noreferrer" class="header-link hide-on-small" title="Portal da Prefeitura">Portal PMI</a>
+        <div class="actions-separator hide-on-small"></div>
+        <a href="https://portal.transparencia.itaguai.rj.gov.br/" target="_blank" rel="noopener noreferrer" class="header-link hide-on-small" title="Portal da Transparência">Transparência</a>
+        <div class="actions-separator hide-on-small"></div>
+        <button class="header-icon-btn" id="darkModeToggle" data-tooltip="Modo noturno" aria-label="Alternar modo noturno"><svg><use href="#i-eye"></use></svg></button>
+        <button class="header-icon-btn" id="accessibilityToggle" data-tooltip="Acessibilidade: ampliar textos" aria-label="Ampliar textos"><svg><use href="#i-info"></use></svg></button>
+        <button class="header-icon-btn" id="notificationButton" data-tooltip="Notificações" aria-label="Notificações"><svg><use href="#i-bell"></use></svg><span class="notification-dot" id="notificationDot"></span></button>
+      </div>
+    </div>
+    <div class="header-bottom">
+      <button class="menu-icon-button" id="menuButton" aria-label="Abrir menu" data-tooltip="Abrir menu de navegação"><svg><use href="#i-menu"></use></svg></button>
+      <div class="department-info">
+        <a href="https://novoportal.itaguai.rj.gov.br/secretarias/educacao" target="_blank" rel="noopener noreferrer" class="hide-on-small">Secretaria Municipal de Educação</a>
+        <span class="hide-on-small">|</span>
+        <a href="/">Agenda Integrada</a>
+        <span class="hide-on-medium">|</span>
+        <span class="department-context hide-on-medium">Infraestrutura e Gestão Escolar em Ação</span>
+      </div>
+      <div class="header-search global-search-wrap">
+        <svg><use href="#i-search"></use></svg>
+        <input id="globalSearch" type="search" placeholder="Pesquisar demanda, código ou unidade..." autocomplete="off" aria-label="Pesquisa global">
+        <div class="search-results" id="globalSearchResults" hidden></div>
+      </div>
+      <button class="user-info" id="userMenuButton" aria-label="Abrir opções do usuário" data-tooltip="Conta e opções do usuário">
+        <span class="header-user-avatar">{{ user.name[0] }}</span>
+        <span class="user-copy"><strong>{{ user.name }}</strong><small>{{ user.role|capitalize }}{% if user.school_name %} · {{ user.school_name }}{% endif %}</small></span>
+        <svg><use href="#i-chevron"></use></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="main-content container" id="pageContent" aria-live="polite">
+    <div class="page-skeleton">
+      <div class="skeleton sk-title"></div>
+      <div class="skeleton sk-subtitle"></div>
+      <div class="skeleton-grid"><div class="skeleton sk-card"></div><div class="skeleton sk-card"></div><div class="skeleton sk-card"></div><div class="skeleton sk-card"></div></div>
+    </div>
+  </main>
+
+  <footer class="govbr-footer">
+    <div class="footer-container container">
+      <strong>Agenda Integrada — Infraestrutura e Gestão Escolar em Ação</strong>
+      <p>Secretaria Municipal de Educação · Prefeitura Municipal de Itaguaí · <a href="/sobre" data-tooltip="Versão, tecnologia e roteiro do sistema">Sobre o sistema</a></p>
+    </div>
+  </footer>
+
+  <div id="modalRoot"></div>
+  <div class="popover notification-panel" id="notificationPanel" hidden></div>
+  <div class="popover user-menu" id="userMenu" hidden>
+    <div class="menu-profile"><span class="avatar lg">{{ user.name[0] }}</span><div><strong>{{ user.name }}</strong><small>{{ user.email }}</small></div></div>
+    <a href="/logout"><svg><use href="#i-logout"></use></svg>Sair da conta</a>
+  </div>
+  <div class="toast-stack" id="toastStack" aria-live="assertive"></div>
+
+  <script>
+    window.APP_CONTEXT = {{ {'page': page, 'entityId': entity_id if entity_id else None, 'user': user, 'priorities': priorities, 'statuses': statuses, 'categories': categories}|tojson }};
+  </script>
+  <script src="/static/app.js?v=govbr-6-stats"></script>
+</body>
+</html>

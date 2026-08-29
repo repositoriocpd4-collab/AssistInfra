@@ -3,7 +3,7 @@
 Esta pasta é a versão visual revisada. Execute **`INICIAR_GOVBR.bat`** (ou `INICIAR_SISTEMA.bat`).
 Ela abre em **http://127.0.0.1:8017** para não confundir com versões antigas ainda abertas na porta 8000.
 
-A interface desta versão usa **cabeçalho institucional em duas faixas, menu lateral recolhido/off-canvas e stat-cards no padrão da TELA BASE da Prefeitura**.
+A interface desta versão usa **cabeçalho institucional em duas faixas, menu lateral fixo no desktop (off-canvas apenas em telas pequenas), atalhos de teclado e stat-cards no padrão da TELA BASE da Prefeitura**.
 
 ---
 
@@ -28,6 +28,7 @@ Versão funcional desenvolvida a partir do protótipo visual anexado, com foco e
 - Layout responsivo para desktop, tablet e celular.
 - Hovers, tooltips, modais, drawer lateral, toasts, skeleton loading, badges e estados vazios.
 - Página **Sobre o Sistema** (`/sobre`), com versão, tecnologia, perfis de acesso e roteiro para produção.
+- Menu lateral fixo no desktop (sempre visível) e atalhos de teclado para as principais telas (tecla `?` mostra a lista completa).
 
 ## Documentação do produto
 
