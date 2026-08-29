@@ -6,28 +6,16 @@
   const content = $('#pageContent');
   let schoolsCache = null;
 
-  // Ícones e linguagem simples por categoria, usados no assistente de registro de demanda.
-  const CATEGORY_ICONS = {
-    'Elétrica':'bolt','Hidráulica':'drop','Cobertura/Telhado':'roof','Pintura':'paint','Climatização':'wind',
-    'Serralheria':'wrench','Alvenaria':'brick','Acessibilidade':'wheelchair','Mobiliário':'chair','Equipamentos':'monitor',
-    'Segurança':'shield','Saneamento':'drain','Estrutura':'column','Área externa':'tree','Iluminação':'bulb',
-    'Portas e janelas':'door','Reforma':'hammer','Obra':'crane','Aquisição':'cart','Outros':'dots'
-  };
-  const CATEGORY_COLOR_CYCLE = ['red','orange','teal','violet','green','blue'];
-  const CATEGORY_COLORS = {};
-  Object.keys(CATEGORY_ICONS).forEach((cat,i)=>{ CATEGORY_COLORS[cat] = CATEGORY_COLOR_CYCLE[i % CATEGORY_COLOR_CYCLE.length]; });
-  const CATEGORY_HINTS = {
-    'Elétrica':'Fiação, tomada, quadro de força, curto-circuito','Hidráulica':'Vazamento, entupimento, cano estourado',
-    'Cobertura/Telhado':'Goteira, infiltração, telha quebrada','Pintura':'Parede descascando, mofo, pintura antiga',
-    'Climatização':'Ventilador ou ar-condicionado com problema','Serralheria':'Portão, grade ou trava com defeito',
-    'Alvenaria':'Rachadura, muro ou parede danificada','Acessibilidade':'Rampa, corrimão, piso tátil',
-    'Mobiliário':'Mesa, cadeira, armário quebrado','Equipamentos':'Computador, projetor, equipamento com defeito',
-    'Segurança':'Câmera, alarme, iluminação de segurança','Saneamento':'Esgoto, caixa de gordura, fossa',
-    'Estrutura':'Coluna, viga, laje ou base comprometida','Área externa':'Quadra, pátio, jardim, área externa',
-    'Iluminação':'Lâmpada queimada, poste ou luminária','Portas e janelas':'Porta ou janela emperrada, vidro quebrado',
-    'Reforma':'Melhoria ou reparo de maior porte','Obra':'Construção ou ampliação',
-    'Aquisição':'Compra de material ou equipamento novo','Outros':'Não se encaixa nas opções acima'
-  };
+  // Ícones, cores e dicas por categoria — vêm do servidor (tabela `categories`, editável em
+  // Administração). CATEGORY_ICONS/COLORS/HINTS abaixo derivam de ctx.categoryMeta, com um
+  // fallback neutro para qualquer categoria sem configuração (não deveria acontecer em uso normal).
+  const CATEGORY_META = ctx.categoryMeta || {};
+  const CATEGORY_ICONS = {}, CATEGORY_COLORS = {}, CATEGORY_HINTS = {};
+  Object.keys(CATEGORY_META).forEach(name => {
+    CATEGORY_ICONS[name] = CATEGORY_META[name].icon || 'wrench';
+    CATEGORY_COLORS[name] = CATEGORY_META[name].color || 'blue';
+    CATEGORY_HINTS[name] = CATEGORY_META[name].hint || '';
+  });
   const URGENCY_CHOICES = [
     {value:'P3', title:'Pode esperar', hint:'Não atrapalha o dia a dia agora', icon:'clock'},
     {value:'P2', title:'Precisa de atenção logo', hint:'Já incomoda a rotina da escola', icon:'warning'},
@@ -56,7 +44,8 @@
     if (Number.isNaN(d.getTime())) return v;
     return d.toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
   };
-  const priorityLabel = p => ({P1:'Urgente',P2:'Alta',P3:'Programada',P4:'Planejamento/Projeto'}[p] || p || '—');
+  const PRIORITY_FALLBACK = {P1:'Urgente',P2:'Alta',P3:'Programada',P4:'Planejamento/Projeto'};
+  const priorityLabel = p => (ctx.priorities && ctx.priorities[p] && ctx.priorities[p].label) || PRIORITY_FALLBACK[p] || p || '—';
   const statusClass = s => {
     s=(s||'').toLowerCase();
     if (s.includes('conclu')) return 'completed';
@@ -125,7 +114,7 @@
 
   async function openDemandForm(){
     const schools = await loadSchools();
-    const schoolOptions = ctx.user.role==='escola'
+    const schoolOptions = ctx.user.perm.school_scoped
       ? `<option value="${ctx.user.school_id}">${esc(ctx.user.school_name||'Minha unidade')}</option>`
       : schools.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('');
     const state = {categories:[], items:[],
@@ -144,7 +133,7 @@
       </div>
       <form id="demandForm">
         <section data-step="1" class="form-step">
-          ${ctx.user.role!=='escola'?`<div class="field span-2 mb-16"><label>Unidade Escolar *</label><select class="select" name="school_id" required>${schoolOptions}</select></div>`:''}
+          ${!ctx.user.perm.school_scoped?`<div class="field span-2 mb-16"><label>Unidade Escolar *</label><select class="select" name="school_id" required>${schoolOptions}</select></div>`:''}
           <p class="wizard-question">Qual é o tipo de problema?</p>
           <p class="wizard-hint">Toque em até 3 opções que mais se parecem com o que você está vendo.</p>
           <p class="wizard-hint" id="categoryPickHint">Nenhum problema selecionado ainda.</p>
@@ -185,7 +174,7 @@
         const totalSteps=4;
 
         const syncNextEnabled=()=>{
-          if(step===1) next.disabled = !state.categories.length || (ctx.user.role!=='escola' && !form.elements.school_id.value);
+          if(step===1) next.disabled = !state.categories.length || (!ctx.user.perm.school_scoped && !form.elements.school_id.value);
           else if(step===2) next.disabled = !state.items.length || state.items.some(it=>!it.description.trim());
           else next.disabled=false;
         };
@@ -310,7 +299,7 @@
           if(step===2) renderDetailsFields();
           syncNextEnabled();
           if(step===totalSteps){
-            const selectedSchoolId = ctx.user.role==='escola' ? ctx.user.school_id : form.elements.school_id?.value;
+            const selectedSchoolId = ctx.user.perm.school_scoped ? ctx.user.school_id : form.elements.school_id?.value;
             const s=schools.find(x=>String(x.id)===String(selectedSchoolId));
             const reach = state.customReach ? (Number($('[name=affected_people_custom]',form).value)||0) : state.reach;
             $('#demandReview').innerHTML=`<div class="info-card accent"><h3>${icon('check-circle')}Confira antes de enviar</h3><div class="key-value">
@@ -331,7 +320,7 @@
           if(step===2 && (!state.items.length || state.items.some(it=>!it.description.trim()))) return;
           if(step<totalSteps){ step++; updateStep(); return; }
           const reach = state.customReach ? (Number($('[name=affected_people_custom]',form).value)||0) : state.reach;
-          const schoolId = ctx.user.role==='escola' ? ctx.user.school_id : form.elements.school_id.value;
+          const schoolId = ctx.user.perm.school_scoped ? ctx.user.school_id : form.elements.school_id.value;
           const created=[], failed=[];
           next.disabled=true; next.textContent='Enviando...';
           for(const it of state.items){
@@ -392,10 +381,10 @@
       ['open_cost','Custo em aberto',s.open_cost,'Estimativa do que ainda não foi concluído','blue','money','Soma do custo estimado de tudo que está em aberto','','money']
     ];
     const maxCat=Math.max(1,...data.categories.map(x=>x.qty));
-    const heroCopy = ctx.user.role==='escola'
+    const heroCopy = ctx.user.perm.school_scoped
       ? {eyebrow:'PRECISOU DE ALGO?', title:'Viu um problema na escola? Conte pra gente.', text:'Leva menos de 2 minutos. Escolha o tipo de problema, descreva com suas palavras e, se quiser, envie uma foto.'}
       : {eyebrow:'REGISTRO RÁPIDO', title:'Uma escola reportou algo? Registre em segundos.', text:'Use o assistente guiado para abrir uma demanda com categoria, urgência e impacto já organizados.'};
-    content.innerHTML = pageHeader('Visão Geral', ctx.user.role==='escola' ? `Acompanhe as demandas de ${ctx.user.school_name}.` : 'Status atual das demandas de infraestrutura em toda a Rede Municipal.',
+    content.innerHTML = pageHeader('Visão Geral', ctx.user.perm.school_scoped ? `Acompanhe as demandas de ${ctx.user.school_name}.` : 'Status atual das demandas de infraestrutura em toda a Rede Municipal.',
       `<a class="btn btn-secondary" href="/api/export/demands.csv" data-tooltip="Baixar a lista completa em CSV">${icon('download')}Exportar</a>`)+
       `<section class="report-hero"><div class="report-hero-copy"><span class="eyebrow">${heroCopy.eyebrow}</span><h2>${heroCopy.title}</h2><p>${heroCopy.text}</p></div><button class="btn-report" data-open-demand data-tooltip="Abrir o assistente de registro em 4 passos">${icon('plus')}Registrar Demanda/CI</button></section>`+
       `<div class="stats-grid">${cards.map(c=>`<article class="stat-card ${c[4]}" data-dashboard-filter="${esc(c[7])}" data-tooltip="${esc(c[6])}"><div class="stat-label">${esc(c[1])}</div><div class="stat-value mono${c[8]==='money'?' stat-value-money':''}">${c[8]==='money'?money(c[2]):num(c[2])}</div><div class="stat-note">${icon(c[5])}${esc(c[3])}</div><div class="stat-icon">${icon(c[5])}</div></article>`).join('')}</div>`+
@@ -512,7 +501,7 @@
     </aside></div>`;
     if(name==='technical') return `<div class="detail-layout"><div>
       <section class="info-card accent"><h3>${icon('settings')}Análise Técnica</h3><div class="key-value"><div class="kv"><span>Parecer técnico</span><strong>${esc(d.technical_opinion||'Ainda não registrado.')}</strong></div><div class="kv"><span>Ação definida</span><strong>${esc(d.action_defined||'Ainda não definida.')}</strong></div><div class="kv"><span>Dependências</span><strong>${esc(d.dependencies||'Nenhuma dependência registrada.')}</strong></div></div></section>
-      ${ctx.user.role!=='escola'?`<button class="btn btn-primary" id="editTechnical">${icon('edit')}Atualizar análise técnica</button>`:''}
+      ${ctx.user.perm.can_edit_analysis?`<button class="btn btn-primary" id="editTechnical">${icon('edit')}Atualizar análise técnica</button>`:''}
     </div><aside class="side-stack"><section class="info-card"><h3>${icon('user')}Responsabilidade</h3><div class="key-value"><div class="kv"><span>Responsável</span><strong>${esc(d.responsible||'Não definido')}</strong></div><div class="kv"><span>Setor</span><strong>${esc(d.sector||'Não definido')}</strong></div><div class="kv"><span>Prazo</span><strong>${fmtDate(d.due_date)}</strong></div></div></section><section class="info-card"><h3>${icon('info')}Dependências operacionais</h3><div class="check-grid"><span class="check">${d.needs_visit?'✓':'—'} Visita técnica</span><span class="check">${d.needs_budget?'✓':'—'} Orçamento</span><span class="check">${d.needs_material?'✓':'—'} Material</span><span class="check">${d.needs_contract?'✓':'—'} Contratação</span></div></section></aside></div>`;
     if(name==='responses') return `<div class="detail-layout"><div>
       <div class="composer"><textarea id="updateMessage" placeholder="Registre uma devolutiva, orientação, informação complementar ou andamento..."></textarea><div class="composer-actions"><span class="text-muted" style="font-size:10px">A mensagem ficará registrada no histórico.</span><button class="btn btn-primary" id="sendUpdate">${icon('message')}Registrar devolutiva</button></div></div>
@@ -556,7 +545,7 @@
     const render=()=>{
       const d=payload.demand, due=dueInfo(d);
       content.innerHTML=`<div class="breadcrumb"><a href="/demandas">Demandas</a><span>›</span><span>${esc(d.code)}</span></div>
-        <div class="detail-head"><div><div class="detail-code-line"><span class="code-label">${esc(d.code)}</span><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span><span class="deadline ${due.cls}">${esc(due.text)}</span></div><h1>${esc(d.title)}</h1></div><div class="page-actions">${ctx.user.role!=='escola'?`<button class="btn btn-secondary" id="editDemand">${icon('edit')}Editar análise</button>`:''}<button class="btn btn-primary" id="quickUpdate">${icon('message')}Devolutiva</button></div></div>
+        <div class="detail-head"><div><div class="detail-code-line"><span class="code-label">${esc(d.code)}</span><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span><span class="deadline ${due.cls}">${esc(due.text)}</span></div><h1>${esc(d.title)}</h1></div><div class="page-actions">${ctx.user.perm.can_edit_analysis?`<button class="btn btn-secondary" id="editDemand">${icon('edit')}Editar análise</button>`:''}<button class="btn btn-primary" id="quickUpdate">${icon('message')}Devolutiva</button></div></div>
         <nav class="tabs" aria-label="Detalhes da demanda"><button class="tab ${active==='summary'?'active':''}" data-tab="summary">Resumo</button><button class="tab ${active==='technical'?'active':''}" data-tab="technical">Análise Técnica</button><button class="tab ${active==='responses'?'active':''}" data-tab="responses">Devolutivas</button><button class="tab ${active==='attachments'?'active':''}" data-tab="attachments">Anexos <span class="badge P3">${payload.attachments.length}</span></button><button class="tab ${active==='history'?'active':''}" data-tab="history">Histórico</button><button class="tab ${active==='planning'?'active':''}" data-tab="planning">Planejamento</button></nav>
         <div id="tabContent">${detailTabContent(active,payload)}</div>`;
       const reload=async()=>{payload=await api(`/api/demands/${id}`);render()};
@@ -576,7 +565,7 @@
 
   async function openFutureDemandForm(){
     const schools=await loadSchools();
-    const schoolOptions=ctx.user.role==='escola'?`<option value="${ctx.user.school_id}">${esc(ctx.user.school_name||'Minha unidade')}</option>`:schools.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
+    const schoolOptions=ctx.user.perm.school_scoped?`<option value="${ctx.user.school_id}">${esc(ctx.user.school_name||'Minha unidade')}</option>`:schools.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
     modal({title:'Nova Demanda Futura',subtitle:'Registre uma necessidade dos próximos exercícios para planejamento, aquisição, contratação ou licitação.',mode:'drawer',body:`<form id="futureDemandForm"><div class="form-grid">
       <div class="field span-2"><label>Unidade Escolar *</label><select class="select" name="school_id" required>${schoolOptions}</select></div>
       <div class="field"><label>Exercício pretendido *</label><select class="select" name="future_year" required>${[2027,2028,2029,2030,2031].map(y=>`<option>${y}</option>`).join('')}</select></div>
@@ -618,7 +607,7 @@
     const stats=data.year_stats.find(x=>x.year===selected)||{items:0,total_cost:0,schools:0};
     content.innerHTML=`<section class="planning-hero"><div><span class="eyebrow" style="color:#7fe2df">PLANEJAMENTO E CONTRATAÇÕES</span><h1>Planejamento Futuro</h1><p>Consolide necessidades da rede e transforme demandas em aquisições, contratações, obras e projetos.</p></div><div><label class="form-label" style="color:#d8e8f7">EXERCÍCIO</label><select id="planningYear" class="year-select">${years.map(y=>`<option ${y===selected?'selected':''}>${y}</option>`).join('')}</select></div></section>
       <div class="stats-grid"><article class="stat-card blue"><div class="stat-label">Orçamento estimado</div><div class="stat-value" style="font-size:28px">${money(stats.total_cost)}</div><div class="stat-note">${icon('money')}Visão consolidada do exercício</div></article><article class="stat-card teal"><div class="stat-label">Itens consolidados</div><div class="stat-value">${num(stats.items)}</div><div class="stat-note">${icon('clipboard')}Objetos em planejamento</div></article><article class="stat-card orange"><div class="stat-label">Escolas impactadas</div><div class="stat-value">${num(stats.schools)}</div><div class="stat-note">${icon('school')}Soma das unidades vinculadas</div></article><article class="stat-card violet"><div class="stat-label">Ciclo administrativo</div><div class="stat-value" style="font-size:21px;margin-top:13px">Planejar → Licitar</div><div class="stat-note">${icon('trend')}Rastreabilidade do início à execução</div></article></div>
-      ${pageHeader(`Planejamento ${selected}`,'Itens previstos, consolidados e em preparação para contratação.',`<button class="btn btn-secondary" id="planningHelp">${icon('info')}Como funciona</button><button class="btn btn-secondary" id="newFutureDemand">${icon('plus')}Nova Demanda Futura</button>${ctx.user.role!=='escola'?`<button class="btn btn-primary" id="newPlanning">${icon('plus')}Consolidar Item</button>`:''}`)}
+      ${pageHeader(`Planejamento ${selected}`,'Itens previstos, consolidados e em preparação para contratação.',`<button class="btn btn-secondary" id="planningHelp">${icon('info')}Como funciona</button><button class="btn btn-secondary" id="newFutureDemand">${icon('plus')}Nova Demanda Futura</button>${ctx.user.perm.can_edit_analysis?`<button class="btn btn-primary" id="newPlanning">${icon('plus')}Consolidar Item</button>`:''}`)}
       <section class="panel"><div class="panel-header"><div><h2>Demandas de aquisição e contratação</h2><p>Itens consolidados para o exercício selecionado.</p></div><div class="search-field" style="width:260px">${icon('search')}<input class="input" id="planningQ" placeholder="Pesquisar planejamento..."></div></div><div id="planningTable"></div></section>`;
     const load=async()=>{const q=$('#planningQ')?.value||'';const res=await api(`/api/planning?year=${selected}&q=${encodeURIComponent(q)}`);$('#planningTable').innerHTML=renderPlanningTable(res.items)};
     $('#planningYear').addEventListener('change',e=>location.href=`/planejamento?year=${e.target.value}`); $('#newFutureDemand')?.addEventListener('click',openFutureDemandForm); $('#newPlanning')?.addEventListener('click',openPlanningForm); let t;$('#planningQ').addEventListener('input',()=>{clearTimeout(t);t=setTimeout(load,200)});$('#planningHelp').addEventListener('click',()=>modal({title:'Fluxo do Planejamento',mode:'center',body:`<div class="info-card accent"><h3>${icon('trend')}Do registro à execução</h3><p><strong>Demanda da escola</strong> → Análise técnica → Planejamento futuro → Consolidação → Processo administrativo → Licitação/Contratação → Contrato → Execução.</p></div><div class="alert info">A consolidação permite agrupar necessidades semelhantes de várias unidades sem perder o vínculo com cada escola de origem.</div>`})); await load();
@@ -651,11 +640,337 @@
       <section class="panel mt-16"><div class="panel-header"><div><h2>Resumo executivo</h2><p>Indicadores atuais para reuniões e pactuações.</p></div></div><div class="panel-body"><div class="metric-row"><div class="metric"><span>Total de demandas</span><strong>${num(dash.stats.total)}</strong></div><div class="metric"><span>Urgentes</span><strong class="text-red">${num(dash.stats.urgent)}</strong></div><div class="metric"><span>Percentual de execução</span><strong class="text-teal">${dash.stats.execution}%</strong></div></div></div></section>`;
   }
 
+  const ADMIN_ICON_SET = ['bolt','drop','roof','paint','wind','wrench','brick','wheelchair','chair','monitor','shield','drain','column','tree','bulb','door','hammer','crane','cart','dots','clipboard','building','file','warning','money','report','camera','settings','school','calendar','grid','paperclip','message','trend'];
+  const ADMIN_COLOR_SET = [['red','Vermelho'],['orange','Laranja'],['teal','Verde-água'],['violet','Violeta'],['green','Verde'],['blue','Azul']];
+  const statePill = (active,onLabel='Ativo',offLabel='Inativo') => `<span class="badge" style="background:var(--${active?'green':'red'}-soft);color:var(--${active?'green':'red'})">${active?onLabel:offLabel}</span>`;
+  function confirmAction(title, message, {confirmLabel='Confirmar', danger=true}={}){
+    return new Promise(resolve=>{
+      let settled=false;
+      const root=$('#modalRoot');
+      const mo=new MutationObserver(()=>{ if(!root.innerHTML && !settled){ settled=true; mo.disconnect(); resolve(false); } });
+      mo.observe(root,{childList:true});
+      modal({title,mode:'center',body:`<div class="alert ${danger?'error':'info'}">${esc(message)}</div>`,
+        footer:`<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn ${danger?'btn-danger':'btn-primary'}" id="confirmOk">${esc(confirmLabel)}</button>`,
+        onOpen(){ $('#confirmOk').addEventListener('click',()=>{ settled=true; mo.disconnect(); closeModal(); resolve(true); }); }
+      });
+    });
+  }
+
   async function renderAdmin(){
-    setLoading(); const a=await api('/api/admin/summary');
-    content.innerHTML=pageHeader('Administração','Configurações, cadastros-base e integridade do ambiente.',`<button class="btn btn-secondary" id="adminInfo">${icon('info')}Sobre esta versão</button>`)+`<div class="admin-grid"><div class="admin-card"><div class="admin-value">${num(a.schools)}</div><div class="admin-label">Unidades Escolares</div></div><div class="admin-card"><div class="admin-value">${num(a.users)}</div><div class="admin-label">Usuários</div></div><div class="admin-card"><div class="admin-value">${num(a.demands)}</div><div class="admin-label">Demandas</div></div><div class="admin-card"><div class="admin-value">${num(a.planning)}</div><div class="admin-label">Itens de planejamento</div></div><div class="admin-card"><div class="admin-value">${num(a.attachments)}</div><div class="admin-label">Anexos</div></div><div class="admin-card"><div class="admin-value">${Math.max(1,Math.round(a.db_size/1024))} KB</div><div class="admin-label">Base local</div></div></div>
-      <section class="panel"><div class="panel-header"><div><h2>Cadastros e parâmetros</h2><p>Estruturas que sustentam o fluxo institucional.</p></div></div><div class="panel-body"><div class="config-list"><div class="config-item">${icon('school')}<div><strong>Unidades Escolares</strong><small>Cadastro e informações institucionais.</small></div><a class="btn btn-secondary" href="/escolas">Abrir</a></div><div class="config-item">${icon('user')}<div><strong>Perfis e permissões</strong><small>Gestor, Unidade Escolar e Planejamento.</small></div><button class="btn btn-secondary" data-disabled>Estruturado</button></div><div class="config-item">${icon('clipboard')}<div><strong>Status e prioridades</strong><small>Fluxo P1–P4 e estados operacionais.</small></div><button class="btn btn-secondary" data-disabled>Parametrizado</button></div><div class="config-item">${icon('calendar')}<div><strong>Exercícios futuros</strong><small>Planejamento plurianual e consolidação.</small></div><a class="btn btn-secondary" href="/planejamento">Abrir</a></div></div></div></section>`;
-    $('#adminInfo').addEventListener('click',()=>modal({title:'Sobre esta versão',mode:'center',body:`<div class="info-card accent"><h3>${icon('info')}Versão funcional demonstrativa</h3><p>Esta implementação possui backend FastAPI, banco SQLite, autenticação por sessão, perfis, CRUD de demandas, histórico, devolutivas, anexos, planejamento futuro, filtros, exportação CSV e interface responsiva.</p></div><div class="alert info">Antes de produção, altere a chave de sessão e as senhas demonstrativas e configure infraestrutura de hospedagem, backup, HTTPS e banco corporativo.</div>`}));$$('[data-disabled]').forEach(b=>b.addEventListener('click',()=>toast('Parâmetro estruturado','A edição administrativa completa pode ser conectada à base institucional na etapa de implantação.')));
+    if(!ctx.user.perm.can_manage_admin){ location.href='/'; return; }
+    const TABS=[['geral','Visão Geral','grid'],['categorias','Categorias','clipboard'],['prioridades','Prioridades','warning'],['kanban','Colunas do Kanban','kanban'],['escolas','Unidades Escolares','school'],['perfis','Perfis de Acesso','user'],['usuarios','Usuários','user']];
+    let active = new URLSearchParams(location.search).get('tab') || 'geral';
+    if(!TABS.some(t=>t[0]===active)) active='geral';
+    async function paint(){
+      content.innerHTML = pageHeader('Administração','Configurações, cadastros-base e integridade do ambiente.',`<button class="btn btn-secondary" id="adminInfo">${icon('info')}Sobre esta versão</button>`)
+        + `<nav class="tabs" aria-label="Seções de administração">${TABS.map(t=>`<button class="tab ${active===t[0]?'active':''}" data-atab="${t[0]}">${icon(t[2])}${t[1]}</button>`).join('')}</nav>
+        <div id="adminTabBody"><div class="page-skeleton"><div class="skeleton sk-title"></div><div class="skeleton sk-subtitle"></div></div></div>`;
+      $('#adminInfo').addEventListener('click',()=>modal({title:'Sobre esta versão',mode:'center',body:`<div class="info-card accent"><h3>${icon('info')}Versão funcional demonstrativa</h3><p>Esta implementação possui backend FastAPI, banco SQLite, autenticação por sessão, perfis, CRUD de demandas, histórico, devolutivas, anexos, planejamento futuro, filtros, exportação CSV e interface responsiva.</p></div><div class="alert info">Antes de produção, altere a chave de sessão e as senhas demonstrativas e configure infraestrutura de hospedagem, backup, HTTPS e banco corporativo.</div>`}));
+      $$('[data-atab]').forEach(b=>b.addEventListener('click',()=>{ if(active===b.dataset.atab)return; active=b.dataset.atab; history.replaceState(null,'',`/administracao?tab=${active}`); paint(); }));
+      const body=$('#adminTabBody');
+      try{
+        if(active==='geral') await renderAdminGeral(body);
+        else if(active==='categorias') await renderAdminCategorias(body);
+        else if(active==='prioridades') await renderAdminPrioridades(body);
+        else if(active==='kanban') await renderAdminKanban(body);
+        else if(active==='escolas') await renderAdminEscolas(body);
+        else if(active==='perfis') await renderAdminPerfis(body);
+        else if(active==='usuarios') await renderAdminUsuarios(body);
+      }catch(e){ body.innerHTML = `<div class="alert error">${esc(e.message)}</div>`; }
+    }
+    await paint();
+  }
+
+  async function renderAdminGeral(body){
+    const a = await api('/api/admin/summary');
+    body.innerHTML = `<div class="admin-grid">
+      <div class="admin-card"><div class="admin-value">${num(a.schools)}</div><div class="admin-label">Unidades Escolares</div></div>
+      <div class="admin-card"><div class="admin-value">${num(a.users)}</div><div class="admin-label">Usuários</div></div>
+      <div class="admin-card"><div class="admin-value">${num(a.demands)}</div><div class="admin-label">Demandas</div></div>
+      <div class="admin-card"><div class="admin-value">${num(a.planning)}</div><div class="admin-label">Itens de planejamento</div></div>
+      <div class="admin-card"><div class="admin-value">${num(a.attachments)}</div><div class="admin-label">Anexos</div></div>
+      <div class="admin-card"><div class="admin-value">${num(a.categories)}</div><div class="admin-label">Categorias ativas</div></div>
+      <div class="admin-card"><div class="admin-value">${num(a.profiles)}</div><div class="admin-label">Perfis de acesso</div></div>
+      <div class="admin-card"><div class="admin-value">${Math.max(1,Math.round(a.db_size/1024))} KB</div><div class="admin-label">Base local</div></div>
+    </div>
+    <section class="panel mt-16"><div class="panel-header"><div><h2>Cadastros e parâmetros</h2><p>Use as abas acima para editar categorias, prioridades, colunas do Kanban, unidades escolares, perfis de acesso e usuários.</p></div></div><div class="panel-body"><div class="config-list">
+      <div class="config-item">${icon('clipboard')}<div><strong>Categorias</strong><small>Ícone, cor e texto de apoio de cada categoria de demanda.</small></div><button class="btn btn-secondary" data-goto="categorias">Abrir</button></div>
+      <div class="config-item">${icon('warning')}<div><strong>Prioridades</strong><small>Rótulo e orientação de P1 a P4.</small></div><button class="btn btn-secondary" data-goto="prioridades">Abrir</button></div>
+      <div class="config-item">${icon('kanban')}<div><strong>Colunas do Kanban</strong><small>Títulos, cores e status de cada coluna do quadro.</small></div><button class="btn btn-secondary" data-goto="kanban">Abrir</button></div>
+      <div class="config-item">${icon('school')}<div><strong>Unidades Escolares</strong><small>Cadastro, ativação e exclusão de unidades.</small></div><button class="btn btn-secondary" data-goto="escolas">Abrir</button></div>
+      <div class="config-item">${icon('user')}<div><strong>Perfis de acesso</strong><small>Crie perfis personalizados com permissões próprias.</small></div><button class="btn btn-secondary" data-goto="perfis">Abrir</button></div>
+      <div class="config-item">${icon('user')}<div><strong>Usuários</strong><small>Cadastro, perfil e situação de cada usuário.</small></div><button class="btn btn-secondary" data-goto="usuarios">Abrir</button></div>
+    </div></div></section>`;
+    $$('[data-goto]',body).forEach(b=>b.addEventListener('click',()=>{ $(`[data-atab="${b.dataset.goto}"]`)?.click(); }));
+  }
+
+  async function renderAdminCategorias(body){
+    const rows = await api('/api/admin/categories');
+    body.innerHTML = `<section class="panel"><div class="panel-header"><div><h2>Categorias</h2><p>Ícone, cor e texto de apoio exibidos ao registrar uma demanda.</p></div><button class="btn btn-primary" id="newCategory">${icon('plus')}Nova categoria</button></div><div class="panel-body">
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>Categoria</th><th>Ícone</th><th>Cor</th><th>Texto de apoio</th><th>Situação</th><th>Ações</th></tr></thead><tbody>
+      ${rows.length?rows.map(c=>`<tr class="${c.active?'':'row-inactive'}"><td><strong>${esc(c.name)}</strong></td><td>${icon(c.icon)}</td><td><span class="color-dot" style="background:var(--${c.color})"></span>${esc(c.color)}</td><td>${esc(c.hint||'—')}</td><td>${statePill(!!c.active,'Ativa','Inativa')}</td><td class="row-actions"><button class="icon-btn" data-edit="${c.id}" data-tooltip="Editar">${icon('edit')}</button><button class="icon-btn" data-del="${c.id}" data-tooltip="Excluir">${icon('x')}</button></td></tr>`).join(''):`<tr><td colspan="6">${empty('Nenhuma categoria cadastrada')}</td></tr>`}
+      </tbody></table></div>
+    </div></section>`;
+    $('#newCategory').addEventListener('click',()=>openCategoryForm(null,body));
+    $$('[data-edit]',body).forEach(b=>b.addEventListener('click',()=>openCategoryForm(rows.find(r=>r.id===Number(b.dataset.edit)),body)));
+    $$('[data-del]',body).forEach(b=>b.addEventListener('click',async()=>{
+      const c=rows.find(r=>r.id===Number(b.dataset.del));
+      const ok=await confirmAction('Excluir categoria',`Tem certeza de que deseja excluir "${c.name}"? Esta ação não pode ser desfeita.`,{confirmLabel:'Excluir'});
+      if(!ok) return;
+      try{ await api(`/api/admin/categories/${c.id}`,{method:'DELETE'}); toast('Categoria excluída'); renderAdminCategorias(body); }
+      catch(e){ toast('Não foi possível excluir',e.message,'error'); }
+    }));
+  }
+
+  function openCategoryForm(cat, body){
+    const editing = !!cat;
+    let selIcon = cat?.icon || 'wrench';
+    let selColor = cat?.color || 'blue';
+    modal({title: editing?'Editar categoria':'Nova categoria', mode:'drawer', body:`<form id="categoryForm"><div class="form-grid">
+      <div class="field span-2"><label>Nome *</label><input class="input" name="name" required maxlength="60" value="${esc(cat?.name||'')}"></div>
+      <div class="field span-2"><label>Texto de apoio</label><input class="input" name="hint" maxlength="140" value="${esc(cat?.hint||'')}" placeholder="Ex.: Fiação, tomada, quadro de força..."></div>
+      <div class="field span-2"><label>Ícone</label><div class="icon-picker" id="iconPicker">${ADMIN_ICON_SET.map(i=>`<button type="button" class="icon-pick ${i===selIcon?'active':''}" data-icon="${i}" data-tooltip="${i}">${icon(i)}</button>`).join('')}</div></div>
+      <div class="field span-2"><label>Cor</label><div class="color-picker" id="colorPicker">${ADMIN_COLOR_SET.map(([v,l])=>`<button type="button" class="color-pick ${v===selColor?'active':''}" data-color="${v}" data-tooltip="${l}" style="background:var(--${v})"></button>`).join('')}</div></div>
+      ${editing?`<div class="field span-2"><label class="check"><input type="checkbox" name="active" ${cat.active?'checked':''}> Categoria ativa</label></div>`:''}
+    </div></form>`,
+    footer:`<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="saveCategory">${editing?'Salvar':'Criar categoria'}</button>`,
+    onOpen(){
+      $$('#iconPicker [data-icon]').forEach(b=>b.addEventListener('click',()=>{selIcon=b.dataset.icon;$$('#iconPicker [data-icon]').forEach(x=>x.classList.toggle('active',x===b));}));
+      $$('#colorPicker [data-color]').forEach(b=>b.addEventListener('click',()=>{selColor=b.dataset.color;$$('#colorPicker [data-color]').forEach(x=>x.classList.toggle('active',x===b));}));
+      $('#saveCategory').addEventListener('click',async()=>{
+        const f=$('#categoryForm'); if(!f.reportValidity())return;
+        const payload=Object.fromEntries(new FormData(f).entries());
+        payload.icon=selIcon; payload.color=selColor;
+        if(editing) payload.active = f.elements['active'] ? f.elements['active'].checked : true;
+        try{
+          if(editing) await api(`/api/admin/categories/${cat.id}`,{method:'PUT',body:payload});
+          else await api('/api/admin/categories',{method:'POST',body:payload});
+          closeModal(); toast(editing?'Categoria atualizada':'Categoria criada'); renderAdminCategorias(body);
+        }catch(e){ toast('Não foi possível salvar',e.message,'error'); }
+      });
+    }});
+  }
+
+  async function renderAdminPrioridades(body){
+    const rows = await api('/api/admin/priorities');
+    body.innerHTML = `<section class="panel"><div class="panel-header"><div><h2>Prioridades</h2><p>Rótulo e orientação exibidos para cada nível de prioridade. Os códigos P1–P4 são fixos.</p></div></div><div class="panel-body">
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>Código</th><th>Rótulo</th><th>Orientação</th><th>Ações</th></tr></thead><tbody>
+      ${rows.map(p=>`<tr><td><span class="badge ${p.code}">${p.code}</span></td><td><strong>${esc(p.label)}</strong></td><td>${esc(p.hint||'—')}</td><td class="row-actions"><button class="icon-btn" data-edit="${p.code}" data-tooltip="Editar">${icon('edit')}</button></td></tr>`).join('')}
+      </tbody></table></div>
+    </div></section>`;
+    $$('[data-edit]',body).forEach(b=>b.addEventListener('click',()=>openPriorityForm(rows.find(r=>r.code===b.dataset.edit),body)));
+  }
+
+  function openPriorityForm(p, body){
+    modal({title:`Editar prioridade ${p.code}`,mode:'center',body:`<form id="priorityForm"><div class="form-grid">
+      <div class="field span-2"><label>Rótulo *</label><input class="input" name="label" required maxlength="60" value="${esc(p.label)}"></div>
+      <div class="field span-2"><label>Orientação</label><textarea class="textarea" name="hint" maxlength="200">${esc(p.hint||'')}</textarea></div>
+    </div></form>`,
+    footer:`<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="savePriority">Salvar</button>`,
+    onOpen(){
+      $('#savePriority').addEventListener('click',async()=>{
+        const f=$('#priorityForm'); if(!f.reportValidity())return;
+        const payload=Object.fromEntries(new FormData(f).entries());
+        try{ await api(`/api/admin/priorities/${p.code}`,{method:'PUT',body:payload}); closeModal(); toast('Prioridade atualizada'); renderAdminPrioridades(body); }
+        catch(e){ toast('Não foi possível salvar',e.message,'error'); }
+      });
+    }});
+  }
+
+  async function renderAdminKanban(body){
+    const rows = await api('/api/admin/kanban-stages');
+    body.innerHTML = `<section class="panel"><div class="panel-header"><div><h2>Colunas do Kanban</h2><p>Título, cor e status agrupados em cada coluna do quadro.</p></div><button class="btn btn-primary" id="newStage">${icon('plus')}Nova coluna</button></div><div class="panel-body">
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>Coluna</th><th>Cor</th><th>Status incluídos</th><th>Status padrão</th><th>Ações</th></tr></thead><tbody>
+      ${rows.length?rows.map(s=>`<tr><td><strong>${esc(s.label)}</strong>${s.hint?`<small>${esc(s.hint)}</small>`:''}</td><td><span class="color-dot" style="background:var(--${s.accent})"></span>${esc(s.accent)}</td><td>${s.statuses.map(x=>`<span class="badge P4">${esc(x)}</span>`).join(' ')}</td><td>${esc(s.target_status)}</td><td class="row-actions"><button class="icon-btn" data-edit="${s.id}" data-tooltip="Editar">${icon('edit')}</button><button class="icon-btn" data-del="${s.id}" data-tooltip="Excluir">${icon('x')}</button></td></tr>`).join(''):`<tr><td colspan="5">${empty('Nenhuma coluna cadastrada')}</td></tr>`}
+      </tbody></table></div>
+    </div></section>`;
+    $('#newStage').addEventListener('click',()=>openStageForm(null,body,rows));
+    $$('[data-edit]',body).forEach(b=>b.addEventListener('click',()=>openStageForm(rows.find(r=>r.id===Number(b.dataset.edit)),body,rows)));
+    $$('[data-del]',body).forEach(b=>b.addEventListener('click',async()=>{
+      const s=rows.find(r=>r.id===Number(b.dataset.del));
+      const ok=await confirmAction('Excluir coluna',`Excluir a coluna "${s.label}"? Só é possível quando ela não tiver nenhum status vinculado.`,{confirmLabel:'Excluir'});
+      if(!ok) return;
+      try{ await api(`/api/admin/kanban-stages/${s.id}`,{method:'DELETE'}); toast('Coluna excluída'); renderAdminKanban(body); }
+      catch(e){ toast('Não foi possível excluir',e.message,'error'); }
+    }));
+  }
+
+  function openStageForm(stage, body, allStages){
+    const editing = !!stage;
+    let selColor = stage?.accent || 'blue';
+    let selStatuses = new Set(stage?.statuses || []);
+    const usedElsewhere = new Set();
+    allStages.filter(s=>!editing||s.id!==stage.id).forEach(s=>s.statuses.forEach(x=>usedElsewhere.add(x)));
+    modal({title: editing?'Editar coluna':'Nova coluna', mode:'drawer', body:`<form id="stageForm"><div class="form-grid">
+      <div class="field span-2"><label>Título *</label><input class="input" name="label" required maxlength="60" value="${esc(stage?.label||'')}"></div>
+      <div class="field span-2"><label>Descrição curta</label><input class="input" name="hint" maxlength="140" value="${esc(stage?.hint||'')}"></div>
+      <div class="field span-2"><label>Cor</label><div class="color-picker" id="stageColorPicker">${ADMIN_COLOR_SET.map(([v,l])=>`<button type="button" class="color-pick ${v===selColor?'active':''}" data-color="${v}" data-tooltip="${l}" style="background:var(--${v})"></button>`).join('')}</div></div>
+      <div class="field span-2"><label>Status incluídos nesta coluna *</label><div class="check-grid" id="statusPicker">${ctx.statuses.map(st=>`<label class="check ${usedElsewhere.has(st)?'check-disabled':''}"><input type="checkbox" value="${esc(st)}" ${selStatuses.has(st)?'checked':''} ${usedElsewhere.has(st)?'disabled':''}> ${esc(st)}${usedElsewhere.has(st)?' (em outra coluna)':''}</label>`).join('')}</div></div>
+      <div class="field span-2"><label>Status padrão ao mover um cartão para cá</label><select class="select" id="targetStatus"></select></div>
+    </div></form>`,
+    footer:`<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="saveStage">${editing?'Salvar':'Criar coluna'}</button>`,
+    onOpen(){
+      $$('#stageColorPicker [data-color]').forEach(b=>b.addEventListener('click',()=>{selColor=b.dataset.color;$$('#stageColorPicker [data-color]').forEach(x=>x.classList.toggle('active',x===b));}));
+      const refreshTarget=()=>{ const sel=$('#targetStatus'); sel.innerHTML=[...selStatuses].map(s=>`<option ${stage&&s===stage.target_status?'selected':''}>${esc(s)}</option>`).join('')||'<option value="">Selecione ao menos um status</option>'; };
+      refreshTarget();
+      $$('#statusPicker input[type=checkbox]').forEach(cb=>cb.addEventListener('change',()=>{ if(cb.checked) selStatuses.add(cb.value); else selStatuses.delete(cb.value); refreshTarget(); }));
+      $('#saveStage').addEventListener('click',async()=>{
+        const f=$('#stageForm'); if(!f.reportValidity())return;
+        if(!selStatuses.size){ toast('Selecione ao menos um status','','error'); return; }
+        const payload={label:f.elements.label.value, hint:f.elements.hint.value, accent:selColor, statuses:[...selStatuses], target_status:$('#targetStatus').value||[...selStatuses][0]};
+        try{
+          if(editing) await api(`/api/admin/kanban-stages/${stage.id}`,{method:'PUT',body:payload});
+          else await api('/api/admin/kanban-stages',{method:'POST',body:payload});
+          closeModal(); toast(editing?'Coluna atualizada':'Coluna criada'); renderAdminKanban(body);
+        }catch(e){ toast('Não foi possível salvar',e.message,'error'); }
+      });
+    }});
+  }
+
+  async function renderAdminEscolas(body){
+    const rows = await api('/api/schools?include_inactive=1');
+    body.innerHTML = `<section class="panel"><div class="panel-header"><div><h2>Unidades Escolares</h2><p>Cadastro, ativação e exclusão de unidades escolares.</p></div><button class="btn btn-primary" id="newSchool">${icon('plus')}Nova unidade</button></div><div class="panel-body">
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>Unidade</th><th>Direção</th><th>Contato</th><th>Situação</th><th>Ações</th></tr></thead><tbody>
+      ${rows.length?rows.map(s=>`<tr class="${s.active?'':'row-inactive'}"><td><strong>${esc(s.name)}</strong>${s.code?`<small>${esc(s.code)}</small>`:''}</td><td>${esc(s.director||'—')}</td><td>${esc(s.phone||'—')}${s.email?` · ${esc(s.email)}`:''}</td><td>${statePill(!!s.active)}</td><td class="row-actions"><button class="icon-btn" data-edit="${s.id}" data-tooltip="Editar">${icon('edit')}</button><button class="icon-btn" data-toggle="${s.id}" data-tooltip="${s.active?'Desativar':'Ativar'}">${icon(s.active?'x':'check-circle')}</button><button class="icon-btn" data-del="${s.id}" data-tooltip="Excluir">${icon('x')}</button></td></tr>`).join(''):`<tr><td colspan="5">${empty('Nenhuma unidade cadastrada')}</td></tr>`}
+      </tbody></table></div>
+    </div></section>`;
+    $('#newSchool').addEventListener('click',()=>openSchoolForm(null,body));
+    $$('[data-edit]',body).forEach(b=>b.addEventListener('click',()=>openSchoolForm(rows.find(r=>r.id===Number(b.dataset.edit)),body)));
+    $$('[data-toggle]',body).forEach(b=>b.addEventListener('click',async()=>{
+      const s=rows.find(r=>r.id===Number(b.dataset.toggle));
+      try{ const res=await api(`/api/admin/schools/${s.id}/toggle-active`,{method:'POST'}); toast(res.active?'Unidade ativada':'Unidade desativada'); schoolsCache=null; renderAdminEscolas(body); }
+      catch(e){ toast('Não foi possível atualizar',e.message,'error'); }
+    }));
+    $$('[data-del]',body).forEach(b=>b.addEventListener('click',async()=>{
+      const s=rows.find(r=>r.id===Number(b.dataset.del));
+      const ok=await confirmAction('Excluir unidade',`Excluir "${s.name}"? Só é possível quando não houver demandas ou usuários vinculados a ela.`,{confirmLabel:'Excluir'});
+      if(!ok) return;
+      try{ await api(`/api/admin/schools/${s.id}`,{method:'DELETE'}); toast('Unidade excluída'); schoolsCache=null; renderAdminEscolas(body); }
+      catch(e){ toast('Não foi possível excluir',e.message,'error'); }
+    }));
+  }
+
+  function openSchoolForm(school, body){
+    const editing = !!school;
+    modal({title: editing?'Editar unidade escolar':'Nova unidade escolar', mode:'drawer', body:`<form id="schoolForm"><div class="form-grid">
+      <div class="field span-2"><label>Nome *</label><input class="input" name="name" required maxlength="140" value="${esc(school?.name||'')}"></div>
+      <div class="field"><label>Código</label><input class="input" name="code" maxlength="30" value="${esc(school?.code||'')}"></div>
+      <div class="field"><label>Direção</label><input class="input" name="director" maxlength="140" value="${esc(school?.director||'')}"></div>
+      <div class="field"><label>Telefone</label><input class="input" name="phone" maxlength="30" value="${esc(school?.phone||'')}"></div>
+      <div class="field"><label>E-mail</label><input class="input" type="email" name="email" maxlength="140" value="${esc(school?.email||'')}"></div>
+      <div class="field span-2"><label>Endereço</label><input class="input" name="address" maxlength="220" value="${esc(school?.address||'')}"></div>
+    </div></form>`,
+    footer:`<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="saveSchool">${editing?'Salvar':'Criar unidade'}</button>`,
+    onOpen(){
+      $('#saveSchool').addEventListener('click',async()=>{
+        const f=$('#schoolForm'); if(!f.reportValidity())return;
+        const payload=Object.fromEntries(new FormData(f).entries());
+        try{
+          if(editing) await api(`/api/admin/schools/${school.id}`,{method:'PUT',body:payload});
+          else await api('/api/admin/schools',{method:'POST',body:payload});
+          closeModal(); toast(editing?'Unidade atualizada':'Unidade criada'); schoolsCache=null; renderAdminEscolas(body);
+        }catch(e){ toast('Não foi possível salvar',e.message,'error'); }
+      });
+    }});
+  }
+
+  async function renderAdminPerfis(body){
+    const rows = await api('/api/admin/profiles');
+    body.innerHTML = `<section class="panel"><div class="panel-header"><div><h2>Perfis de Acesso</h2><p>Crie perfis personalizados combinando as permissões abaixo, ou ajuste os perfis padrão do sistema.</p></div><button class="btn btn-primary" id="newProfile">${icon('plus')}Novo perfil</button></div><div class="panel-body">
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>Perfil</th><th>Escopo</th><th>Permissões</th><th>Situação</th><th>Ações</th></tr></thead><tbody>
+      ${rows.map(p=>`<tr class="${p.active?'':'row-inactive'}"><td><strong>${esc(p.label)}</strong><small>${esc(p.slug)}${p.is_system?' · perfil do sistema':''}</small></td><td>${p.school_scoped?'Restrito à própria escola':'Visão da rede'}</td><td>${[p.can_edit_analysis?'Análise técnica':null,p.can_manage_admin?'Administração':null,p.can_view_reports?'Relatórios':null,p.can_view_planning?'Planejamento':null].filter(Boolean).map(x=>`<span class="badge P4">${x}</span>`).join(' ')||'—'}</td><td>${statePill(!!p.active)}</td><td class="row-actions"><button class="icon-btn" data-edit="${p.id}" data-tooltip="Editar">${icon('edit')}</button>${p.is_system?'':`<button class="icon-btn" data-del="${p.id}" data-tooltip="Excluir">${icon('x')}</button>`}</td></tr>`).join('')}
+      </tbody></table></div>
+    </div></section>`;
+    $('#newProfile').addEventListener('click',()=>openProfileForm(null,body));
+    $$('[data-edit]',body).forEach(b=>b.addEventListener('click',()=>openProfileForm(rows.find(r=>r.id===Number(b.dataset.edit)),body)));
+    $$('[data-del]',body).forEach(b=>b.addEventListener('click',async()=>{
+      const p=rows.find(r=>r.id===Number(b.dataset.del));
+      const ok=await confirmAction('Excluir perfil',`Excluir o perfil "${p.label}"? Só é possível quando nenhum usuário estiver com esse perfil.`,{confirmLabel:'Excluir'});
+      if(!ok) return;
+      try{ await api(`/api/admin/profiles/${p.id}`,{method:'DELETE'}); toast('Perfil excluído'); renderAdminPerfis(body); }
+      catch(e){ toast('Não foi possível excluir',e.message,'error'); }
+    }));
+  }
+
+  function openProfileForm(profile, body){
+    const editing = !!profile;
+    modal({title: editing?`Editar perfil${profile.is_system?' do sistema':''}`:'Novo perfil de acesso', mode:'drawer', body:`<form id="profileForm"><div class="form-grid">
+      <div class="field span-2"><label>Nome do perfil *</label><input class="input" name="label" required maxlength="60" value="${esc(profile?.label||'')}"></div>
+      <div class="field span-2"><label>Descrição</label><input class="input" name="description" maxlength="200" value="${esc(profile?.description||'')}"></div>
+      <div class="field span-2"><label>Permissões</label><div class="check-grid">
+        <label class="check"><input type="checkbox" name="school_scoped" ${profile?.school_scoped?'checked':''}> Restrito à própria unidade escolar</label>
+        <label class="check"><input type="checkbox" name="can_edit_analysis" ${profile?.can_edit_analysis??true?'checked':''}> Pode editar a análise técnica</label>
+        <label class="check"><input type="checkbox" name="can_manage_admin" ${profile?.can_manage_admin?'checked':''}> Acesso à Administração</label>
+        <label class="check"><input type="checkbox" name="can_view_reports" ${profile?.can_view_reports??true?'checked':''}> Acesso a Relatórios</label>
+        <label class="check"><input type="checkbox" name="can_view_planning" ${profile?.can_view_planning??true?'checked':''}> Acesso ao Planejamento Futuro</label>
+      </div></div>
+      ${editing?`<div class="field span-2"><label class="check"><input type="checkbox" name="active" ${profile.active?'checked':''}> Perfil ativo</label></div>`:''}
+    </div></form>`,
+    footer:`<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="saveProfile">${editing?'Salvar':'Criar perfil'}</button>`,
+    onOpen(){
+      $('#saveProfile').addEventListener('click',async()=>{
+        const f=$('#profileForm'); if(!f.reportValidity())return;
+        const payload=Object.fromEntries(new FormData(f).entries());
+        ['school_scoped','can_edit_analysis','can_manage_admin','can_view_reports','can_view_planning'].forEach(k=>payload[k]=f.elements[k].checked);
+        if(editing) payload.active=f.elements.active.checked;
+        try{
+          if(editing) await api(`/api/admin/profiles/${profile.id}`,{method:'PUT',body:payload});
+          else await api('/api/admin/profiles',{method:'POST',body:payload});
+          closeModal(); toast(editing?'Perfil atualizado':'Perfil criado'); renderAdminPerfis(body);
+        }catch(e){ toast('Não foi possível salvar',e.message,'error'); }
+      });
+    }});
+  }
+
+  async function renderAdminUsuarios(body){
+    const [rows, profiles] = await Promise.all([api('/api/admin/users'), api('/api/admin/profiles')]);
+    const schools = await loadSchools();
+    body.innerHTML = `<section class="panel"><div class="panel-header"><div><h2>Usuários</h2><p>Cadastro, perfil de acesso e situação de cada usuário do sistema.</p></div><button class="btn btn-primary" id="newUser">${icon('plus')}Novo usuário</button></div><div class="panel-body">
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Unidade Escolar</th><th>Situação</th><th>Ações</th></tr></thead><tbody>
+      ${rows.length?rows.map(u=>`<tr class="${u.active?'':'row-inactive'}"><td><strong>${esc(u.name)}</strong>${u.id===ctx.user.id?' <small>(você)</small>':''}</td><td>${esc(u.email)}</td><td>${esc(u.profile_label||u.role)}</td><td>${esc(u.school_name||'—')}</td><td>${statePill(!!u.active)}</td><td class="row-actions"><button class="icon-btn" data-edit="${u.id}" data-tooltip="Editar">${icon('edit')}</button></td></tr>`).join(''):`<tr><td colspan="6">${empty('Nenhum usuário cadastrado')}</td></tr>`}
+      </tbody></table></div>
+    </div></section>`;
+    $('#newUser').addEventListener('click',()=>openUserForm(null,body,profiles,schools));
+    $$('[data-edit]',body).forEach(b=>b.addEventListener('click',()=>openUserForm(rows.find(r=>r.id===Number(b.dataset.edit)),body,profiles,schools)));
+  }
+
+  function openUserForm(user, body, profiles, schools){
+    const editing = !!user;
+    const isSelf = editing && user.id===ctx.user.id;
+    modal({title: editing?'Editar usuário':'Novo usuário', mode:'drawer', body:`<form id="userForm"><div class="form-grid">
+      <div class="field span-2"><label>Nome *</label><input class="input" name="name" required maxlength="140" value="${esc(user?.name||'')}"></div>
+      <div class="field span-2"><label>E-mail *</label><input class="input" type="email" name="email" required maxlength="140" value="${esc(user?.email||'')}"></div>
+      <div class="field span-2"><label>${editing?'Nova senha (deixe em branco para manter)':'Senha *'}</label><input class="input" type="password" name="password" ${editing?'':'required'} minlength="4" autocomplete="new-password"></div>
+      <div class="field span-2"><label>Perfil de acesso *</label><select class="select" name="role" id="userRoleField" required>${profiles.filter(p=>p.active||p.slug===user?.role).map(p=>`<option value="${p.slug}" ${p.slug===user?.role?'selected':''}>${esc(p.label)}</option>`).join('')}</select></div>
+      <div class="field span-2" id="userSchoolWrap"></div>
+      ${editing?`<div class="field span-2"><label class="check"><input type="checkbox" name="active" ${user.active?'checked':''} ${isSelf?'disabled':''}> Usuário ativo</label>${isSelf?'<small>Você não pode desativar seu próprio usuário.</small>':''}</div>`:''}
+    </div></form>`,
+    footer:`<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="saveUser">${editing?'Salvar':'Criar usuário'}</button>`,
+    onOpen(){
+      const updateSchoolField=()=>{
+        const p=profiles.find(x=>x.slug===$('#userRoleField').value);
+        const wrap=$('#userSchoolWrap');
+        if(p?.school_scoped){
+          wrap.innerHTML = `<label>Unidade Escolar *</label><select class="select" name="school_id" required><option value="">Selecione...</option>${schools.map(s=>`<option value="${s.id}" ${Number(user?.school_id)===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select>`;
+        } else {
+          wrap.innerHTML = '';
+        }
+      };
+      updateSchoolField();
+      $('#userRoleField').addEventListener('change',updateSchoolField);
+      $('#saveUser').addEventListener('click',async()=>{
+        const f=$('#userForm'); if(!f.reportValidity())return;
+        const payload=Object.fromEntries(new FormData(f).entries());
+        if(!payload.password) delete payload.password;
+        if(!payload.school_id) delete payload.school_id; else payload.school_id=Number(payload.school_id);
+        if(editing) payload.active = isSelf ? true : f.elements.active.checked;
+        try{
+          if(editing) await api(`/api/admin/users/${user.id}`,{method:'PUT',body:payload});
+          else await api('/api/admin/users',{method:'POST',body:payload});
+          closeModal(); toast(editing?'Usuário atualizado':'Usuário criado'); renderAdminUsuarios(body);
+        }catch(e){ toast('Não foi possível salvar',e.message,'error'); }
+      });
+    }});
   }
 
   async function renderAbout(){
@@ -719,23 +1034,15 @@
   // QUADRO KANBAN — visão por etapa ou por prioridade, com
   // arrastar-e-soltar para mudar o andamento das demandas.
   // ============================================================
-  const STAGE_GROUPS = [
-    {key:'novas', label:'Novas', hint:'Acabaram de chegar, ainda sem triagem', accent:'blue', statuses:['Nova','Recebida'], target:'Recebida'},
-    {key:'analise', label:'Em Análise', hint:'Triagem, avaliação técnica ou visita agendada', accent:'orange', statuses:['Em triagem','Em análise técnica','Aguardando informações da escola','Visita técnica agendada'], target:'Em análise técnica'},
-    {key:'aguardando', label:'Aguardando', hint:'Depende de material, orçamento, contratação ou outro setor', accent:'violet', statuses:['Em planejamento','Aguardando material','Aguardando orçamento','Aguardando contratação','Aguardando empresa','Encaminhada para outro setor','Reprogramada'], target:'Aguardando contratação'},
-    {key:'execucao', label:'Em Execução', hint:'Serviço programado ou em andamento', accent:'teal', statuses:['Serviço programado','Em execução','Parcialmente executada'], target:'Em execução'},
-    {key:'futuro', label:'Planejamento Futuro', hint:'Reservada para um exercício futuro', accent:'blue', statuses:['Planejamento futuro'], target:'Planejamento futuro'},
-    {key:'concluida', label:'Concluída', hint:'Atendimento finalizado', accent:'green', statuses:['Concluída'], target:'Concluída'},
-    {key:'cancelada', label:'Cancelada', hint:'Encerrada sem execução', accent:'red', statuses:['Cancelada'], target:'Cancelada'},
-  ];
+  const STAGE_GROUPS = (ctx.kanbanStages || []).map(s => ({key:s.stage_key, label:s.label, hint:s.hint||'', accent:s.accent||'blue', statuses:s.statuses||[], target:s.target_status}));
   const STATUS_TO_STAGE = {};
   STAGE_GROUPS.forEach(g=>g.statuses.forEach(s=>STATUS_TO_STAGE[s]=g.key));
-  const stageKeyForStatus = s => STATUS_TO_STAGE[s] || 'aguardando';
+  const stageKeyForStatus = s => STATUS_TO_STAGE[s] || (STAGE_GROUPS[0] && STAGE_GROUPS[0].key) || 'aguardando';
   const PRIORITY_GROUPS = ['P1','P2','P3','P4'].map(p=>({key:p, label:`${p} · ${priorityLabel(p)}`, hint:URGENCY_CHOICES.find(u=>u.value===p)?.hint || '', accent:{P1:'red',P2:'orange',P3:'blue',P4:'green'}[p], target:p}));
 
   function kanbanCard(d){
     const due=dueInfo(d);
-    const canEdit = ctx.user.role!=='escola';
+    const canEdit = ctx.user.perm.can_edit_analysis;
     return `<article class="kanban-card" ${canEdit?'draggable="true"':''} tabindex="0" role="button" data-id="${d.id}" aria-label="Abrir demanda ${esc(d.code)} — ${esc(d.title)}">
       <div class="kc-top">
         <span class="badge ${d.priority}">${d.priority}</span>
@@ -758,9 +1065,9 @@
     const schools = await loadSchools();
     const state = {
       q:'', category:'', priority:'', groupBy:'stage', hideDone:false,
-      school_id: ctx.user.role==='escola' ? String(ctx.user.school_id) : '',
+      school_id: ctx.user.perm.school_scoped ? String(ctx.user.school_id) : '',
     };
-    const schoolField = ctx.user.role==='escola'
+    const schoolField = ctx.user.perm.school_scoped
       ? `<div class="field"><label>Unidade Escolar</label><select class="select" id="fSchool" disabled><option>${esc(ctx.user.school_name||'Minha unidade')}</option></select></div>`
       : `<div class="field"><label>Unidade Escolar</label><select class="select" id="fSchool"><option value="">Todas</option>${schools.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>`;
 
@@ -804,7 +1111,7 @@
         <div class="km km-red"><span>${num(urgent)}</span><small>Urgentes (P1) em aberto</small></div>
         <div class="km km-orange"><span>${num(overdue)}</span><small>Com prazo vencido</small></div>
         <div class="km km-blue"><span>${money(openCost)}</span><small>Custo estimado em aberto</small></div>`;
-      $('#kanbanHint').textContent = ctx.user.role==='escola'
+      $('#kanbanHint').textContent = !ctx.user.perm.can_edit_analysis
         ? 'Toque em uma demanda para ver os detalhes.'
         : 'Arraste um cartão para outra coluna para mudar o andamento, ou use o lápis para editar.';
 
@@ -835,13 +1142,13 @@
           const d = rowsById.get(Number(card.dataset.id));
           if(d) openEditTechnical(d, load);
         });
-        if(ctx.user.role!=='escola'){
+        if(ctx.user.perm.can_edit_analysis){
           card.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/plain', card.dataset.id); e.dataTransfer.effectAllowed='move'; card.classList.add('dragging'); });
           card.addEventListener('dragend', ()=>{ card.classList.remove('dragging'); $$('.kanban-col-body',content).forEach(b=>b.classList.remove('drag-over')); });
         }
       });
 
-      if(ctx.user.role!=='escola'){
+      if(ctx.user.perm.can_edit_analysis){
         $$('.kanban-col-body',content).forEach(body=>{
           body.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; body.classList.add('drag-over'); });
           body.addEventListener('dragleave', e=>{ if(!body.contains(e.relatedTarget)) body.classList.remove('drag-over'); });
@@ -871,12 +1178,12 @@
     $('#fCategory').addEventListener('change',()=>{ state.category=$('#fCategory').value; load(); });
     $('#fPriority').addEventListener('change',()=>{ state.priority=$('#fPriority').value; load(); });
     $('#fGroupBy').addEventListener('change',()=>{ state.groupBy=$('#fGroupBy').value; load(); });
-    if(ctx.user.role!=='escola') $('#fSchool').addEventListener('change',()=>{ state.school_id=$('#fSchool').value; load(); });
+    if(!ctx.user.perm.school_scoped) $('#fSchool').addEventListener('change',()=>{ state.school_id=$('#fSchool').value; load(); });
     $('#hideDoneChip').addEventListener('click',()=>{ state.hideDone=!state.hideDone; $('#hideDoneChip').classList.toggle('active',state.hideDone); load(); });
     $('#clearKanbanFilters').addEventListener('click',()=>{
       state.q='';state.category='';state.priority='';state.hideDone=false;
       $('#fQ').value='';$('#fCategory').value='';$('#fPriority').value='';$('#hideDoneChip').classList.remove('active');
-      if(ctx.user.role!=='escola'){ state.school_id=''; $('#fSchool').value=''; }
+      if(!ctx.user.perm.school_scoped){ state.school_id=''; $('#fSchool').value=''; }
       load();
     });
     await load();
@@ -926,12 +1233,10 @@
     {key:'P', label:'Ir para o Painel', href:'/'},
     {key:'D', label:'Ir para Demandas', href:'/demandas'},
     {key:'K', label:'Ir para o Quadro Kanban', href:'/kanban'},
-    {key:'F', label:'Ir para Planejamento Futuro', href:'/planejamento'},
+    ...(ctx.user.perm.can_view_planning ? [{key:'F', label:'Ir para Planejamento Futuro', href:'/planejamento'}] : []),
     {key:'E', label:'Ir para Unidades Escolares', href:'/escolas'},
-    ...(ctx.user.role!=='escola' ? [
-      {key:'R', label:'Ir para Relatórios', href:'/relatorios'},
-      {key:'A', label:'Ir para Administração', href:'/administracao'},
-    ] : []),
+    ...(ctx.user.perm.can_view_reports ? [{key:'R', label:'Ir para Relatórios', href:'/relatorios'}] : []),
+    ...(ctx.user.perm.can_manage_admin ? [{key:'A', label:'Ir para Administração', href:'/administracao'}] : []),
     {key:'S', label:'Ir para Sobre o Sistema', href:'/sobre'},
     {key:'B', label:'Voltar para a página anterior', action:()=>history.back()},
     {key:'Esc', label:'Fechar uma janela aberta', action:()=>closeModal()},

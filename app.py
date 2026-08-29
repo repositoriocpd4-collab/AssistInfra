@@ -53,6 +53,27 @@ CATEGORIES = [
     "Iluminação", "Portas e janelas", "Reforma", "Obra", "Aquisição", "Outros"
 ]
 
+# Semente inicial (usada só na primeira inicialização do banco — depois disso a fonte da verdade
+# passa a ser a tabela `categories`, editável pelo administrador).
+CATEGORY_ICONS = {
+    'Elétrica': 'bolt', 'Hidráulica': 'drop', 'Cobertura/Telhado': 'roof', 'Pintura': 'paint', 'Climatização': 'wind',
+    'Serralheria': 'wrench', 'Alvenaria': 'brick', 'Acessibilidade': 'wheelchair', 'Mobiliário': 'chair', 'Equipamentos': 'monitor',
+    'Segurança': 'shield', 'Saneamento': 'drain', 'Estrutura': 'column', 'Área externa': 'tree', 'Iluminação': 'bulb',
+    'Portas e janelas': 'door', 'Reforma': 'hammer', 'Obra': 'crane', 'Aquisição': 'cart', 'Outros': 'dots',
+}
+CATEGORY_HINTS = {
+    'Elétrica': 'Fiação, tomada, quadro de força, curto-circuito', 'Hidráulica': 'Vazamento, entupimento, cano estourado',
+    'Cobertura/Telhado': 'Goteira, infiltração, telha quebrada', 'Pintura': 'Parede descascando, mofo, pintura antiga',
+    'Climatização': 'Ventilador ou ar-condicionado com problema', 'Serralheria': 'Portão, grade ou trava com defeito',
+    'Alvenaria': 'Rachadura, muro ou parede danificada', 'Acessibilidade': 'Rampa, corrimão, piso tátil',
+    'Mobiliário': 'Mesa, cadeira, armário quebrado', 'Equipamentos': 'Computador, projetor, equipamento com defeito',
+    'Segurança': 'Câmera, alarme, iluminação de segurança', 'Saneamento': 'Esgoto, caixa de gordura, fossa',
+    'Estrutura': 'Coluna, viga, laje ou base comprometida', 'Área externa': 'Quadra, pátio, jardim, área externa',
+    'Iluminação': 'Lâmpada queimada, poste ou luminária', 'Portas e janelas': 'Porta ou janela emperrada, vidro quebrado',
+    'Reforma': 'Melhoria ou reparo de maior porte', 'Obra': 'Construção ou ampliação',
+    'Aquisição': 'Compra de material ou equipamento novo', 'Outros': 'Não se encaixa nas opções acima',
+}
+
 
 # --- Mapa de rota (OpenFreeMap + Nominatim + OSRM) --------------------------
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
@@ -106,6 +127,47 @@ def verify_password(password: str, encoded: str) -> bool:
         return hmac.compare_digest(candidate, digest)
     except Exception:
         return False
+
+
+DEFAULT_PERM = {"school_scoped": True, "can_edit_analysis": False, "can_manage_admin": False, "can_view_reports": False, "can_view_planning": False}
+
+
+def get_profile_by_slug(conn: sqlite3.Connection, slug: str) -> Optional[dict]:
+    row = conn.execute("SELECT * FROM access_profiles WHERE slug=?", (slug,)).fetchone()
+    return dict(row) if row else None
+
+
+def perm_from_profile(profile: Optional[dict]) -> dict:
+    if not profile:
+        return dict(DEFAULT_PERM)
+    return {
+        "school_scoped": bool(profile["school_scoped"]),
+        "can_edit_analysis": bool(profile["can_edit_analysis"]),
+        "can_manage_admin": bool(profile["can_manage_admin"]),
+        "can_view_reports": bool(profile["can_view_reports"]),
+        "can_view_planning": bool(profile["can_view_planning"]),
+    }
+
+
+def require_admin(user: dict) -> None:
+    if not user.get("perm", {}).get("can_manage_admin"):
+        raise HTTPException(403, "Acesso restrito à administração")
+
+
+def get_categories(conn: sqlite3.Connection, only_active: bool = True) -> list:
+    q = "SELECT * FROM categories" + (" WHERE active=1" if only_active else "") + " ORDER BY sort_order, id"
+    return [dict(r) for r in conn.execute(q).fetchall()]
+
+
+def get_priorities(conn: sqlite3.Connection) -> list:
+    return [dict(r) for r in conn.execute("SELECT * FROM priority_levels ORDER BY rank").fetchall()]
+
+
+def get_kanban_stages(conn: sqlite3.Connection) -> list:
+    rows = [dict(r) for r in conn.execute("SELECT * FROM kanban_stages ORDER BY sort_order, id").fetchall()]
+    for r in rows:
+        r["statuses"] = json.loads(r["statuses"])
+    return rows
 
 
 def init_db() -> None:
@@ -220,6 +282,51 @@ def init_db() -> None:
             FOREIGN KEY (planning_id) REFERENCES planning_items(id) ON DELETE CASCADE,
             FOREIGN KEY (demand_id) REFERENCES demands(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            icon TEXT NOT NULL DEFAULT 'wrench',
+            color TEXT NOT NULL DEFAULT 'blue',
+            hint TEXT,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            active INTEGER NOT NULL DEFAULT 1
+        );
+
+        CREATE TABLE IF NOT EXISTS priority_levels (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT UNIQUE NOT NULL,
+            label TEXT NOT NULL,
+            hint TEXT,
+            color TEXT NOT NULL DEFAULT 'red',
+            rank INTEGER NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS kanban_stages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stage_key TEXT UNIQUE NOT NULL,
+            label TEXT NOT NULL,
+            hint TEXT,
+            accent TEXT NOT NULL DEFAULT 'blue',
+            statuses TEXT NOT NULL,
+            target_status TEXT NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE TABLE IF NOT EXISTS access_profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            slug TEXT UNIQUE NOT NULL,
+            label TEXT NOT NULL,
+            description TEXT,
+            school_scoped INTEGER NOT NULL DEFAULT 0,
+            can_edit_analysis INTEGER NOT NULL DEFAULT 1,
+            can_manage_admin INTEGER NOT NULL DEFAULT 0,
+            can_view_reports INTEGER NOT NULL DEFAULT 1,
+            can_view_planning INTEGER NOT NULL DEFAULT 1,
+            is_system INTEGER NOT NULL DEFAULT 0,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL
+        );
         """
     )
 
@@ -233,6 +340,12 @@ def init_db() -> None:
         conn.execute("ALTER TABLE schools ADD COLUMN lat REAL")
     if "lon" not in school_cols:
         conn.execute("ALTER TABLE schools ADD COLUMN lon REAL")
+    if "active" not in school_cols:
+        conn.execute("ALTER TABLE schools ADD COLUMN active INTEGER NOT NULL DEFAULT 1")
+
+    user_cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "active" not in user_cols:
+        conn.execute("ALTER TABLE users ADD COLUMN active INTEGER NOT NULL DEFAULT 1")
 
     if conn.execute("SELECT COUNT(*) c FROM schools").fetchone()["c"] == 0:
         schools = [
@@ -355,6 +468,58 @@ def init_db() -> None:
                                (*item, now_iso(), now_iso()))
             conn.execute("UPDATE planning_items SET code=? WHERE id=?", (f"PLAN-{item[0]}-{cur.lastrowid:04d}", cur.lastrowid))
 
+    # Categorias, prioridades, colunas do Kanban e perfis de acesso — semeados uma única vez a
+    # partir dos valores que já existiam fixos no código; depois disso, editáveis em Administração.
+    if conn.execute("SELECT COUNT(*) c FROM categories").fetchone()["c"] == 0:
+        color_cycle = ['red', 'orange', 'teal', 'violet', 'green', 'blue']
+        for i, name in enumerate(CATEGORIES):
+            conn.execute(
+                "INSERT INTO categories(name,icon,color,hint,sort_order,active) VALUES(?,?,?,?,?,1)",
+                (name, CATEGORY_ICONS.get(name, 'wrench'), color_cycle[i % len(color_cycle)], CATEGORY_HINTS.get(name, ''), i),
+            )
+
+    if conn.execute("SELECT COUNT(*) c FROM priority_levels").fetchone()["c"] == 0:
+        priority_seed = [
+            ("P1", "Urgente", "Risco agora ou impede a aula", "red", 1),
+            ("P2", "Alta", "Já incomoda a rotina da escola", "orange", 2),
+            ("P3", "Programada", "Não atrapalha o dia a dia agora", "blue", 3),
+            ("P4", "Planejamento/Projeto", "Reservada para um exercício futuro", "green", 4),
+        ]
+        conn.executemany("INSERT INTO priority_levels(code,label,hint,color,rank) VALUES(?,?,?,?,?)", priority_seed)
+
+    if conn.execute("SELECT COUNT(*) c FROM kanban_stages").fetchone()["c"] == 0:
+        stage_seed = [
+            ("novas", "Novas", "Acabaram de chegar, ainda sem triagem", "blue", ["Nova", "Recebida"], "Recebida"),
+            ("analise", "Em Análise", "Triagem, avaliação técnica ou visita agendada", "orange",
+             ["Em triagem", "Em análise técnica", "Aguardando informações da escola", "Visita técnica agendada"], "Em análise técnica"),
+            ("aguardando", "Aguardando", "Depende de material, orçamento, contratação ou outro setor", "violet",
+             ["Em planejamento", "Aguardando material", "Aguardando orçamento", "Aguardando contratação", "Aguardando empresa",
+              "Encaminhada para outro setor", "Reprogramada"], "Aguardando contratação"),
+            ("execucao", "Em Execução", "Serviço programado ou em andamento", "teal",
+             ["Serviço programado", "Em execução", "Parcialmente executada"], "Em execução"),
+            ("futuro", "Planejamento Futuro", "Reservada para um exercício futuro", "blue", ["Planejamento futuro"], "Planejamento futuro"),
+            ("concluida", "Concluída", "Atendimento finalizado", "green", ["Concluída"], "Concluída"),
+            ("cancelada", "Cancelada", "Encerrada sem execução", "red", ["Cancelada"], "Cancelada"),
+        ]
+        for i, (key, label, hint, accent, statuses, target) in enumerate(stage_seed):
+            conn.execute(
+                "INSERT INTO kanban_stages(stage_key,label,hint,accent,statuses,target_status,sort_order) VALUES(?,?,?,?,?,?,?)",
+                (key, label, hint, accent, json.dumps(statuses, ensure_ascii=False), target, i),
+            )
+
+    if conn.execute("SELECT COUNT(*) c FROM access_profiles").fetchone()["c"] == 0:
+        profile_seed = [
+            ("gestor", "Gestor da Infraestrutura", "Visão completa, análise técnica, priorização, relatórios e administração.", 0, 1, 1, 1, 1),
+            ("escola", "Unidade Escolar", "Cadastro e acompanhamento das demandas da própria unidade.", 1, 0, 0, 0, 0),
+            ("planejamento", "Planejamento", "Consolidação de demandas futuras, exercícios e planejamento orçamentário.", 0, 1, 0, 1, 1),
+        ]
+        for slug, label, desc, school_scoped, can_edit_analysis, can_manage_admin, can_view_reports, can_view_planning in profile_seed:
+            conn.execute(
+                """INSERT INTO access_profiles(slug,label,description,school_scoped,can_edit_analysis,can_manage_admin,can_view_reports,can_view_planning,is_system,created_at)
+                   VALUES(?,?,?,?,?,?,?,?,1,?)""",
+                (slug, label, desc, school_scoped, can_edit_analysis, can_manage_admin, can_view_reports, can_view_planning, now_iso()),
+            )
+
     conn.commit()
     conn.close()
 
@@ -367,9 +532,19 @@ def current_user(request: Request):
     if not uid:
         return None
     conn = db()
-    user = conn.execute("SELECT u.id,u.name,u.email,u.role,u.school_id,s.name school_name FROM users u LEFT JOIN schools s ON s.id=u.school_id WHERE u.id=?", (uid,)).fetchone()
+    row = conn.execute(
+        "SELECT u.id,u.name,u.email,u.role,u.school_id,u.active,s.name school_name FROM users u LEFT JOIN schools s ON s.id=u.school_id WHERE u.id=?",
+        (uid,),
+    ).fetchone()
+    if not row or not row["active"]:
+        conn.close()
+        return None
+    result = dict(row)
+    profile = get_profile_by_slug(conn, result["role"])
     conn.close()
-    return dict(user) if user else None
+    result["perm"] = perm_from_profile(profile)
+    result["profile_label"] = profile["label"] if profile else result["role"]
+    return result
 
 
 def require_user(request: Request):
@@ -383,12 +558,23 @@ def render(request: Request, template: str, **context):
     user = current_user(request)
     if not user:
         return RedirectResponse("/login", status_code=303)
+    conn = db()
+    priority_rows = get_priorities(conn)
+    priorities = {r["code"]: {"label": r["label"], "rank": r["rank"], "hint": r["hint"], "color": r["color"]} for r in priority_rows} or PRIORITIES
+    active_categories = get_categories(conn, only_active=True)
+    all_categories = get_categories(conn, only_active=False)
+    category_names = [c["name"] for c in active_categories] or CATEGORIES
+    category_meta = {c["name"]: {"icon": c["icon"], "color": c["color"], "hint": c["hint"]} for c in all_categories}
+    kanban_stages = get_kanban_stages(conn)
+    conn.close()
     base = {
         "request": request,
         "user": user,
-        "priorities": PRIORITIES,
+        "priorities": priorities,
         "statuses": STATUSES,
-        "categories": CATEGORIES,
+        "categories": category_names,
+        "category_meta": category_meta,
+        "kanban_stages": kanban_stages,
         "today": date.today().isoformat(),
     }
     base.update(context)
@@ -446,6 +632,9 @@ def kanban_page(request: Request):
 
 @app.get("/planejamento", response_class=HTMLResponse)
 def planning_page(request: Request):
+    user = current_user(request)
+    if user and not user["perm"]["can_view_planning"]:
+        return RedirectResponse("/", status_code=303)
     return render(request, "index.html", page="planning", title="Planejamento Futuro")
 
 
@@ -456,11 +645,17 @@ def schools_page(request: Request):
 
 @app.get("/relatorios", response_class=HTMLResponse)
 def reports_page(request: Request):
+    user = current_user(request)
+    if user and not user["perm"]["can_view_reports"]:
+        return RedirectResponse("/", status_code=303)
     return render(request, "index.html", page="reports", title="Relatórios")
 
 
 @app.get("/administracao", response_class=HTMLResponse)
 def admin_page(request: Request):
+    user = current_user(request)
+    if user and not user["perm"]["can_manage_admin"]:
+        return RedirectResponse("/", status_code=303)
     return render(request, "index.html", page="admin", title="Administração")
 
 
@@ -472,6 +667,9 @@ def about_page(request: Request):
 @app.get("/api/about")
 def api_about(request: Request):
     require_user(request)
+    conn = db()
+    profiles = [dict(r) for r in conn.execute("SELECT * FROM access_profiles WHERE active=1 ORDER BY id").fetchall()]
+    conn.close()
     return {
         "system_name": "Agenda Integrada — Infraestrutura e Gestão Escolar em Ação",
         "version": APP_VERSION,
@@ -485,16 +683,12 @@ def api_about(request: Request):
             "templates": "Jinja2",
             "session": "Starlette SessionMiddleware",
         },
-        "roles": [
-            {"role": "gestor", "label": "Gestor da Infraestrutura", "description": "Visão completa, análise técnica, priorização, relatórios e administração."},
-            {"role": "escola", "label": "Unidade Escolar", "description": "Cadastro e acompanhamento das demandas da própria unidade."},
-            {"role": "planejamento", "label": "Planejamento", "description": "Consolidação de demandas futuras, exercícios e planejamento orçamentário."},
-        ],
+        "roles": [{"role": p["slug"], "label": p["label"], "description": p["description"] or ""} for p in profiles],
     }
 
 
 def demand_scope_sql(user: dict):
-    if user["role"] == "escola" and user.get("school_id"):
+    if user["perm"]["school_scoped"] and user.get("school_id"):
         return " AND d.school_id=? ", [user["school_id"]]
     return "", []
 
@@ -548,7 +742,7 @@ def api_demands(request: Request, q: str = "", status: str = "", priority: str =
     user = require_user(request)
     where = ["1=1"]
     params: list = []
-    if user["role"] == "escola" and user.get("school_id"):
+    if user["perm"]["school_scoped"] and user.get("school_id"):
         where.append("d.school_id=?")
         params.append(user["school_id"])
     if q:
@@ -585,7 +779,7 @@ def api_demand_detail(request: Request, demand_id: int):
                         FROM demands d JOIN schools s ON s.id=d.school_id WHERE d.id=?""", (demand_id,)).fetchone()
     if not row:
         conn.close(); raise HTTPException(404, "Demanda não encontrada")
-    if user["role"] == "escola" and row["school_id"] != user.get("school_id"):
+    if user["perm"]["school_scoped"] and row["school_id"] != user.get("school_id"):
         conn.close(); raise HTTPException(403)
     updates = conn.execute("SELECT * FROM demand_updates WHERE demand_id=? ORDER BY datetime(created_at) DESC", (demand_id,)).fetchall()
     attachments = conn.execute("SELECT * FROM attachments WHERE demand_id=? ORDER BY datetime(created_at) DESC", (demand_id,)).fetchall()
@@ -602,7 +796,7 @@ async def create_demand(request: Request):
     if any(not payload.get(k) for k in required):
         raise HTTPException(400, "Preencha os campos obrigatórios")
     school_id = int(payload["school_id"])
-    if user["role"] == "escola":
+    if user["perm"]["school_scoped"]:
         school_id = int(user["school_id"])
     created = now_iso()
     conn = db()
@@ -625,10 +819,10 @@ async def update_demand(request: Request, demand_id: int):
     old = conn.execute("SELECT * FROM demands WHERE id=?", (demand_id,)).fetchone()
     if not old:
         conn.close(); raise HTTPException(404)
-    if user["role"] == "escola" and old["school_id"] != user.get("school_id"):
+    if user["perm"]["school_scoped"] and old["school_id"] != user.get("school_id"):
         conn.close(); raise HTTPException(403)
     allowed = ["title", "description", "category", "subcategory", "location", "impact", "affected_people", "risk", "blocks_activity"]
-    if user["role"] != "escola":
+    if user["perm"]["can_edit_analysis"]:
         allowed += ["priority", "status", "due_date", "responsible", "sector", "cost_estimate", "action_defined", "technical_opinion", "dependencies", "needs_visit", "needs_budget", "needs_material", "needs_contract", "future_year", "planning_kind", "planned_quantity", "planned_unit"]
     changes = []
     for key in allowed:
@@ -665,7 +859,7 @@ async def add_update(request: Request, demand_id: int):
     demand = conn.execute("SELECT school_id FROM demands WHERE id=?", (demand_id,)).fetchone()
     if not demand:
         conn.close(); raise HTTPException(404)
-    if user["role"] == "escola" and demand["school_id"] != user.get("school_id"):
+    if user["perm"]["school_scoped"] and demand["school_id"] != user.get("school_id"):
         conn.close(); raise HTTPException(403)
     conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,visibility,created_at) VALUES(?,?,?,?,?,?)", (demand_id, kind, message, user["name"], visibility, now_iso()))
     conn.execute("UPDATE demands SET updated_at=? WHERE id=?", (now_iso(), demand_id))
@@ -680,7 +874,7 @@ async def upload_attachment(request: Request, demand_id: int, file: UploadFile =
     demand = conn.execute("SELECT school_id FROM demands WHERE id=?", (demand_id,)).fetchone()
     if not demand:
         conn.close(); raise HTTPException(404)
-    if user["role"] == "escola" and demand["school_id"] != user.get("school_id"):
+    if user["perm"]["school_scoped"] and demand["school_id"] != user.get("school_id"):
         conn.close(); raise HTTPException(403)
     allowed_ext = {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".png", ".jpg", ".jpeg", ".webp", ".txt", ".csv"}
     suffix = Path(file.filename or "arquivo").suffix.lower()
@@ -709,26 +903,28 @@ def download_attachment(request: Request, attachment_id: int):
 
 
 @app.get("/api/schools")
-def api_schools(request: Request):
+def api_schools(request: Request, include_inactive: int = 0):
     user = require_user(request)
     conn = db()
-    if user["role"] == "escola":
-        rows = conn.execute("""SELECT s.*, COUNT(d.id) total_demands,
+    show_inactive = bool(include_inactive) and user["perm"]["can_manage_admin"]
+    active_clause = "" if show_inactive else "AND s.active=1"
+    if user["perm"]["school_scoped"]:
+        rows = conn.execute(f"""SELECT s.*, COUNT(d.id) total_demands,
                              SUM(CASE WHEN d.status='Concluída' THEN 1 ELSE 0 END) completed,
                              SUM(CASE WHEN d.priority='P1' AND d.status!='Concluída' THEN 1 ELSE 0 END) urgent
-                             FROM schools s LEFT JOIN demands d ON d.school_id=s.id WHERE s.id=? GROUP BY s.id""", (user["school_id"],)).fetchall()
+                             FROM schools s LEFT JOIN demands d ON d.school_id=s.id WHERE s.id=? {active_clause} GROUP BY s.id""", (user["school_id"],)).fetchall()
     else:
-        rows = conn.execute("""SELECT s.*, COUNT(d.id) total_demands,
+        rows = conn.execute(f"""SELECT s.*, COUNT(d.id) total_demands,
                              SUM(CASE WHEN d.status='Concluída' THEN 1 ELSE 0 END) completed,
                              SUM(CASE WHEN d.priority='P1' AND d.status!='Concluída' THEN 1 ELSE 0 END) urgent
-                             FROM schools s LEFT JOIN demands d ON d.school_id=s.id GROUP BY s.id ORDER BY s.name""").fetchall()
+                             FROM schools s LEFT JOIN demands d ON d.school_id=s.id WHERE 1=1 {active_clause} GROUP BY s.id ORDER BY s.name""").fetchall()
     conn.close(); return [dict(x) for x in rows]
 
 
 @app.get("/api/schools/{school_id}")
 def api_school(request: Request, school_id: int):
     user = require_user(request)
-    if user["role"] == "escola" and school_id != user.get("school_id"):
+    if user["perm"]["school_scoped"] and school_id != user.get("school_id"):
         raise HTTPException(403)
     conn = db()
     school = conn.execute("SELECT * FROM schools WHERE id=?", (school_id,)).fetchone()
@@ -741,7 +937,7 @@ def api_school(request: Request, school_id: int):
 @app.get("/api/schools/{school_id}/geocode")
 def api_school_geocode(request: Request, school_id: int):
     user = require_user(request)
-    if user["role"] == "escola" and school_id != user.get("school_id"):
+    if user["perm"]["school_scoped"] and school_id != user.get("school_id"):
         raise HTTPException(403)
     conn = db()
     school = conn.execute("SELECT * FROM schools WHERE id=?", (school_id,)).fetchone()
@@ -804,7 +1000,7 @@ def api_planning(request: Request, year: Optional[int] = None, q: str = ""):
 @app.post("/api/planning")
 async def create_planning(request: Request):
     user = require_user(request)
-    if user["role"] == "escola":
+    if user["perm"]["school_scoped"]:
         raise HTTPException(403, "Perfil sem permissão para consolidar planejamento")
     payload = await request.json()
     for k in ("year","title","category","kind"):
@@ -826,7 +1022,7 @@ async def create_planning(request: Request):
 @app.get("/api/admin/summary")
 def admin_summary(request: Request):
     user = require_user(request)
-    if user["role"] == "escola": raise HTTPException(403)
+    require_admin(user)
     conn = db()
     data = {
         "schools": conn.execute("SELECT COUNT(*) c FROM schools").fetchone()["c"],
@@ -834,6 +1030,8 @@ def admin_summary(request: Request):
         "demands": conn.execute("SELECT COUNT(*) c FROM demands").fetchone()["c"],
         "planning": conn.execute("SELECT COUNT(*) c FROM planning_items").fetchone()["c"],
         "attachments": conn.execute("SELECT COUNT(*) c FROM attachments").fetchone()["c"],
+        "categories": conn.execute("SELECT COUNT(*) c FROM categories WHERE active=1").fetchone()["c"],
+        "profiles": conn.execute("SELECT COUNT(*) c FROM access_profiles WHERE active=1").fetchone()["c"],
         "db_size": DB_PATH.stat().st_size if DB_PATH.exists() else 0,
     }
     conn.close(); return data
@@ -843,7 +1041,7 @@ def admin_summary(request: Request):
 def export_demands(request: Request, status: str = "", priority: str = ""):
     user = require_user(request)
     where=["1=1"]; params=[]
-    if user["role"] == "escola": where.append("d.school_id=?"); params.append(user["school_id"])
+    if user["perm"]["school_scoped"]: where.append("d.school_id=?"); params.append(user["school_id"])
     if status: where.append("d.status=?"); params.append(status)
     if priority: where.append("d.priority=?"); params.append(priority)
     conn=db()
@@ -856,6 +1054,360 @@ def export_demands(request: Request, status: str = "", priority: str = ""):
     content='\ufeff'+output.getvalue()
     headers={"Content-Disposition": f'attachment; filename="demandas_{date.today().isoformat()}.csv"'}
     return StreamingResponse(iter([content.encode('utf-8')]), media_type='text/csv; charset=utf-8', headers=headers)
+
+
+# ================================================================
+# ADMINISTRAÇÃO — categorias, prioridades, colunas do Kanban,
+# unidades escolares, perfis de acesso e usuários. Tudo abaixo
+# exige perfil com permissão de administração (can_manage_admin).
+# ================================================================
+
+@app.get("/api/admin/categories")
+def admin_list_categories(request: Request):
+    user = require_user(request); require_admin(user)
+    conn = db()
+    rows = get_categories(conn, only_active=False)
+    conn.close(); return rows
+
+
+@app.post("/api/admin/categories")
+async def admin_create_category(request: Request):
+    user = require_user(request); require_admin(user)
+    payload = await request.json()
+    name = (payload.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "Informe o nome da categoria")
+    conn = db()
+    if conn.execute("SELECT id FROM categories WHERE name=?", (name,)).fetchone():
+        conn.close(); raise HTTPException(409, "Já existe uma categoria com esse nome")
+    max_order = conn.execute("SELECT COALESCE(MAX(sort_order),-1) m FROM categories").fetchone()["m"]
+    cur = conn.execute("INSERT INTO categories(name,icon,color,hint,sort_order,active) VALUES(?,?,?,?,?,1)",
+                        (name, payload.get("icon") or "wrench", payload.get("color") or "blue", payload.get("hint") or "", max_order + 1))
+    conn.commit(); conn.close()
+    return {"ok": True, "id": cur.lastrowid}
+
+
+@app.put("/api/admin/categories/{cat_id}")
+async def admin_update_category(request: Request, cat_id: int):
+    user = require_user(request); require_admin(user)
+    payload = await request.json()
+    conn = db()
+    row = conn.execute("SELECT * FROM categories WHERE id=?", (cat_id,)).fetchone()
+    if not row:
+        conn.close(); raise HTTPException(404)
+    new_name = (payload.get("name") or row["name"]).strip()
+    if new_name != row["name"] and conn.execute("SELECT id FROM categories WHERE name=? AND id!=?", (new_name, cat_id)).fetchone():
+        conn.close(); raise HTTPException(409, "Já existe uma categoria com esse nome")
+    old_name = row["name"]
+    conn.execute("UPDATE categories SET name=?, icon=?, color=?, hint=?, active=? WHERE id=?",
+                 (new_name, payload.get("icon") or row["icon"], payload.get("color") or row["color"],
+                  payload.get("hint", row["hint"]), int(bool(payload.get("active", row["active"]))), cat_id))
+    if new_name != old_name:
+        conn.execute("UPDATE demands SET category=? WHERE category=?", (new_name, old_name))
+    conn.commit(); conn.close()
+    return {"ok": True}
+
+
+@app.delete("/api/admin/categories/{cat_id}")
+def admin_delete_category(request: Request, cat_id: int):
+    user = require_user(request); require_admin(user)
+    conn = db()
+    row = conn.execute("SELECT * FROM categories WHERE id=?", (cat_id,)).fetchone()
+    if not row:
+        conn.close(); raise HTTPException(404)
+    in_use = conn.execute("SELECT COUNT(*) c FROM demands WHERE category=?", (row["name"],)).fetchone()["c"]
+    if in_use:
+        conn.close(); raise HTTPException(409, f"Categoria usada em {in_use} demanda(s). Desative em vez de excluir.")
+    conn.execute("DELETE FROM categories WHERE id=?", (cat_id,))
+    conn.commit(); conn.close()
+    return {"ok": True}
+
+
+@app.get("/api/admin/priorities")
+def admin_list_priorities(request: Request):
+    user = require_user(request); require_admin(user)
+    conn = db(); rows = get_priorities(conn); conn.close()
+    return rows
+
+
+@app.put("/api/admin/priorities/{code}")
+async def admin_update_priority(request: Request, code: str):
+    user = require_user(request); require_admin(user)
+    payload = await request.json()
+    conn = db()
+    row = conn.execute("SELECT * FROM priority_levels WHERE code=?", (code,)).fetchone()
+    if not row:
+        conn.close(); raise HTTPException(404)
+    conn.execute("UPDATE priority_levels SET label=?, hint=?, color=? WHERE code=?",
+                 (payload.get("label") or row["label"], payload.get("hint", row["hint"]), payload.get("color") or row["color"], code))
+    conn.commit(); conn.close()
+    return {"ok": True}
+
+
+@app.get("/api/admin/kanban-stages")
+def admin_list_stages(request: Request):
+    user = require_user(request); require_admin(user)
+    conn = db(); rows = get_kanban_stages(conn); conn.close()
+    return rows
+
+
+def _validate_stage_statuses(conn: sqlite3.Connection, stage_id: Optional[int], statuses: list) -> None:
+    for s in statuses:
+        if s not in STATUSES:
+            raise HTTPException(400, f'Status "{s}" não existe no fluxo do sistema.')
+    others = conn.execute("SELECT id, statuses FROM kanban_stages" + (" WHERE id!=?" if stage_id else ""), ((stage_id,) if stage_id else ())).fetchall()
+    used = set()
+    for r in others:
+        used |= set(json.loads(r["statuses"]))
+    overlap = used & set(statuses)
+    if overlap:
+        raise HTTPException(409, f'Status já usados em outra coluna: {", ".join(sorted(overlap))}')
+
+
+@app.post("/api/admin/kanban-stages")
+async def admin_create_stage(request: Request):
+    user = require_user(request); require_admin(user)
+    payload = await request.json()
+    label = (payload.get("label") or "").strip()
+    if not label:
+        raise HTTPException(400, "Informe o nome da coluna")
+    key = (payload.get("stage_key") or label).strip().lower()
+    key = "".join(c if c.isalnum() else "-" for c in key).strip("-") or f"coluna-{secrets.token_hex(3)}"
+    statuses = payload.get("statuses") or []
+    if not statuses:
+        raise HTTPException(400, "Selecione ao menos um status para a coluna")
+    target = payload.get("target_status") or statuses[0]
+    if target not in statuses:
+        raise HTTPException(400, "O status padrão precisa estar entre os status da coluna")
+    conn = db()
+    if conn.execute("SELECT id FROM kanban_stages WHERE stage_key=?", (key,)).fetchone():
+        conn.close(); raise HTTPException(409, "Já existe uma coluna com essa chave")
+    _validate_stage_statuses(conn, None, statuses)
+    max_order = conn.execute("SELECT COALESCE(MAX(sort_order),0) m FROM kanban_stages").fetchone()["m"]
+    cur = conn.execute("INSERT INTO kanban_stages(stage_key,label,hint,accent,statuses,target_status,sort_order) VALUES(?,?,?,?,?,?,?)",
+                        (key, label, payload.get("hint") or "", payload.get("accent") or "blue", json.dumps(statuses, ensure_ascii=False), target, max_order + 1))
+    conn.commit(); conn.close()
+    return {"ok": True, "id": cur.lastrowid}
+
+
+@app.put("/api/admin/kanban-stages/{stage_id}")
+async def admin_update_stage(request: Request, stage_id: int):
+    user = require_user(request); require_admin(user)
+    payload = await request.json()
+    conn = db()
+    row = conn.execute("SELECT * FROM kanban_stages WHERE id=?", (stage_id,)).fetchone()
+    if not row:
+        conn.close(); raise HTTPException(404)
+    statuses = payload.get("statuses", json.loads(row["statuses"]))
+    if not statuses:
+        conn.close(); raise HTTPException(400, "A coluna precisa manter ao menos um status")
+    target = payload.get("target_status", row["target_status"])
+    if target not in statuses:
+        conn.close(); raise HTTPException(400, "O status padrão precisa estar entre os status da coluna")
+    _validate_stage_statuses(conn, stage_id, statuses)
+    conn.execute("UPDATE kanban_stages SET label=?, hint=?, accent=?, statuses=?, target_status=?, sort_order=? WHERE id=?",
+                 (payload.get("label") or row["label"], payload.get("hint", row["hint"]), payload.get("accent") or row["accent"],
+                  json.dumps(statuses, ensure_ascii=False), target, payload.get("sort_order", row["sort_order"]), stage_id))
+    conn.commit(); conn.close()
+    return {"ok": True}
+
+
+@app.delete("/api/admin/kanban-stages/{stage_id}")
+def admin_delete_stage(request: Request, stage_id: int):
+    user = require_user(request); require_admin(user)
+    conn = db()
+    row = conn.execute("SELECT * FROM kanban_stages WHERE id=?", (stage_id,)).fetchone()
+    if not row:
+        conn.close(); raise HTTPException(404)
+    if json.loads(row["statuses"]):
+        conn.close(); raise HTTPException(409, "Mova os status desta coluna para outra antes de excluí-la")
+    conn.execute("DELETE FROM kanban_stages WHERE id=?", (stage_id,))
+    conn.commit(); conn.close()
+    return {"ok": True}
+
+
+@app.post("/api/admin/schools")
+async def admin_create_school(request: Request):
+    user = require_user(request); require_admin(user)
+    payload = await request.json()
+    name = (payload.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "Informe o nome da unidade")
+    conn = db()
+    cur = conn.execute("INSERT INTO schools(name,director,address,phone,email,code,active) VALUES(?,?,?,?,?,?,1)",
+                        (name, payload.get("director") or "", payload.get("address") or "", payload.get("phone") or "",
+                         payload.get("email") or "", payload.get("code") or ""))
+    conn.commit(); conn.close()
+    return {"ok": True, "id": cur.lastrowid}
+
+
+@app.put("/api/admin/schools/{school_id}")
+async def admin_update_school(request: Request, school_id: int):
+    user = require_user(request); require_admin(user)
+    payload = await request.json()
+    conn = db()
+    row = conn.execute("SELECT * FROM schools WHERE id=?", (school_id,)).fetchone()
+    if not row:
+        conn.close(); raise HTTPException(404)
+    fields = ["name", "director", "address", "phone", "email", "code"]
+    conn.execute(f"UPDATE schools SET {', '.join(f'{f}=?' for f in fields)} WHERE id=?",
+                 [payload.get(f, row[f]) for f in fields] + [school_id])
+    conn.commit(); conn.close()
+    return {"ok": True}
+
+
+@app.post("/api/admin/schools/{school_id}/toggle-active")
+def admin_toggle_school(request: Request, school_id: int):
+    user = require_user(request); require_admin(user)
+    conn = db()
+    row = conn.execute("SELECT * FROM schools WHERE id=?", (school_id,)).fetchone()
+    if not row:
+        conn.close(); raise HTTPException(404)
+    new_active = 0 if row["active"] else 1
+    conn.execute("UPDATE schools SET active=? WHERE id=?", (new_active, school_id))
+    conn.commit(); conn.close()
+    return {"ok": True, "active": bool(new_active)}
+
+
+@app.delete("/api/admin/schools/{school_id}")
+def admin_delete_school(request: Request, school_id: int):
+    user = require_user(request); require_admin(user)
+    conn = db()
+    demands_c = conn.execute("SELECT COUNT(*) c FROM demands WHERE school_id=?", (school_id,)).fetchone()["c"]
+    users_c = conn.execute("SELECT COUNT(*) c FROM users WHERE school_id=?", (school_id,)).fetchone()["c"]
+    if demands_c or users_c:
+        conn.close(); raise HTTPException(409, "Unidade com demandas ou usuários vinculados. Desative em vez de excluir.")
+    conn.execute("DELETE FROM schools WHERE id=?", (school_id,))
+    conn.commit(); conn.close()
+    return {"ok": True}
+
+
+@app.get("/api/admin/profiles")
+def admin_list_profiles(request: Request):
+    user = require_user(request); require_admin(user)
+    conn = db()
+    rows = [dict(r) for r in conn.execute("SELECT * FROM access_profiles ORDER BY id").fetchall()]
+    conn.close(); return rows
+
+
+@app.post("/api/admin/profiles")
+async def admin_create_profile(request: Request):
+    user = require_user(request); require_admin(user)
+    payload = await request.json()
+    label = (payload.get("label") or "").strip()
+    if not label:
+        raise HTTPException(400, "Informe o nome do perfil")
+    slug = (payload.get("slug") or label).strip().lower()
+    slug = "".join(c if (c.isalnum() or c == "_") else "_" for c in slug).strip("_") or f"perfil_{secrets.token_hex(3)}"
+    conn = db()
+    if conn.execute("SELECT id FROM access_profiles WHERE slug=?", (slug,)).fetchone():
+        conn.close(); raise HTTPException(409, "Já existe um perfil com essa identificação")
+    cur = conn.execute(
+        """INSERT INTO access_profiles(slug,label,description,school_scoped,can_edit_analysis,can_manage_admin,can_view_reports,can_view_planning,is_system,created_at)
+           VALUES(?,?,?,?,?,?,?,?,0,?)""",
+        (slug, label, payload.get("description") or "", int(bool(payload.get("school_scoped"))), int(bool(payload.get("can_edit_analysis"))),
+         int(bool(payload.get("can_manage_admin"))), int(bool(payload.get("can_view_reports"))), int(bool(payload.get("can_view_planning"))), now_iso()))
+    conn.commit(); conn.close()
+    return {"ok": True, "id": cur.lastrowid, "slug": slug}
+
+
+@app.put("/api/admin/profiles/{profile_id}")
+async def admin_update_profile(request: Request, profile_id: int):
+    user = require_user(request); require_admin(user)
+    payload = await request.json()
+    conn = db()
+    row = conn.execute("SELECT * FROM access_profiles WHERE id=?", (profile_id,)).fetchone()
+    if not row:
+        conn.close(); raise HTTPException(404)
+    conn.execute(
+        """UPDATE access_profiles SET label=?, description=?, school_scoped=?, can_edit_analysis=?, can_manage_admin=?,
+           can_view_reports=?, can_view_planning=?, active=? WHERE id=?""",
+        (payload.get("label") or row["label"], payload.get("description", row["description"]),
+         int(bool(payload.get("school_scoped", row["school_scoped"]))), int(bool(payload.get("can_edit_analysis", row["can_edit_analysis"]))),
+         int(bool(payload.get("can_manage_admin", row["can_manage_admin"]))), int(bool(payload.get("can_view_reports", row["can_view_reports"]))),
+         int(bool(payload.get("can_view_planning", row["can_view_planning"]))), int(bool(payload.get("active", row["active"]))), profile_id))
+    conn.commit(); conn.close()
+    return {"ok": True}
+
+
+@app.delete("/api/admin/profiles/{profile_id}")
+def admin_delete_profile(request: Request, profile_id: int):
+    user = require_user(request); require_admin(user)
+    conn = db()
+    row = conn.execute("SELECT * FROM access_profiles WHERE id=?", (profile_id,)).fetchone()
+    if not row:
+        conn.close(); raise HTTPException(404)
+    if row["is_system"]:
+        conn.close(); raise HTTPException(409, "Perfis padrão do sistema não podem ser excluídos — apenas desativados ou editados.")
+    in_use = conn.execute("SELECT COUNT(*) c FROM users WHERE role=?", (row["slug"],)).fetchone()["c"]
+    if in_use:
+        conn.close(); raise HTTPException(409, f"Perfil em uso por {in_use} usuário(s). Reatribua-os antes de excluir.")
+    conn.execute("DELETE FROM access_profiles WHERE id=?", (profile_id,))
+    conn.commit(); conn.close()
+    return {"ok": True}
+
+
+@app.get("/api/admin/users")
+def admin_list_users(request: Request):
+    user = require_user(request); require_admin(user)
+    conn = db()
+    rows = conn.execute("""SELECT u.id,u.name,u.email,u.role,u.school_id,u.active,s.name school_name,p.label profile_label
+                           FROM users u LEFT JOIN schools s ON s.id=u.school_id
+                           LEFT JOIN access_profiles p ON p.slug=u.role ORDER BY u.name""").fetchall()
+    conn.close(); return [dict(x) for x in rows]
+
+
+@app.post("/api/admin/users")
+async def admin_create_user(request: Request):
+    user = require_user(request); require_admin(user)
+    payload = await request.json()
+    name = (payload.get("name") or "").strip()
+    email = (payload.get("email") or "").strip().lower()
+    password = payload.get("password") or ""
+    role = payload.get("role") or ""
+    if not name or not email or not password or not role:
+        raise HTTPException(400, "Preencha nome, e-mail, senha e perfil de acesso")
+    conn = db()
+    profile = get_profile_by_slug(conn, role)
+    if not profile:
+        conn.close(); raise HTTPException(400, "Perfil de acesso inválido")
+    if conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone():
+        conn.close(); raise HTTPException(409, "Já existe um usuário com esse e-mail")
+    school_id = payload.get("school_id")
+    if profile["school_scoped"] and not school_id:
+        conn.close(); raise HTTPException(400, "Este perfil exige a seleção de uma unidade escolar")
+    cur = conn.execute("INSERT INTO users(name,email,password_hash,role,school_id,active) VALUES(?,?,?,?,?,1)",
+                        (name, email, hash_password(password), role, school_id or None))
+    conn.commit(); conn.close()
+    return {"ok": True, "id": cur.lastrowid}
+
+
+@app.put("/api/admin/users/{user_id}")
+async def admin_update_user(request: Request, user_id: int):
+    user = require_user(request); require_admin(user)
+    payload = await request.json()
+    conn = db()
+    row = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    if not row:
+        conn.close(); raise HTTPException(404)
+    role = payload.get("role", row["role"])
+    profile = get_profile_by_slug(conn, role)
+    if not profile:
+        conn.close(); raise HTTPException(400, "Perfil de acesso inválido")
+    school_id = payload.get("school_id", row["school_id"])
+    if profile["school_scoped"] and not school_id:
+        conn.close(); raise HTTPException(400, "Este perfil exige a seleção de uma unidade escolar")
+    if user_id == user["id"] and not bool(payload.get("active", row["active"])):
+        conn.close(); raise HTTPException(400, "Você não pode desativar o seu próprio usuário")
+    if user_id == user["id"] and not profile["can_manage_admin"]:
+        conn.close(); raise HTTPException(400, "Você não pode remover sua própria permissão de administração")
+    conn.execute("UPDATE users SET name=?, email=?, role=?, school_id=?, active=? WHERE id=?",
+                 (payload.get("name") or row["name"], payload.get("email") or row["email"], role, school_id or None,
+                  int(bool(payload.get("active", row["active"]))), user_id))
+    if payload.get("password"):
+        conn.execute("UPDATE users SET password_hash=? WHERE id=?", (hash_password(payload["password"]), user_id))
+    conn.commit(); conn.close()
+    return {"ok": True}
 
 
 @app.get("/health")
