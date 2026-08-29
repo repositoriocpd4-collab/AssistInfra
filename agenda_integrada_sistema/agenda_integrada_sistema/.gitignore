@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+agenda_integrada.db
+uploads/*
+!uploads/.gitkeep
+.env
