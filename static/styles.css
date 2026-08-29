@@ -71,7 +71,7 @@ body.text-large{zoom:1.18}
 .backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:80;backdrop-filter:blur(2px)}
 
 /* CONTEÚDO */
-.main-shell{margin-left:0}.main-content.container,.container{max-width:1200px;width:100%;margin:0 auto;box-sizing:border-box}.main-content{padding:2rem;min-height:calc(100vh - 190px)}
+.main-shell{margin-left:0}.main-content.container,.container{max-width:1600px;width:100%;margin:0 auto;box-sizing:border-box}.main-content{padding:2rem;min-height:calc(100vh - 190px)}
 .page-header{align-items:flex-start;margin-bottom:1.5rem}.page-header h1{font-size:1.85rem;font-weight:400;color:var(--govbr-blue-dark);letter-spacing:-.02em;margin:.2rem 0 .45rem}.page-header p{font-size:.94rem;line-height:1.5;color:#667085;max-width:780px}.eyebrow{color:var(--govbr-blue);font-size:.69rem;font-weight:700;letter-spacing:.12em}
 .page-actions{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
 
@@ -243,7 +243,7 @@ kbd.key-hint{font-family:inherit;font-size:10px;font-weight:800;line-height:1;pa
   .side-close{display:none!important}
   .menu-icon-button{display:none!important}
   #backdrop{display:none!important}
-  .main-content{margin-left:calc(var(--sidebar-fixed) + max(0px,(100vw - var(--sidebar-fixed) - 1500px)/2))!important;margin-right:max(0px,(100vw - var(--sidebar-fixed) - 1500px)/2)!important}
+  .main-content{margin-left:calc(var(--sidebar-fixed) + max(0px,(100vw - var(--sidebar-fixed) - 1600px)/2))!important;margin-right:max(0px,(100vw - var(--sidebar-fixed) - 1600px)/2)!important}
   .govbr-footer{margin-left:var(--sidebar-fixed)!important}
 }
 
@@ -587,3 +587,62 @@ body.dark-mode .nav-back:hover{background:#20252d!important;color:#c7ccd4!import
 .stat-card .stat-note{margin-top:.3rem!important}
 @media(max-width:600px){.stat-card{padding:.85rem!important}.stat-card .stat-value{font-size:1.45rem!important}.stat-card .stat-icon{width:28px!important;height:28px!important;margin-bottom:.3rem!important}.stat-card .stat-icon svg{width:15px!important;height:15px!important}}
 @media(max-width:380px){.stat-card .stat-label{font-size:.74rem!important}}
+
+/* ============================================================
+   PAINEL — indicadores agrupados por tema (Visão geral, Prioridades,
+   Prazos críticos, Andamento, Planejamento, Responsabilidade, Custo)
+   ============================================================ */
+.stats-groups{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:1rem}
+.stat-group{background:#fff;border:1px solid #e5e9ef;border-radius:12px;padding:15px 17px;box-shadow:0 3px 10px rgba(15,35,65,.06);flex:1 1 auto}
+.stat-group-label{font-size:10.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#7a8593;margin-bottom:12px;white-space:nowrap}
+.stat-group-cards{display:flex;gap:20px}
+.stat-tile{display:flex;gap:12px;align-items:flex-start;flex:1 1 148px;min-width:132px;cursor:pointer;border-radius:8px;padding:2px;margin:-2px;transition:background .15s ease}
+.stat-tile:hover{background:#f5f7fa}
+.stat-tile-icon{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;background:#eef3fc;color:#005A9C}
+.stat-tile-icon svg{width:20px;height:20px}
+.stat-tile-body{min-width:0}
+.stat-tile-value{font-size:1.65rem;font-weight:700;line-height:1.1;letter-spacing:-.01em;color:#005A9C}
+.stat-tile-label{font-size:.8rem;color:#333;margin-top:2px;font-weight:500}
+.stat-tile-note{font-size:max(11px,.68rem);color:#8a94a3;margin-top:3px;line-height:1.3}
+.stat-tile.primary .stat-tile-value{color:#071d41}
+.stat-tile.red .stat-tile-icon{background:#fdeaea;color:#b71c1c}
+.stat-tile.orange .stat-tile-icon{background:#fff3dc;color:#c67c00}
+.stat-tile.green .stat-tile-icon{background:#e8f5ed;color:#1a7c44}
+.stat-tile.violet .stat-tile-icon{background:#f1ebfb;color:#6f42c1}
+.stat-tile.teal .stat-tile-icon,.stat-tile.blue .stat-tile-icon,.stat-tile.primary .stat-tile-icon{background:#eef3fc;color:#005A9C}
+.stat-tile.red .stat-tile-value{color:#b71c1c}
+.stat-tile.orange .stat-tile-value{color:#c67c00}
+.stat-tile.green .stat-tile-value{color:#1a7c44}
+.stat-tile.violet .stat-tile-value{color:#6f42c1}
+.stat-tile.teal .stat-tile-value,.stat-tile.blue .stat-tile-value{color:#005A9C}
+@media(max-width:900px){.stat-group{flex:1 1 260px}}
+@media(max-width:600px){.stats-groups{gap:10px}.stat-group{padding:11px 13px}.stat-group-cards{gap:12px;flex-wrap:wrap}.stat-tile{min-width:120px}.stat-tile-value{font-size:1.35rem}.stat-tile-icon{width:34px;height:34px}.stat-tile-icon svg{width:17px;height:17px}}
+body.dark-mode .stat-group{background:#1a1f27!important;border-color:#2a2f3a!important}
+body.dark-mode .stat-group-label{color:#8892a0!important}
+body.dark-mode .stat-tile:hover{background:#20252d!important}
+body.dark-mode .stat-tile-value{color:#5ba3e0!important}
+body.dark-mode .stat-tile.primary .stat-tile-value{color:#e6e8eb!important}
+body.dark-mode .stat-tile-label{color:#c7ccd4!important}
+body.dark-mode .stat-tile-note{color:#8892a0!important}
+body.dark-mode .stat-tile-icon{background:#123049!important;color:#5ba3e0!important}
+body.dark-mode .stat-tile.red .stat-tile-icon{background:#3a1a1a!important;color:#ff6b6b!important}
+body.dark-mode .stat-tile.orange .stat-tile-icon{background:#3a2c14!important;color:#f0a94e!important}
+body.dark-mode .stat-tile.violet .stat-tile-icon{background:#241a3a!important;color:#a78bfa!important}
+body.dark-mode .stat-tile.green .stat-tile-icon{background:#123a24!important;color:#4ade95!important}
+body.dark-mode .stat-tile.red .stat-tile-value{color:#ff6b6b!important}
+body.dark-mode .stat-tile.orange .stat-tile-value{color:#f0a94e!important}
+body.dark-mode .stat-tile.green .stat-tile-value{color:#4ade95!important}
+body.dark-mode .stat-tile.violet .stat-tile-value{color:#a78bfa!important}
+
+/* ABAS — detalhe da demanda: ícones + pill arredondada no item ativo */
+.tabs{display:flex!important;flex-wrap:wrap!important;gap:6px!important;padding:5px!important;background:#f1f3f6!important;border-radius:12px!important;border-bottom:0!important;margin-bottom:1rem!important}
+.tab{display:inline-flex!important;align-items:center!important;gap:7px!important;border-radius:9px!important;padding:9px 16px!important;font-size:.83rem!important;font-weight:600!important;border-bottom:0!important;color:#5b6572!important;transition:background .15s ease,color .15s ease}
+.tab svg{width:16px;height:16px;flex:0 0 auto}
+.tab:hover{background:rgba(0,90,156,.08)!important;color:var(--govbr-blue,#005A9C)!important}
+.tab.active,.tab.active:hover{background:var(--govbr-blue,#005A9C)!important;color:#fff!important;border-color:transparent!important;font-weight:700!important;box-shadow:0 2px 6px rgba(0,90,156,.28)!important}
+.tab .badge{margin-left:2px}
+@media(max-width:600px){.tabs{gap:4px!important;padding:4px!important}.tab{padding:8px 12px!important;font-size:.78rem!important}}
+body.dark-mode .tabs{background:#1a1f27!important}
+body.dark-mode .tab{color:#9aa4b2!important}
+body.dark-mode .tab:hover{background:rgba(91,163,224,.12)!important;color:#5ba3e0!important}
+body.dark-mode .tab.active,body.dark-mode .tab.active:hover{background:#005A9C!important;color:#fff!important}

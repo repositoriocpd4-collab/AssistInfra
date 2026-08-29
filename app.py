@@ -737,6 +737,16 @@ def api_dashboard(request: Request):
     return {"stats": stats, "recent": [dict(x) for x in recent], "attention": [dict(x) for x in attention], "categories": [dict(x) for x in category_rows], "status_breakdown": [dict(x) for x in status_rows]}
 
 
+@app.get("/api/demands/category-counts")
+def api_demand_category_counts(request: Request):
+    user = require_user(request)
+    scope, params = demand_scope_sql(user)
+    conn = db()
+    rows = conn.execute(f"SELECT d.category, COUNT(*) qty FROM demands d WHERE 1=1 {scope} GROUP BY d.category", params).fetchall()
+    conn.close()
+    return {"counts": {r["category"]: r["qty"] for r in rows}}
+
+
 @app.get("/api/demands")
 def api_demands(request: Request, q: str = "", status: str = "", priority: str = "", category: str = "", year: str = "", overdue: int = 0, due_soon: int = 0, unassigned: int = 0):
     user = require_user(request)
@@ -995,6 +1005,47 @@ def api_planning(request: Request, year: Optional[int] = None, q: str = ""):
     year_stats = conn.execute("""SELECT year, COUNT(*) items, SUM(estimated_cost) total_cost, SUM(schools_count) schools FROM planning_items GROUP BY year ORDER BY year""").fetchall()
     conn.close()
     return {"items": [dict(x) for x in rows], "year_stats": [dict(x) for x in year_stats]}
+
+
+@app.get("/api/planning/insights")
+def api_planning_insights(request: Request, year: int):
+    require_user(request)
+    conn = db()
+    items = conn.execute("SELECT * FROM planning_items WHERE year=? ORDER BY estimated_cost DESC", (year,)).fetchall()
+
+    all_schools = {}
+    item_list = []
+    for it in items:
+        schools = conn.execute("""SELECT DISTINCT s.id, s.name FROM planning_links l
+            JOIN demands d ON d.id = l.demand_id
+            JOIN schools s ON s.id = d.school_id
+            WHERE l.planning_id = ? ORDER BY s.name""", (it["id"],)).fetchall()
+        for s in schools:
+            all_schools[s["id"]] = s["name"]
+        item_list.append({**dict(it), "linked_schools": [dict(s) for s in schools]})
+
+    by_category = conn.execute("""SELECT category, COUNT(*) items, SUM(estimated_cost) cost FROM planning_items
+        WHERE year=? GROUP BY category ORDER BY cost DESC""", (year,)).fetchall()
+    by_status = conn.execute("""SELECT status, COUNT(*) items FROM planning_items
+        WHERE year=? GROUP BY status ORDER BY items DESC""", (year,)).fetchall()
+
+    items_count = len(items)
+    total_cost = sum((it["estimated_cost"] or 0) for it in items)
+    schools_estimate = sum((it["schools_count"] or 0) for it in items)
+    conn.close()
+    return {
+        "year": year,
+        "items": item_list,
+        "by_category": [dict(x) for x in by_category],
+        "by_status": [dict(x) for x in by_status],
+        "summary": {
+            "items": items_count,
+            "total_cost": total_cost,
+            "schools_estimate": schools_estimate,
+            "schools_confirmed": len(all_schools),
+            "schools_confirmed_list": [{"id": k, "name": v} for k, v in sorted(all_schools.items(), key=lambda kv: kv[1])],
+        },
+    }
 
 
 @app.post("/api/planning")

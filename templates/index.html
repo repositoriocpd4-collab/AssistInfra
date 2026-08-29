@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#005A9C">
   <title>{{ title }} · Agenda Integrada</title>
-  <link rel="stylesheet" href="/static/styles.css?v=govbr-16">
+  <link rel="stylesheet" href="/static/styles.css?v=govbr-20">
 </head>
 <body data-page="{{ page }}"{% if entity_id %} data-entity-id="{{ entity_id }}"{% endif %}>
   <svg aria-hidden="true" class="svg-sprite">
@@ -178,6 +178,6 @@
   <script>
     window.APP_CONTEXT = {{ {'page': page, 'entityId': entity_id if entity_id else None, 'user': user, 'priorities': priorities, 'statuses': statuses, 'categories': categories, 'categoryMeta': category_meta, 'kanbanStages': kanban_stages}|tojson }};
   </script>
-  <script src="/static/app.js?v=govbr-11"></script>
+  <script src="/static/app.js?v=govbr-15"></script>
 </body>
 </html>

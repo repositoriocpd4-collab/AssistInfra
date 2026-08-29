@@ -380,6 +380,18 @@
       ['unassigned','Sem responsável',s.unassigned,'Falta indicar quem vai cuidar disso','violet','user','Demandas em aberto sem responsável definido','unassigned=1'],
       ['open_cost','Custo em aberto',s.open_cost,'Estimativa do que ainda não foi concluído','blue','money','Soma do custo estimado de tudo que está em aberto','','money']
     ];
+    const byKey=Object.fromEntries(cards.map(c=>[c[0],c]));
+    const statGroups=[
+      ['VISÃO GERAL',['total']],
+      ['PRIORIDADES',['P1','P2']],
+      ['PRAZOS CRÍTICOS',['overdue','due_soon']],
+      ['ANDAMENTO DAS DEMANDAS',['analysis','progress','contract']],
+      ['PLANEJAMENTO',['completed','future']],
+      ['RESPONSABILIDADE',['unassigned']],
+      ['CUSTO EM ABERTO',['open_cost']],
+    ];
+    const statTile=c=>`<article class="stat-tile ${c[4]}" data-dashboard-filter="${esc(c[7])}" data-tooltip="${esc(c[6])}"><div class="stat-tile-icon">${icon(c[5])}</div><div class="stat-tile-body"><div class="stat-tile-value mono">${c[8]==='money'?money(c[2]):num(c[2])}</div><div class="stat-tile-label">${esc(c[1])}</div><div class="stat-tile-note">${esc(c[3])}</div></div></article>`;
+    const statsGroupsHtml=`<div class="stats-groups">${statGroups.map(([label,keys])=>`<div class="stat-group"><div class="stat-group-label">${esc(label)}</div><div class="stat-group-cards">${keys.map(k=>statTile(byKey[k])).join('')}</div></div>`).join('')}</div>`;
     const maxCat=Math.max(1,...data.categories.map(x=>x.qty));
     const heroCopy = ctx.user.perm.school_scoped
       ? {eyebrow:'PRECISOU DE ALGO?', title:'Viu um problema na escola? Conte pra gente.', text:'Leva menos de 2 minutos. Escolha o tipo de problema, descreva com suas palavras e, se quiser, envie uma foto.'}
@@ -387,7 +399,7 @@
     content.innerHTML = pageHeader('Visão Geral', ctx.user.perm.school_scoped ? `Acompanhe as demandas de ${ctx.user.school_name}.` : 'Status atual das demandas de infraestrutura em toda a Rede Municipal.',
       `<a class="btn btn-secondary" href="/api/export/demands.csv" data-tooltip="Baixar a lista completa em CSV">${icon('download')}Exportar</a>`)+
       `<section class="report-hero"><div class="report-hero-copy"><span class="eyebrow">${heroCopy.eyebrow}</span><h2>${heroCopy.title}</h2><p>${heroCopy.text}</p></div><button class="btn-report" data-open-demand data-tooltip="Abrir o assistente de registro em 4 passos">${icon('plus')}Registrar Demanda/CI</button></section>`+
-      `<div class="stats-grid">${cards.map(c=>`<article class="stat-card ${c[4]}" data-dashboard-filter="${esc(c[7])}" data-tooltip="${esc(c[6])}"><div class="stat-label">${esc(c[1])}</div><div class="stat-value mono${c[8]==='money'?' stat-value-money':''}">${c[8]==='money'?money(c[2]):num(c[2])}</div><div class="stat-note">${icon(c[5])}${esc(c[3])}</div><div class="stat-icon">${icon(c[5])}</div></article>`).join('')}</div>`+
+      statsGroupsHtml+
       `<div class="content-grid">
         <section class="panel"><div class="panel-header"><div><h2>Precisa de atenção</h2><p>Priorizado por criticidade e prazo.</p></div><a class="link-btn" href="/demandas">Ver todas</a></div>
           <div class="attention-list">${data.attention.length?data.attention.map(d=>{const due=dueInfo(d);return `<a class="attention-item" href="/demandas/${d.id}"><span class="priority-dot ${d.priority}"></span><div><strong>${esc(d.title)}</strong><small>${esc(d.school_name)} · ${d.code}</small></div><span class="deadline ${due.cls}">${esc(due.text)}</span></a>`}).join(''):empty('Tudo em dia','Não há demandas críticas neste momento.')}</div>
@@ -417,8 +429,9 @@
   async function renderDemands(){
     setLoading();
     const query=new URLSearchParams(location.search);
-    const [schools,dash]=await Promise.all([loadSchools(), api('/api/dashboard')]);
+    const [schools,dash,catCounts]=await Promise.all([loadSchools(), api('/api/dashboard'), api('/api/demands/category-counts')]);
     const ds=dash.stats;
+    const counts=catCounts.counts||{};
     const filters={q:query.get('q')||'',status:query.get('status')||'',priority:query.get('priority')||'',category:query.get('category')||'',year:query.get('year')||'2026',overdue:query.get('overdue')==='1',due_soon:query.get('due_soon')==='1',unassigned:query.get('unassigned')==='1'};
     content.innerHTML = pageHeader('Demandas Escolares','Gerencie, filtre e acompanhe todas as solicitações de infraestrutura.',`<a class="btn btn-secondary" href="/api/export/demands.csv" data-tooltip="Baixar a lista filtrada em CSV">${icon('download')}Exportar CSV</a><button class="btn btn-primary" data-open-demand data-tooltip="Abrir o assistente de registro">${icon('plus')}Registrar Demanda/CI</button>`)+
       `<section class="filters-card">
@@ -426,7 +439,7 @@
         <div class="field"><label>Ano</label><select class="select" id="fYear"><option value="">Todos</option>${[2026,2025,2024].map(y=>`<option ${String(y)===filters.year?'selected':''}>${y}</option>`).join('')}</select></div>
         <div class="field"><label>Status</label><select class="select" id="fStatus"><option value="">Todos</option>${ctx.statuses.map(x=>`<option ${x===filters.status?'selected':''}>${esc(x)}</option>`).join('')}</select></div>
         <div class="field"><label>Prioridade</label><select class="select" id="fPriority"><option value="">Todas</option>${Object.keys(ctx.priorities).map(x=>`<option value="${x}" ${x===filters.priority?'selected':''}>${x} · ${priorityLabel(x)}</option>`).join('')}</select></div>
-        <div class="field"><label>Categoria</label><select class="select" id="fCategory"><option value="">Todas</option>${ctx.categories.map(x=>`<option ${x===filters.category?'selected':''}>${esc(x)}</option>`).join('')}</select></div>
+        <div class="field"><label>Categoria</label><select class="select" id="fCategory"><option value="">Todas</option>${ctx.categories.map(x=>`<option value="${esc(x)}" ${x===filters.category?'selected':''}>${esc(x)} (${num(counts[x]||0)})</option>`).join('')}</select></div>
         <button class="btn btn-secondary" id="clearFilters">${icon('filter')}Limpar</button>
       </section>
       <div class="filter-chips">${[
@@ -546,7 +559,7 @@
       const d=payload.demand, due=dueInfo(d);
       content.innerHTML=`<div class="breadcrumb"><a href="/demandas">Demandas</a><span>›</span><span>${esc(d.code)}</span></div>
         <div class="detail-head"><div><div class="detail-code-line"><span class="code-label">${esc(d.code)}</span><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span><span class="deadline ${due.cls}">${esc(due.text)}</span></div><h1>${esc(d.title)}</h1></div><div class="page-actions">${ctx.user.perm.can_edit_analysis?`<button class="btn btn-secondary" id="editDemand">${icon('edit')}Editar análise</button>`:''}<button class="btn btn-primary" id="quickUpdate">${icon('message')}Devolutiva</button></div></div>
-        <nav class="tabs" aria-label="Detalhes da demanda"><button class="tab ${active==='summary'?'active':''}" data-tab="summary">Resumo</button><button class="tab ${active==='technical'?'active':''}" data-tab="technical">Análise Técnica</button><button class="tab ${active==='responses'?'active':''}" data-tab="responses">Devolutivas</button><button class="tab ${active==='attachments'?'active':''}" data-tab="attachments">Anexos <span class="badge P3">${payload.attachments.length}</span></button><button class="tab ${active==='history'?'active':''}" data-tab="history">Histórico</button><button class="tab ${active==='planning'?'active':''}" data-tab="planning">Planejamento</button></nav>
+        <nav class="tabs" aria-label="Detalhes da demanda"><button class="tab ${active==='summary'?'active':''}" data-tab="summary">${icon('file')}Resumo</button><button class="tab ${active==='technical'?'active':''}" data-tab="technical">${icon('settings')}Análise Técnica</button><button class="tab ${active==='responses'?'active':''}" data-tab="responses">${icon('message')}Devolutivas</button><button class="tab ${active==='attachments'?'active':''}" data-tab="attachments">${icon('paperclip')}Anexos <span class="badge P3">${payload.attachments.length}</span></button><button class="tab ${active==='history'?'active':''}" data-tab="history">${icon('clock')}Histórico</button><button class="tab ${active==='planning'?'active':''}" data-tab="planning">${icon('calendar')}Planejamento</button></nav>
         <div id="tabContent">${detailTabContent(active,payload)}</div>`;
       const reload=async()=>{payload=await api(`/api/demands/${id}`);render()};
       $$('[data-tab]',content).forEach(b=>b.addEventListener('click',()=>{active=b.dataset.tab;render()}));
@@ -606,11 +619,42 @@
     setLoading(); const data=await api('/api/planning'); const years=[...new Set(data.year_stats.map(x=>x.year))].sort(); const selected=Number(new URLSearchParams(location.search).get('year')||years[0]||2027);
     const stats=data.year_stats.find(x=>x.year===selected)||{items:0,total_cost:0,schools:0};
     content.innerHTML=`<section class="planning-hero"><div><span class="eyebrow" style="color:#7fe2df">PLANEJAMENTO E CONTRATAÇÕES</span><h1>Planejamento Futuro</h1><p>Consolide necessidades da rede e transforme demandas em aquisições, contratações, obras e projetos.</p></div><div><label class="form-label" style="color:#d8e8f7">EXERCÍCIO</label><select id="planningYear" class="year-select">${years.map(y=>`<option ${y===selected?'selected':''}>${y}</option>`).join('')}</select></div></section>
-      <div class="stats-grid"><article class="stat-card blue"><div class="stat-label">Orçamento estimado</div><div class="stat-value" style="font-size:28px">${money(stats.total_cost)}</div><div class="stat-note">${icon('money')}Visão consolidada do exercício</div></article><article class="stat-card teal"><div class="stat-label">Itens consolidados</div><div class="stat-value">${num(stats.items)}</div><div class="stat-note">${icon('clipboard')}Objetos em planejamento</div></article><article class="stat-card orange"><div class="stat-label">Escolas impactadas</div><div class="stat-value">${num(stats.schools)}</div><div class="stat-note">${icon('school')}Soma das unidades vinculadas</div></article><article class="stat-card violet"><div class="stat-label">Ciclo administrativo</div><div class="stat-value" style="font-size:21px;margin-top:13px">Planejar → Licitar</div><div class="stat-note">${icon('trend')}Rastreabilidade do início à execução</div></article></div>
+      <div class="stats-grid" id="planningStatsGrid">
+        <article class="stat-card blue" data-planning-insight data-tooltip="Ver detalhamento do planejamento do exercício"><div class="stat-label">Orçamento estimado</div><div class="stat-value" style="font-size:28px">${money(stats.total_cost)}</div><div class="stat-note">${icon('money')}Visão consolidada do exercício</div></article>
+        <article class="stat-card teal" data-planning-insight data-tooltip="Ver detalhamento do planejamento do exercício"><div class="stat-label">Itens consolidados</div><div class="stat-value">${num(stats.items)}</div><div class="stat-note">${icon('clipboard')}Objetos em planejamento</div></article>
+        <article class="stat-card orange" data-planning-insight data-tooltip="Ver quais unidades escolares são impactadas"><div class="stat-label">Escolas impactadas</div><div class="stat-value">${num(stats.schools)}</div><div class="stat-note">${icon('school')}Soma das unidades vinculadas</div></article>
+        <article class="stat-card violet" data-planning-insight data-tooltip="Ver detalhamento do planejamento do exercício"><div class="stat-label">Ciclo administrativo</div><div class="stat-value" style="font-size:21px;margin-top:13px">Planejar → Licitar</div><div class="stat-note">${icon('trend')}Rastreabilidade do início à execução</div></article>
+      </div>
       ${pageHeader(`Planejamento ${selected}`,'Itens previstos, consolidados e em preparação para contratação.',`<button class="btn btn-secondary" id="planningHelp">${icon('info')}Como funciona</button><button class="btn btn-secondary" id="newFutureDemand">${icon('plus')}Nova Demanda Futura</button>${ctx.user.perm.can_edit_analysis?`<button class="btn btn-primary" id="newPlanning">${icon('plus')}Consolidar Item</button>`:''}`)}
       <section class="panel"><div class="panel-header"><div><h2>Demandas de aquisição e contratação</h2><p>Itens consolidados para o exercício selecionado.</p></div><div class="search-field" style="width:260px">${icon('search')}<input class="input" id="planningQ" placeholder="Pesquisar planejamento..."></div></div><div id="planningTable"></div></section>`;
     const load=async()=>{const q=$('#planningQ')?.value||'';const res=await api(`/api/planning?year=${selected}&q=${encodeURIComponent(q)}`);$('#planningTable').innerHTML=renderPlanningTable(res.items)};
-    $('#planningYear').addEventListener('change',e=>location.href=`/planejamento?year=${e.target.value}`); $('#newFutureDemand')?.addEventListener('click',openFutureDemandForm); $('#newPlanning')?.addEventListener('click',openPlanningForm); let t;$('#planningQ').addEventListener('input',()=>{clearTimeout(t);t=setTimeout(load,200)});$('#planningHelp').addEventListener('click',()=>modal({title:'Fluxo do Planejamento',mode:'center',body:`<div class="info-card accent"><h3>${icon('trend')}Do registro à execução</h3><p><strong>Demanda da escola</strong> → Análise técnica → Planejamento futuro → Consolidação → Processo administrativo → Licitação/Contratação → Contrato → Execução.</p></div><div class="alert info">A consolidação permite agrupar necessidades semelhantes de várias unidades sem perder o vínculo com cada escola de origem.</div>`})); await load();
+    $('#planningYear').addEventListener('change',e=>location.href=`/planejamento?year=${e.target.value}`); $('#newFutureDemand')?.addEventListener('click',openFutureDemandForm); $('#newPlanning')?.addEventListener('click',openPlanningForm); let t;$('#planningQ').addEventListener('input',()=>{clearTimeout(t);t=setTimeout(load,200)});$('#planningHelp').addEventListener('click',()=>modal({title:'Fluxo do Planejamento',mode:'center',body:`<div class="info-card accent"><h3>${icon('trend')}Do registro à execução</h3><p><strong>Demanda da escola</strong> → Análise técnica → Planejamento futuro → Consolidação → Processo administrativo → Licitação/Contratação → Contrato → Execução.</p></div><div class="alert info">A consolidação permite agrupar necessidades semelhantes de várias unidades sem perder o vínculo com cada escola de origem.</div>`}));
+    $$('[data-planning-insight]',$('#planningStatsGrid')).forEach(card=>card.addEventListener('click',()=>openPlanningInsights(selected)));
+    await load();
+  }
+
+  async function openPlanningInsights(year){
+    modal({title:'Impacto por Unidade Escolar',subtitle:`Exercício ${year}`,mode:'drawer',body:`<div class="empty-state">${icon('clock')}<p>Carregando...</p></div>`});
+    let data;
+    try{ data=await api(`/api/planning/insights?year=${year}`); }
+    catch(e){ $('#modalRoot .modal-body').innerHTML=`<div class="alert error">Não foi possível carregar os dados deste exercício.</div>`; return; }
+    const s=data.summary;
+    const catMax=Math.max(1,...data.by_category.map(x=>x.cost||0));
+    const body=`
+      <div class="metric-row" style="grid-template-columns:repeat(3,1fr)">
+        <div class="metric"><span>Itens consolidados</span><strong>${num(s.items)}</strong></div>
+        <div class="metric"><span>Orçamento estimado</span><strong>${money(s.total_cost)}</strong></div>
+        <div class="metric"><span>Escolas (estimativa)</span><strong>${num(s.schools_estimate)}</strong></div>
+      </div>
+      <div class="alert info mt-16">${icon('school')} <strong>${num(s.schools_confirmed)} unidade${s.schools_confirmed===1?'':'s'}</strong> identificada${s.schools_confirmed===1?'':'s'} por vínculo direto com demandas cadastradas nos itens deste exercício${s.schools_confirmed!==s.schools_estimate?` — a soma estimada manualmente nos itens é de ${num(s.schools_estimate)}.`:'.'}</div>
+      ${s.schools_confirmed_list.length?`<div class="mt-16"><strong style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)">Unidades identificadas</strong><div class="filter-chips" style="margin-top:8px">${s.schools_confirmed_list.map(x=>`<span class="chip" style="cursor:default">${icon('school')}${esc(x.name)}</span>`).join('')}</div></div>`:''}
+      ${data.by_category.length?`<div class="mt-16"><h3 style="font-size:14px;margin:0 0 10px">Orçamento por categoria</h3><div class="mini-chart">${data.by_category.map(c=>`<div class="bar-row"><label title="${esc(c.category)}">${esc(c.category)}</label><div class="bar-track"><div class="bar-fill" style="width:${Math.max(8,(c.cost||0)/catMax*100)}%"></div></div><b>${money(c.cost||0)}</b></div>`).join('')}</div></div>`:''}
+      <div class="mt-16"><h3 style="font-size:14px;margin:0 0 10px">Detalhamento por item</h3><div class="side-stack">${data.items.length?data.items.map(it=>`<div class="info-card" style="margin-bottom:0;padding:14px">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><strong style="font-size:13px">${esc(it.title)}</strong><span class="status-badge future" style="white-space:nowrap">${esc(it.status)}</span></div>
+        <p style="margin:4px 0 8px;color:var(--muted);font-size:11.5px">${esc(it.category)} · ${esc(it.kind)} · ${money(it.estimated_cost)}</p>
+        ${it.linked_schools.length?`<div class="filter-chips">${it.linked_schools.map(x=>`<span class="chip" style="cursor:default">${icon('school')}${esc(x.name)}</span>`).join('')}</div>`:`<small class="text-muted">${num(it.schools_count)} unidade${it.schools_count===1?'':'s'} — estimativa manual, sem vínculo com demandas específicas cadastradas</small>`}
+      </div>`).join(''):empty('Nenhum item neste exercício','')}</div></div>`;
+    $('#modalRoot .modal-body').innerHTML=body;
   }
   function renderPlanningTable(items){
     if(!items.length)return empty('Nenhum item neste exercício','Cadastre uma necessidade futura ou altere o exercício.');
@@ -1074,7 +1118,8 @@
 
   async function renderKanban(){
     setLoading();
-    const schools = await loadSchools();
+    const [schools,catCounts] = await Promise.all([loadSchools(), api('/api/demands/category-counts')]);
+    const counts = catCounts.counts||{};
     const state = {
       q:'', category:'', priority:'', groupBy:'stage', hideDone:false,
       school_id: ctx.user.perm.school_scoped ? String(ctx.user.school_id) : '',
@@ -1089,7 +1134,7 @@
       <section class="filters-card">
         <div class="field"><label>Buscar</label><div class="search-field">${icon('search')}<input class="input" id="fQ" placeholder="Código, demanda ou escola..."></div></div>
         ${schoolField}
-        <div class="field"><label>Categoria</label><select class="select" id="fCategory"><option value="">Todas</option>${ctx.categories.map(x=>`<option>${esc(x)}</option>`).join('')}</select></div>
+        <div class="field"><label>Categoria</label><select class="select" id="fCategory"><option value="">Todas</option>${ctx.categories.map(x=>`<option value="${esc(x)}">${esc(x)} (${num(counts[x]||0)})</option>`).join('')}</select></div>
         <div class="field"><label>Prioridade</label><select class="select" id="fPriority"><option value="">Todas</option>${Object.keys(ctx.priorities).map(x=>`<option value="${x}">${x} · ${priorityLabel(x)}</option>`).join('')}</select></div>
         <div class="field"><label>Agrupar por</label><select class="select" id="fGroupBy"><option value="stage">Etapa do fluxo</option><option value="priority">Prioridade</option></select></div>
         <button class="btn btn-secondary" id="clearKanbanFilters">${icon('filter')}Limpar</button>
