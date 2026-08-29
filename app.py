@@ -17,6 +17,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Stre
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+import httpx
 import uvicorn
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -51,6 +52,34 @@ CATEGORIES = [
     "Acessibilidade", "Mobiliário", "Equipamentos", "Segurança", "Saneamento", "Estrutura", "Área externa",
     "Iluminação", "Portas e janelas", "Reforma", "Obra", "Aquisição", "Outros"
 ]
+
+
+# --- Mapa de rota (OpenFreeMap + Nominatim + OSRM) --------------------------
+NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+OSRM_ROUTE_URL = "https://router.project-osrm.org/route/v1/driving"
+GEOCODE_USER_AGENT = "AgendaIntegrada-Itaguai/1.1 (uso interno - Secretaria Municipal de Educacao de Itaguai-RJ)"
+
+
+def geocode_address(address: Optional[str]) -> Optional[dict]:
+    """Converte um endereço em texto para latitude/longitude usando o Nominatim (OpenStreetMap).
+    Retorna None se o endereço estiver vazio ou não puder ser localizado."""
+    if not address or not address.strip():
+        return None
+    try:
+        resp = httpx.get(
+            NOMINATIM_URL,
+            params={"q": address, "format": "json", "limit": 1, "countrycodes": "br", "addressdetails": 0},
+            headers={"User-Agent": GEOCODE_USER_AGENT, "Accept-Language": "pt-BR"},
+            timeout=8.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if not data:
+            return None
+        item = data[0]
+        return {"lat": float(item["lat"]), "lon": float(item["lon"]), "display_name": item.get("display_name")}
+    except Exception:
+        return None
 
 
 def db() -> sqlite3.Connection:
@@ -200,6 +229,10 @@ def init_db() -> None:
         conn.execute("ALTER TABLE schools ADD COLUMN code TEXT")
     if "external_id" not in school_cols:
         conn.execute("ALTER TABLE schools ADD COLUMN external_id TEXT")
+    if "lat" not in school_cols:
+        conn.execute("ALTER TABLE schools ADD COLUMN lat REAL")
+    if "lon" not in school_cols:
+        conn.execute("ALTER TABLE schools ADD COLUMN lon REAL")
 
     if conn.execute("SELECT COUNT(*) c FROM schools").fetchone()["c"] == 0:
         schools = [
@@ -703,6 +736,56 @@ def api_school(request: Request, school_id: int):
     demands = conn.execute("SELECT * FROM demands WHERE school_id=? ORDER BY datetime(updated_at) DESC", (school_id,)).fetchall()
     conn.close()
     return {"school": dict(school), "demands": [dict(x) for x in demands]}
+
+
+@app.get("/api/schools/{school_id}/geocode")
+def api_school_geocode(request: Request, school_id: int):
+    user = require_user(request)
+    if user["role"] == "escola" and school_id != user.get("school_id"):
+        raise HTTPException(403)
+    conn = db()
+    school = conn.execute("SELECT * FROM schools WHERE id=?", (school_id,)).fetchone()
+    if not school:
+        conn.close(); raise HTTPException(404)
+    if school["lat"] is not None and school["lon"] is not None:
+        conn.close()
+        return {"lat": school["lat"], "lon": school["lon"], "cached": True}
+    address = school["address"] or f"{school['name']}, Itaguaí - RJ"
+    result = geocode_address(address)
+    if not result:
+        conn.close()
+        raise HTTPException(404, "Não foi possível localizar o endereço desta escola no mapa.")
+    conn.execute("UPDATE schools SET lat=?, lon=? WHERE id=?", (result["lat"], result["lon"], school_id))
+    conn.commit(); conn.close()
+    return {"lat": result["lat"], "lon": result["lon"], "cached": False}
+
+
+@app.get("/api/geocode")
+def api_geocode(request: Request, q: str = Query("", min_length=3)):
+    require_user(request)
+    result = geocode_address(q)
+    if not result:
+        raise HTTPException(404, "Endereço não encontrado. Tente incluir bairro e cidade.")
+    return result
+
+
+@app.get("/api/route")
+def api_route(request: Request, from_lat: float, from_lon: float, to_lat: float, to_lon: float):
+    require_user(request)
+    try:
+        resp = httpx.get(
+            f"{OSRM_ROUTE_URL}/{from_lon},{from_lat};{to_lon},{to_lat}",
+            params={"overview": "full", "geometries": "geojson"},
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception:
+        raise HTTPException(502, "Serviço de rotas indisponível no momento. Tente novamente em instantes.")
+    if data.get("code") != "Ok" or not data.get("routes"):
+        raise HTTPException(404, "Não foi possível calcular uma rota entre os dois endereços.")
+    route = data["routes"][0]
+    return {"geometry": route["geometry"], "distance_m": route["distance"], "duration_s": route["duration"]}
 
 
 @app.get("/api/planning")

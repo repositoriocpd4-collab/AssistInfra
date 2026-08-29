@@ -13,6 +13,9 @@
     'Segurança':'shield','Saneamento':'drain','Estrutura':'column','Área externa':'tree','Iluminação':'bulb',
     'Portas e janelas':'door','Reforma':'hammer','Obra':'crane','Aquisição':'cart','Outros':'dots'
   };
+  const CATEGORY_COLOR_CYCLE = ['red','orange','teal','violet','green','blue'];
+  const CATEGORY_COLORS = {};
+  Object.keys(CATEGORY_ICONS).forEach((cat,i)=>{ CATEGORY_COLORS[cat] = CATEGORY_COLOR_CYCLE[i % CATEGORY_COLOR_CYCLE.length]; });
   const CATEGORY_HINTS = {
     'Elétrica':'Fiação, tomada, quadro de força, curto-circuito','Hidráulica':'Vazamento, entupimento, cano estourado',
     'Cobertura/Telhado':'Goteira, infiltração, telha quebrada','Pintura':'Parede descascando, mofo, pintura antiga',
@@ -130,7 +133,7 @@
     const MAX_CATEGORIES = 3;
 
     modal({
-      title:'Registrar uma demanda',
+      title:'Registrar Demanda/CI',
       subtitle:'Conte pra gente o que está acontecendo. São só 4 passos rápidos.',
       mode:'drawer',
       body:`<div class="stepper">
@@ -239,16 +242,16 @@
           if(!container) return;
           const multi = state.items.length>1;
           container.innerHTML = (multi?`<p class="wizard-question">Conte os detalhes de cada problema</p><p class="wizard-hint">Você escolheu ${state.items.length} tipos — cada um vira uma demanda com seu próprio código.</p>`:`<p class="wizard-question">Onde isso está acontecendo?</p>`) +
-            state.items.map((it,i)=>`
-            <div class="detail-block ${multi?'':'detail-block-single'}">
-              ${multi?`<div class="detail-block-head"><span class="category-icon">${icon(CATEGORY_ICONS[it.category]||'clipboard')}</span><strong>${i+1}. ${esc(it.category)}</strong></div>`:''}
+            state.items.map((it,i)=>{const c=CATEGORY_COLORS[it.category]||'blue';return `
+            <div class="detail-block ${multi?'':'detail-block-single'}" ${multi?`style="border-left:4px solid var(--${c})"`:''}>
+              ${multi?`<div class="detail-block-head" style="color:var(--${c})"><span class="detail-icon-badge" style="background:var(--${c}-soft);color:var(--${c})">${icon(CATEGORY_ICONS[it.category]||'clipboard')}</span><strong>${i+1}. ${esc(it.category)}</strong></div>`:''}
               ${multi?`<p class="wizard-question">Onde isso está acontecendo?</p>`:''}
               <div class="field span-2"><input class="input" data-field="location" data-idx="${i}" placeholder="Ex.: Sala 3, banheiro do pátio, cozinha..." autocomplete="off" value="${esc(it.location)}"></div>
               <p class="wizard-question mt-16">Descreva com suas palavras</p>
               <p class="wizard-hint">O que está acontecendo, desde quando e o que você já percebeu.</p>
               <div class="field span-2"><textarea class="textarea" data-field="description" data-idx="${i}" placeholder="Ex.: Está caindo água do teto da sala 3 sempre que chove, desde a semana passada.">${esc(it.description)}</textarea></div>
               ${!multi?`<div class="field span-2 mt-16"><label>Nome curto para essa demanda</label><input class="input" data-field="title" data-idx="${i}" maxlength="140" placeholder="Preenchemos pra você — pode ajustar se quiser" value="${esc(it.title)}"></div>`:''}
-            </div>`).join('');
+            </div>`}).join('');
           const suggestItemTitle=(i)=>{
             const it=state.items[i];
             const suggestion=[it.category, it.location].filter(Boolean).join(' — ') || it.category || '';
@@ -394,13 +397,13 @@
       : {eyebrow:'REGISTRO RÁPIDO', title:'Uma escola reportou algo? Registre em segundos.', text:'Use o assistente guiado para abrir uma demanda com categoria, urgência e impacto já organizados.'};
     content.innerHTML = pageHeader('Visão Geral', ctx.user.role==='escola' ? `Acompanhe as demandas de ${ctx.user.school_name}.` : 'Status atual das demandas de infraestrutura em toda a Rede Municipal.',
       `<a class="btn btn-secondary" href="/api/export/demands.csv" data-tooltip="Baixar a lista completa em CSV">${icon('download')}Exportar</a>`)+
-      `<section class="report-hero"><div class="report-hero-copy"><span class="eyebrow">${heroCopy.eyebrow}</span><h2>${heroCopy.title}</h2><p>${heroCopy.text}</p></div><button class="btn-report" data-open-demand data-tooltip="Abrir o assistente de registro em 4 passos">${icon('plus')}Registrar uma demanda</button></section>`+
-      `<div class="stats-grid">${cards.map(c=>`<article class="stat-card ${c[4]}" data-dashboard-filter="${esc(c[7])}" data-tooltip="${esc(c[6])}"><div class="stat-label">${esc(c[1])}</div><div class="stat-value mono">${c[8]==='money'?money(c[2]):num(c[2])}</div><div class="stat-note">${icon(c[5])}${esc(c[3])}</div><div class="stat-icon">${icon(c[5])}</div></article>`).join('')}</div>`+
+      `<section class="report-hero"><div class="report-hero-copy"><span class="eyebrow">${heroCopy.eyebrow}</span><h2>${heroCopy.title}</h2><p>${heroCopy.text}</p></div><button class="btn-report" data-open-demand data-tooltip="Abrir o assistente de registro em 4 passos">${icon('plus')}Registrar Demanda/CI</button></section>`+
+      `<div class="stats-grid">${cards.map(c=>`<article class="stat-card ${c[4]}" data-dashboard-filter="${esc(c[7])}" data-tooltip="${esc(c[6])}"><div class="stat-label">${esc(c[1])}</div><div class="stat-value mono${c[8]==='money'?' stat-value-money':''}">${c[8]==='money'?money(c[2]):num(c[2])}</div><div class="stat-note">${icon(c[5])}${esc(c[3])}</div><div class="stat-icon">${icon(c[5])}</div></article>`).join('')}</div>`+
       `<div class="content-grid">
         <section class="panel"><div class="panel-header"><div><h2>Precisa de atenção</h2><p>Priorizado por criticidade e prazo.</p></div><a class="link-btn" href="/demandas">Ver todas</a></div>
           <div class="attention-list">${data.attention.length?data.attention.map(d=>{const due=dueInfo(d);return `<a class="attention-item" href="/demandas/${d.id}"><span class="priority-dot ${d.priority}"></span><div><strong>${esc(d.title)}</strong><small>${esc(d.school_name)} · ${d.code}</small></div><span class="deadline ${due.cls}">${esc(due.text)}</span></a>`}).join(''):empty('Tudo em dia','Não há demandas críticas neste momento.')}</div>
         </section>
-        <section class="panel"><div class="panel-header"><div><h2>Demandas por categoria</h2><p>Concentração atual da carteira.</p></div></div><div class="panel-body mini-chart">${data.categories.map(x=>`<div class="bar-row"><label title="${esc(x.category)}">${esc(x.category)}</label><div class="bar-track"><div class="bar-fill" style="width:${Math.max(8,x.qty/maxCat*100)}%"></div></div><b>${x.qty}</b></div>`).join('')}</div></section>
+        <section class="panel"><div class="panel-header"><div><h2>Demandas por categoria</h2><p>Concentração atual da carteira. Clique para ver as demandas.</p></div></div><div class="panel-body mini-chart">${data.categories.map(x=>`<div class="bar-row" data-dashboard-filter="category=${encodeURIComponent(x.category)}" data-tooltip="Ver demandas de ${esc(x.category)}"><label title="${esc(x.category)}">${esc(x.category)}</label><div class="bar-track"><div class="bar-fill" style="width:${Math.max(8,x.qty/maxCat*100)}%"></div></div><b>${x.qty}</b></div>`).join('')}</div></section>
       </div>
       <section class="panel"><div class="panel-header"><div><h2>Atividade recente</h2><p>Últimas demandas atualizadas.</p></div><a class="link-btn" href="/demandas">Abrir lista completa</a></div>${renderDemandTable(data.recent,true)}</section>
       <section class="panel mt-16"><div class="panel-header"><div><h2>Indicador de execução</h2><p>Percentual das demandas registradas que já foram concluídas.</p></div><strong class="text-teal mono">${s.execution}%</strong></div><div class="panel-body"><div class="bar-track" style="height:14px"><div class="bar-fill" style="width:${Math.min(100,s.execution)}%"></div></div></div></section>`;
@@ -411,18 +414,24 @@
     }));
   }
 
-  function renderDemandTable(rows, compact=false){
+  function renderDemandTable(rows, compact=false, filterable=false, filters=null){
     if(!rows?.length) return empty();
-    return `<div class="table-wrap"><table class="data-table"><thead><tr><th>ID</th><th>Demanda</th>${compact?'':'<th>Categoria</th>'}<th>Unidade Escolar</th><th>Prioridade</th><th>Status</th><th>Prazo</th><th>Ações</th></tr></thead><tbody>${rows.map(d=>{
-      const due=dueInfo(d);return `<tr data-href="/demandas/${d.id}"><td class="mono"><strong>${esc(d.code)}</strong></td><td class="cell-title"><strong>${esc(d.title)}</strong><small>Atualizado ${fmtDateTime(d.updated_at)}</small></td>${compact?'':`<td>${esc(d.category)}</td>`}<td>${esc(d.school_name||'—')}</td><td><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span></td><td><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span></td><td><span class="deadline ${due.cls}">${esc(due.text)}</span></td><td><a class="icon-btn" href="/demandas/${d.id}" aria-label="Ver detalhes" data-tooltip="Ver detalhes">${icon('eye')}</a></td></tr>`}).join('')}</tbody></table></div>`;
+    const th=(label,field)=>{
+      if(!filterable||!field) return `<th>${label}</th>`;
+      const active = filters && filters[field];
+      return `<th class="th-filter${active?' active':''}" data-th-filter="${field}">${label}${icon('chevron')}</th>`;
+    };
+    return `<div class="table-wrap"><table class="data-table"><thead><tr><th>ID</th><th>Demanda</th>${compact?'':th('Categoria','category')}<th>Unidade Escolar</th>${th('Prioridade','priority')}${th('Status','status')}<th>Prazo</th><th>Ações</th></tr></thead><tbody>${rows.map(d=>{
+      const due=dueInfo(d);return `<tr data-href="/demandas/${d.id}" class="${d.status==='Concluída'?'row-done':''}"><td class="mono"><strong>${esc(d.code)}</strong></td><td class="cell-title"><strong>${esc(d.title)}</strong><small>Atualizado ${fmtDateTime(d.updated_at)}</small></td>${compact?'':`<td>${esc(d.category)}</td>`}<td>${esc(d.school_name||'—')}</td><td><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span></td><td><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span></td><td><span class="deadline ${due.cls}">${esc(due.text)}</span></td><td><a class="icon-btn" href="/demandas/${d.id}" aria-label="Ver detalhes" data-tooltip="Ver detalhes">${icon('eye')}</a></td></tr>`}).join('')}</tbody></table></div>`;
   }
 
   async function renderDemands(){
     setLoading();
     const query=new URLSearchParams(location.search);
-    const schools=await loadSchools();
+    const [schools,dash]=await Promise.all([loadSchools(), api('/api/dashboard')]);
+    const ds=dash.stats;
     const filters={q:query.get('q')||'',status:query.get('status')||'',priority:query.get('priority')||'',category:query.get('category')||'',year:query.get('year')||'2026',overdue:query.get('overdue')==='1',due_soon:query.get('due_soon')==='1',unassigned:query.get('unassigned')==='1'};
-    content.innerHTML = pageHeader('Demandas Escolares','Gerencie, filtre e acompanhe todas as solicitações de infraestrutura.',`<a class="btn btn-secondary" href="/api/export/demands.csv" data-tooltip="Baixar a lista filtrada em CSV">${icon('download')}Exportar CSV</a><button class="btn btn-primary" data-open-demand data-tooltip="Abrir o assistente de registro">${icon('plus')}Registrar demanda</button>`)+
+    content.innerHTML = pageHeader('Demandas Escolares','Gerencie, filtre e acompanhe todas as solicitações de infraestrutura.',`<a class="btn btn-secondary" href="/api/export/demands.csv" data-tooltip="Baixar a lista filtrada em CSV">${icon('download')}Exportar CSV</a><button class="btn btn-primary" data-open-demand data-tooltip="Abrir o assistente de registro">${icon('plus')}Registrar Demanda/CI</button>`)+
       `<section class="filters-card">
         <div class="field"><label>Buscar</label><div class="search-field">${icon('search')}<input class="input" id="fQ" value="${esc(filters.q)}" placeholder="Código, demanda ou escola..."></div></div>
         <div class="field"><label>Ano</label><select class="select" id="fYear"><option value="">Todos</option>${[2026,2025,2024].map(y=>`<option ${String(y)===filters.year?'selected':''}>${y}</option>`).join('')}</select></div>
@@ -435,8 +444,8 @@
         filters.overdue?['overdueChip','Prazo vencido']:null,
         filters.due_soon?['dueSoonChip','Vence em 7 dias']:null,
         filters.unassigned?['unassignedChip','Sem responsável']:null,
-      ].filter(Boolean).map(([id,label])=>`<button class="chip active" id="${id}">${esc(label)} ×</button>`).join('')}<button class="chip" data-chip-priority="P1">P1 Urgentes</button><button class="chip" data-chip-status="Aguardando contratação">Aguardando contratação</button><button class="chip" data-chip-status="Em execução">Em execução</button><button class="chip" data-chip-status="Planejamento futuro">Planejamento futuro</button><button class="chip" data-chip-status="Concluída">Concluídas</button></div>
-      <section class="panel"><div class="panel-header"><div><h2>Carteira de demandas</h2><p id="demandCount">Carregando...</p></div></div><div id="demandTable"></div></section>`;
+      ].filter(Boolean).map(([id,label])=>`<button class="chip active" id="${id}">${esc(label)} ×</button>`).join('')}<button class="chip" data-chip-priority="P1">P1 Urgentes (${num(ds.urgent)})</button><button class="chip" data-chip-status="Aguardando contratação">Aguardando contratação (${num(ds.contract)})</button><button class="chip" data-chip-status="Em execução">Em execução (${num(ds.progress)})</button><button class="chip" data-chip-status="Planejamento futuro">Planejamento futuro (${num(ds.future)})</button><button class="chip" data-chip-status="Concluída">Concluídas (${num(ds.completed)})</button></div>
+      <section class="panel" id="demandsPanel"><div class="panel-header"><div><h2>Carteira de demandas</h2><p id="demandCount">Carregando...</p></div></div><div id="demandTable"></div></section>`;
     $('[data-open-demand]',content).addEventListener('click',openDemandForm);
     const load=async()=>{
       const params=new URLSearchParams();
@@ -448,8 +457,37 @@
       $('#demandTable').innerHTML=`<div class="empty-state"><p>Atualizando lista...</p></div>`;
       const rows=await api('/api/demands?'+params.toString());
       $('#demandCount').textContent=`${rows.length} registro${rows.length===1?'':'s'} encontrado${rows.length===1?'':'s'}`;
-      $('#demandTable').innerHTML=renderDemandTable(rows,false);
+      $('#demandTable').innerHTML=renderDemandTable(rows,false,true,{category:$('#fCategory').value,priority:$('#fPriority').value,status:$('#fStatus').value});
     };
+    const THFILTER_OPTIONS={
+      category:()=>ctx.categories.map(x=>({value:x,label:x})),
+      priority:()=>Object.keys(ctx.priorities).map(x=>({value:x,label:`${x} · ${priorityLabel(x)}`})),
+      status:()=>ctx.statuses.map(x=>({value:x,label:x}))
+    };
+    const FIELD_SELECT={category:'#fCategory',priority:'#fPriority',status:'#fStatus'};
+    const closeThMenu=()=>{ $('#thFilterMenu')?.remove(); };
+    $('#demandsPanel').addEventListener('click',e=>{
+      const t=e.target.closest('[data-th-filter]');
+      if(!t) return;
+      e.stopPropagation();
+      const field=t.dataset.thFilter;
+      const existing=$('#thFilterMenu');
+      const already=existing && existing.dataset.for===field;
+      closeThMenu();
+      if(already) return;
+      const rect=t.getBoundingClientRect();
+      const menu=document.createElement('div');
+      menu.className='th-filter-menu'; menu.id='thFilterMenu'; menu.dataset.for=field;
+      menu.style.top=(rect.bottom+6)+'px'; menu.style.left=Math.min(rect.left,window.innerWidth-220)+'px';
+      menu.innerHTML=`<button data-val="">Todas</button>`+THFILTER_OPTIONS[field]().map(o=>`<button data-val="${esc(o.value)}">${esc(o.label)}</button>`).join('');
+      document.body.appendChild(menu);
+      menu.addEventListener('click',ev=>{
+        const b=ev.target.closest('button'); if(!b) return;
+        $(FIELD_SELECT[field]).value=b.dataset.val;
+        closeThMenu(); load();
+      });
+    });
+    document.addEventListener('click',e=>{ if(!e.target.closest('.th-filter-menu') && !e.target.closest('[data-th-filter]')) closeThMenu(); });
     let timer; $('#fQ').addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(load,250)});
     ['#fYear','#fStatus','#fPriority','#fCategory'].forEach(id=>$(id).addEventListener('change',load));
     $('#clearFilters').addEventListener('click',()=>{filters.overdue=false;filters.due_soon=false;filters.unassigned=false;['#fQ','#fStatus','#fPriority','#fCategory'].forEach(id=>$(id).value='');$('#fYear').value='2026';$('#overdueChip')?.remove();$('#dueSoonChip')?.remove();$('#unassignedChip')?.remove();load();});
@@ -727,7 +765,7 @@
       : `<div class="field"><label>Unidade Escolar</label><select class="select" id="fSchool"><option value="">Todas</option>${schools.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('')}</select></div>`;
 
     content.innerHTML = pageHeader('Quadro Kanban', 'Visualize e movimente as demandas por etapa do fluxo ou por prioridade, com arrastar e soltar.',
-        `<a class="btn btn-secondary" href="/api/export/demands.csv" data-tooltip="Baixar a lista completa em CSV">${icon('download')}Exportar</a><button class="btn btn-primary" data-open-demand data-tooltip="Abrir o assistente de registro">${icon('plus')}Registrar demanda</button>`)+
+        `<a class="btn btn-secondary" href="/api/export/demands.csv" data-tooltip="Baixar a lista completa em CSV">${icon('download')}Exportar</a><button class="btn btn-primary" data-open-demand data-tooltip="Abrir o assistente de registro">${icon('plus')}Registrar Demanda/CI</button>`)+
       `<div class="kanban-metrics" id="kanbanMetrics"></div>
       <section class="filters-card">
         <div class="field"><label>Buscar</label><div class="search-field">${icon('search')}<input class="input" id="fQ" placeholder="Código, demanda ou escola..."></div></div>
@@ -884,7 +922,7 @@
   $('#userMenuButton')?.addEventListener('click',()=>{const m=$('#userMenu');m.hidden=!m.hidden;$('#notificationPanel').hidden=true});
   $('#notificationButton')?.addEventListener('click',async()=>{const p=$('#notificationPanel');p.hidden=!p.hidden;$('#userMenu').hidden=true;if(!p.hidden){const d=await api('/api/dashboard');const n=[];if(d.stats.urgent)n.push([`${d.stats.urgent} demanda(s) urgente(s)`,`Prioridade P1 requer acompanhamento imediato.`]);if(d.stats.overdue)n.push([`${d.stats.overdue} prazo(s) vencido(s)`,`Revise prazos e registre reprogramações quando necessário.`]);if(d.stats.contract)n.push([`${d.stats.contract} aguardando contratação`,`Itens dependem de encaminhamento administrativo.`]);if(!n.length)n.push(['Nenhuma pendência crítica','Os principais indicadores estão sob controle.']);p.innerHTML=`<div class="notification-head"><strong>Notificações</strong><small class="text-muted">Agora</small></div>${n.map(x=>`<div class="notification-item"><span class="n-dot"></span><div><strong>${esc(x[0])}</strong><small>${esc(x[1])}</small></div></div>`).join('')}`;$('#notificationDot').hidden=true;}});
   const SHORTCUTS = [
-    {key:'N', label:'Registrar uma demanda', action:()=>openDemandForm()},
+    {key:'N', label:'Registrar Demanda/CI', action:()=>openDemandForm()},
     {key:'P', label:'Ir para o Painel', href:'/'},
     {key:'D', label:'Ir para Demandas', href:'/demandas'},
     {key:'K', label:'Ir para o Quadro Kanban', href:'/kanban'},

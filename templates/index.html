@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#005A9C">
   <title>{{ title }} · Agenda Integrada</title>
-  <link rel="stylesheet" href="/static/styles.css?v=govbr-8-kanban">
+  <link rel="stylesheet" href="/static/styles.css?v=govbr-9">
 </head>
 <body data-page="{{ page }}"{% if entity_id %} data-entity-id="{{ entity_id }}"{% endif %}>
   <svg aria-hidden="true" class="svg-sprite">
@@ -76,7 +76,7 @@
       <button class="side-close" id="sideClose" aria-label="Fechar menu"><svg><use href="#i-x"></use></svg></button>
     </div>
     <div class="side-menu-content">
-      <button class="btn btn-primary btn-new" data-open-demand aria-label="Registrar uma nova demanda ou intercorrência" data-tooltip="Contar o que está acontecendo na escola · tecla N"><svg><use href="#i-plus"></use></svg><span>Registrar uma demanda</span><kbd class="key-hint">N</kbd></button>
+      <button class="btn btn-primary btn-new" data-open-demand aria-label="Registrar uma nova demanda ou intercorrência" data-tooltip="Contar o que está acontecendo na escola · tecla N"><svg><use href="#i-plus"></use></svg><span>Registrar Demanda/CI</span><kbd class="key-hint">N</kbd></button>
       <button class="nav-item nav-back" id="navBack" type="button" data-tooltip="Voltar para a página anterior · tecla B"><svg style="transform:rotate(180deg)"><use href="#i-chevron"></use></svg><span>Voltar</span><kbd class="key-hint">B</kbd></button>
       <nav class="nav-list">
         <a class="nav-item {% if page == 'dashboard' %}active{% endif %}" href="/" data-tooltip="Visão geral, alertas e indicadores · tecla P"><svg><use href="#i-grid"></use></svg><span>Painel</span><kbd class="key-hint">P</kbd></a>
@@ -169,6 +169,6 @@
   <script>
     window.APP_CONTEXT = {{ {'page': page, 'entityId': entity_id if entity_id else None, 'user': user, 'priorities': priorities, 'statuses': statuses, 'categories': categories}|tojson }};
   </script>
-  <script src="/static/app.js?v=govbr-8-kanban"></script>
+  <script src="/static/app.js?v=govbr-9"></script>
 </body>
 </html>
