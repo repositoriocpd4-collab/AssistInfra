@@ -5,6 +5,7 @@
   const page = document.body.dataset.page;
   const content = $('#pageContent');
   let schoolsCache = null;
+  let staffCache = null;
 
   // Ícones, cores e dicas por categoria — vêm do servidor (tabela `categories`, editável em
   // Administração). CATEGORY_ICONS/COLORS/HINTS abaixo derivam de ctx.categoryMeta, com um
@@ -22,9 +23,9 @@
     {value:'P1', title:'É urgente', hint:'Risco agora ou impede a aula', icon:'bolt'}
   ];
   const REACH_CHOICES = [
-    {value:5, title:'Poucas pessoas', hint:'Uma sala ou um pequeno grupo'},
-    {value:30, title:'Muitas pessoas', hint:'Vários alunos e funcionários'},
-    {value:150, title:'Quase todo mundo', hint:'A escola inteira é afetada'}
+    {value:5, title:'Poucas pessoas', hint:'Uma sala ou um pequeno grupo', icon:'users'},
+    {value:30, title:'Muitas pessoas', hint:'Vários alunos e funcionários', icon:'users'},
+    {value:150, title:'Quase todo mundo', hint:'A escola inteira é afetada', icon:'globe'}
   ];
   // Agrupamento temático das categorias no assistente de registro (passo 1) — só para
   // organizar a busca em abas (Infraestrutura/Manutenção/Serviços/Administrativo/Outros);
@@ -141,6 +142,22 @@
     return schoolsCache;
   }
 
+  async function loadStaff(){
+    if (staffCache) return staffCache;
+    staffCache = await api('/api/staff');
+    return staffCache;
+  }
+
+  // Tipos de ação para a providência/encaminhamento registrado numa demanda (aba Resumo).
+  const PROV_ACTION_TYPES = [
+    {key:'manutencao', label:'Manutenção', icon:'wrench', color:'blue'},
+    {key:'obra', label:'Obra', icon:'building', color:'green'},
+    {key:'visita', label:'Visita técnica', icon:'user', color:'violet'},
+    {key:'processo', label:'Processo administrativo', icon:'file', color:'orange'},
+    {key:'urgente', label:'Alerta urgente', icon:'bell', color:'red'}
+  ];
+  const PROV_PRIORITIES = ['Baixa','Média','Alta'];
+
   function pageHeader(title, subtitle, actions=''){
     return `<div class="page-header"><div><span class="eyebrow">AGENDA INTEGRADA</span><h1>${esc(title)}</h1><p>${esc(subtitle)}</p></div><div class="page-actions">${actions}</div></div>`;
   }
@@ -213,16 +230,15 @@
           <div class="choice-grid" id="urgencyGrid" role="radiogroup" aria-label="Nível de urgência">
             ${URGENCY_CHOICES.map(u=>`<button type="button" class="choice-card ${u.value==='P3'?'active':''}" data-priority="${u.value}"><span class="choice-icon">${icon(u.icon)}</span><strong>${esc(u.title)}</strong><small>${esc(u.hint)}</small></button>`).join('')}
           </div>
-          <p class="wizard-question mt-16">Quantas pessoas isso afeta, mais ou menos?</p>
           <div class="choice-grid choice-grid-3" id="reachGrid" role="radiogroup" aria-label="Pessoas afetadas">
-            ${REACH_CHOICES.map(r=>`<button type="button" class="choice-card ${r.value===30?'active':''}" data-reach="${r.value}"><strong>${esc(r.title)}</strong><small>${esc(r.hint)}</small></button>`).join('')}
+            ${REACH_CHOICES.map(r=>`<button type="button" class="choice-card ${r.value===30?'active':''}" data-reach="${r.value}"><span class="choice-icon">${icon(r.icon)}</span><strong>${esc(r.title)}</strong><small>${esc(r.hint)}</small></button>`).join('')}
           </div>
-          <button type="button" class="link-btn mt-12" id="toggleCustomReach">Prefiro informar um número exato</button>
+          <button type="button" class="link-btn mt-12" id="toggleCustomReach">${icon('grid')}Prefiro informar um número exato</button>
           <div class="field mt-12 hidden" id="customReachField"><label>Número aproximado de pessoas</label><input class="input" type="number" min="0" name="affected_people_custom" placeholder="0"></div>
           <p class="wizard-question mt-16">Isso impede alguma atividade da escola?</p>
-          <div class="toggle-row"><button type="button" class="toggle-btn" data-toggle="blocks_activity" data-val="0">Não</button><button type="button" class="toggle-btn" data-toggle="blocks_activity" data-val="1">Sim</button></div>
+          <div class="toggle-row"><button type="button" class="toggle-btn toggle-btn-no" data-toggle="blocks_activity" data-val="0">${icon('x-circle')}Não</button><button type="button" class="toggle-btn toggle-btn-yes" data-toggle="blocks_activity" data-val="1">${icon('check-circle')}Sim</button></div>
           <p class="wizard-question mt-16">Alguém pode se machucar por causa disso?</p>
-          <div class="toggle-row"><button type="button" class="toggle-btn" data-toggle="risk" data-val="0">Não</button><button type="button" class="toggle-btn" data-toggle="risk" data-val="1">Sim</button></div>
+          <div class="toggle-row"><button type="button" class="toggle-btn toggle-btn-no" data-toggle="risk" data-val="0">${icon('x-circle')}Não</button><button type="button" class="toggle-btn toggle-btn-yes" data-toggle="risk" data-val="1">${icon('check-circle')}Sim</button></div>
         </section>
 
         <section data-step="4" class="form-step hidden"><div id="demandReview"></div></section>
@@ -327,11 +343,11 @@
           const container=$('#detailsFields',root);
           if(!container) return;
           const multi = state.items.length>1;
-          container.innerHTML = (multi?`<p class="wizard-question">Conte os detalhes de cada problema</p><p class="wizard-hint">Você escolheu ${state.items.length} tipos — cada um vira uma demanda com seu próprio código.</p>`:`<p class="wizard-question">Onde isso está acontecendo?</p>`) +
+          container.innerHTML = (multi?`<p class="wizard-question">Conte os detalhes de cada problema</p><p class="wizard-hint">Você escolheu ${state.items.length} tipos — cada um vira uma demanda com seu próprio código.</p>`:'') +
             state.items.map((it,i)=>{const c=CATEGORY_COLORS[it.category]||'blue';return `
             <div class="detail-block ${multi?'':'detail-block-single'}" ${multi?`style="border-left:4px solid var(--${c})"`:''}>
-              ${multi?`<div class="detail-block-head" style="color:var(--${c})"><span class="detail-icon-badge" style="background:var(--${c}-soft);color:var(--${c})">${icon(CATEGORY_ICONS[it.category]||'clipboard')}</span><strong>${i+1}. ${esc(it.category)}</strong></div>`:''}
-              ${multi?`<p class="wizard-question">Onde isso está acontecendo?</p>`:''}
+              <div class="detail-block-head" style="color:var(--${c})"><span class="detail-icon-badge" style="background:var(--${c}-soft);color:var(--${c})">${icon(CATEGORY_ICONS[it.category]||'clipboard')}</span><strong>${i+1}. ${esc(it.category)}</strong></div>
+              <p class="wizard-question">Onde isso está acontecendo?</p>
               <div class="field span-2"><input class="input" data-field="location" data-idx="${i}" placeholder="Ex.: Sala 3, banheiro do pátio, cozinha..." autocomplete="off" value="${esc(it.location)}"></div>
               <p class="wizard-question mt-16">Descreva com suas palavras</p>
               <p class="wizard-hint">O que está acontecendo, desde quando e o que você já percebeu.</p>
@@ -650,15 +666,61 @@
 
   function detailTabContent(name, payload){
     const d=payload.demand;
-    if(name==='summary') return `<div class="detail-layout"><div>
+    if(name==='summary'){
+      const catColor=CATEGORY_COLORS[d.category]||'blue', catIcon=CATEGORY_ICONS[d.category]||'clipboard';
+      const provType=PROV_ACTION_TYPES.find(t=>t.key===d.prov_action_type);
+      const provStep = !d.prov_action_type ? 0 : (!d.prov_responsible ? 1 : (statusClass(d.status)==='completed' ? 4 : (statusClass(d.status)==='execution' ? 3 : 2)));
+      const staffOptions = (payload.staff||[]).map(s=>`<option value="${esc(s.name)}" ${s.name===d.prov_responsible?'selected':''}>${esc(s.name)}</option>`).join('');
+      return `<div class="detail-layout"><div>
       <section class="info-card accent"><h3>${icon('clipboard')}Descrição</h3><p>${esc(d.description)}</p></section>
-      <div class="metric-row"><div class="metric"><span>Categoria</span><strong>${esc(d.category)}</strong></div><div class="metric"><span>Custo estimado</span><strong>${money(d.cost_estimate)}</strong></div><div class="metric"><span>Pessoas afetadas</span><strong>${num(d.affected_people)}</strong></div></div>
+      <div class="info-stat-row">
+        <div class="info-stat"><span class="info-stat-icon" style="background:var(--${catColor}-soft);color:var(--${catColor})">${icon(catIcon)}</span><div><span>Categoria</span><strong>${esc(d.category)}</strong></div></div>
+        <div class="info-stat"><span class="info-stat-icon" style="background:var(--blue-soft);color:var(--blue)">${icon('money')}</span><div><span>Custo estimado</span><strong>${money(d.cost_estimate)}</strong></div></div>
+        <div class="info-stat"><span class="info-stat-icon" style="background:var(--violet-soft);color:var(--violet)">${icon('users')}</span><div><span>Pessoas afetadas</span><strong>${num(d.affected_people)}</strong></div></div>
+      </div>
       ${d.subcategory?`<p class="wizard-hint mt-12">Também identificado como: <strong>${esc(d.subcategory)}</strong></p>`:''}
       <section class="info-card mt-16"><h3>${icon('warning')}Impacto</h3><p>${esc(d.impact||'Impacto não detalhado.')}</p></section>
+
+      <section class="info-card mt-16 prov-form-card">
+        <h3>${icon('send')}Providência / Encaminhamento</h3>
+        <p class="wizard-hint">Registre a ação tomada para essa demanda e mantenha a escola informada.</p>
+        <p class="wizard-question mt-16">Tipo de ação</p>
+        <div class="prov-type-row" id="provTypeRow">${PROV_ACTION_TYPES.map(t=>`<button type="button" class="prov-type-chip ${d.prov_action_type===t.key?'active':''}" data-prov-type="${t.key}" style="--chip-color:var(--${t.color});--chip-soft:var(--${t.color}-soft)"><span class="prov-type-icon">${icon(t.icon)}</span>${esc(t.label)}</button>`).join('')}</div>
+        <div class="form-grid mt-16">
+          <div class="field"><label>Responsável</label><select class="select" id="provResponsible"><option value="">Selecionar responsável...</option>${staffOptions}</select></div>
+          <div class="field"><label>Prazo</label><input class="input" type="date" id="provDueDate" value="${esc(d.prov_due_date||'')}"></div>
+          <div class="field"><label>Prioridade</label><select class="select" id="provPriority"><option value="">Selecionar...</option>${PROV_PRIORITIES.map(p=>`<option ${p===d.prov_priority?'selected':''}>${p}</option>`).join('')}</select></div>
+          <div class="field span-2"><label>Observação</label><textarea class="textarea" id="provNote" placeholder="Detalhe a providência tomada ou o encaminhamento dado...">${esc(d.prov_note||'')}</textarea></div>
+        </div>
+        <div class="prov-form-footer">
+          <button type="button" class="attach-btn" id="provAttachBtn">${icon('paperclip')}Anexar documento</button>
+          <input type="file" id="provAttachInput" hidden>
+          <label class="prov-notify-row"><span>Notificar escola</span><span class="switch"><input type="checkbox" id="provNotify" ${d.prov_notify_school?'checked':''}><span class="switch-track"></span></span></label>
+        </div>
+        <div class="prov-form-actions">
+          <button type="button" class="btn btn-secondary" id="saveProvidence">${icon('bookmark')}Salvar providência</button>
+          <button type="button" class="btn btn-primary" id="saveProvidenceNotify">${icon('send')}Salvar e enviar devolutiva</button>
+        </div>
+      </section>
+
+      <section class="info-card mt-16 flow-card">
+        <h3>${icon('trend')}Fluxo da providência</h3>
+        <div class="flow-stepper">
+          <div class="flow-step ${provStep>=1?'done':''}"><div class="flow-step-marker"><span class="flow-step-num">1</span><span class="flow-step-badge">${icon('building')}</span></div><strong>Providência registrada</strong><small>Encaminhamento criado e tipo de ação definido</small></div>
+          <div class="flow-connector ${provStep>=2?'done':''}"></div>
+          <div class="flow-step ${provStep>=2?'done':''}"><div class="flow-step-marker outline">${icon('user')}</div><strong>Responsável designado</strong><small>Equipe ou setor assumiu o encaminhamento</small></div>
+          <div class="flow-connector ${provStep>=3?'done':''}"></div>
+          <div class="flow-step ${provStep>=3?'done':''}"><div class="flow-step-marker outline"><span class="flow-step-num">3</span></div><strong>Em execução</strong><small>Ação em andamento junto à unidade</small></div>
+          <div class="flow-connector ${provStep>=4?'done':''}"></div>
+          <div class="flow-step ${provStep>=4?'done':''}"><div class="flow-step-marker outline">${icon('check-circle')}</div><strong>Providência concluída</strong><small>Encaminhamento finalizado e escola notificada</small></div>
+        </div>
+      </section>
     </div><aside class="side-stack">
       <section class="info-card"><h3>${icon('school')}Unidade Escolar</h3><div class="key-value"><div class="kv"><span>Unidade</span><strong>${esc(d.school_name)}</strong></div><div class="kv"><span>Direção</span><strong>${esc(d.director||'—')}</strong></div><div class="kv"><span>Local da ocorrência</span><strong>${esc(d.location||'—')}</strong></div><div class="kv"><span>Endereço</span><strong>${esc(d.address||'—')}</strong></div></div></section>
+      <section class="info-card providence-status"><h3>${icon('send')}Status da providência</h3>${provType?`<div class="prov-status-type" style="--chip-color:var(--${provType.color});--chip-soft:var(--${provType.color}-soft)"><span class="prov-type-icon">${icon(provType.icon)}</span>${esc(provType.label)}</div><div class="key-value mt-12"><div class="kv"><span>Responsável</span><strong>${esc(d.prov_responsible||'Não definido')}</strong></div><div class="kv"><span>Prazo</span><strong>${fmtDate(d.prov_due_date)}</strong></div><div class="kv"><span>Prioridade</span><strong>${esc(d.prov_priority||'Não definida')}</strong></div></div>`:`<p>Nenhuma providência registrada ainda.</p>`}</section>
       <section class="info-card"><h3>${icon('warning')}Sinais de atenção</h3>${d.risk?`<div class="impact-item">${icon('warning')}<span>Há risco informado à comunidade escolar.</span></div>`:''}${d.blocks_activity?`<div class="impact-item">${icon('clock')}<span>Impacta ou impede atividade escolar.</span></div>`:''}${!d.risk&&!d.blocks_activity?`<p>Nenhum sinal crítico registrado.</p>`:''}</section>
     </aside></div>`;
+    }
     if(name==='technical') return `<div class="detail-layout"><div>
       <section class="info-card accent"><h3>${icon('settings')}Análise Técnica</h3><div class="key-value"><div class="kv"><span>Parecer técnico</span><strong>${esc(d.technical_opinion||'Ainda não registrado.')}</strong></div><div class="kv"><span>Ação definida</span><strong>${esc(d.action_defined||'Ainda não definida.')}</strong></div><div class="kv"><span>Dependências</span><strong>${esc(d.dependencies||'Nenhuma dependência registrada.')}</strong></div></div></section>
       ${ctx.user.perm.can_edit_analysis?`<button class="btn btn-primary" id="editTechnical">${icon('edit')}Atualizar análise técnica</button>`:''}
@@ -669,7 +731,9 @@
     </div><aside class="side-stack"><section class="info-card"><h3>${icon('info')}Boa devolutiva</h3><p>Informe o que foi analisado, qual é o próximo passo, quem está responsável e a previsão atualizada.</p></section></aside></div>`;
     if(name==='attachments') return `<section class="info-card"><h3>${icon('paperclip')}Anexos</h3><label class="upload-zone" id="uploadZone">${icon('paperclip')}<strong>Arraste um arquivo ou clique para selecionar</strong><small>PDF, DOCX, XLSX e imagens · até 12 MB</small><input type="file" id="attachmentInput" hidden></label>${renderFiles(payload.attachments)}</section>`;
     if(name==='history') return `<section class="info-card"><h3>${icon('clock')}Histórico completo</h3>${renderTimeline(payload.updates)}</section>`;
-    if(name==='planning') return `<div class="detail-layout"><div><section class="info-card accent"><h3>${icon('calendar')}Planejamento</h3>${d.future_year?`<p>Esta demanda está vinculada ao planejamento do exercício de <strong>${d.future_year}</strong>.</p><div class="metric-row mt-16"><div class="metric"><span>Tipo</span><strong>${esc(d.planning_kind||'Planejamento futuro')}</strong></div><div class="metric"><span>Quantidade</span><strong>${num(d.planned_quantity||0)} ${esc(d.planned_unit||'')}</strong></div><div class="metric"><span>Estimativa</span><strong>${money(d.cost_estimate)}</strong></div></div>`:`<p>Esta demanda ainda não foi destinada a um exercício futuro.</p>`}</section>${payload.planning.length?payload.planning.map(p=>`<section class="info-card"><div class="detail-code-line"><span class="badge P4">${esc(p.code)}</span><span class="status-badge future">${esc(p.status)}</span></div><h3 style="margin-top:12px">${esc(p.title)}</h3><div class="metric-row"><div class="metric"><span>Exercício</span><strong>${p.year}</strong></div><div class="metric"><span>Estimativa</span><strong>${money(p.estimated_cost)}</strong></div><div class="metric"><span>Escolas</span><strong>${p.schools_count}</strong></div></div></section>`).join(''):''}</div><aside class="side-stack"><section class="info-card"><h3>${icon('info')}Fluxo futuro</h3><p>Demanda → Planejamento → Consolidação → Processo administrativo → Licitação/Contratação → Execução.</p></section></aside></div>`;
+    if(name==='planning') return `<div class="detail-layout"><div><section class="info-card accent"><h3>${icon('calendar')}Planejamento</h3>${d.future_year?`<p>Esta demanda está vinculada ao planejamento do exercício de <strong>${d.future_year}</strong>.</p><div class="metric-row mt-16"><div class="metric"><span>Tipo</span><strong>${esc(d.planning_kind||'Planejamento futuro')}</strong></div><div class="metric"><span>Quantidade</span><strong>${num(d.planned_quantity||0)} ${esc(d.planned_unit||'')}</strong></div><div class="metric"><span>Estimativa</span><strong>${money(d.cost_estimate)}</strong></div></div>`:`<p>Esta demanda ainda não foi destinada a um exercício futuro.</p>`}</section>
+      ${ctx.user.perm.can_edit_analysis?`<button class="btn btn-primary" id="editPlanningLink">${icon('calendar')}${d.future_year?'Editar planejamento':'Destinar a um exercício futuro'}</button>`:''}
+      ${payload.planning.length?payload.planning.map(p=>`<section class="info-card mt-16"><div class="detail-code-line"><span class="badge P4">${esc(p.code)}</span><span class="status-badge future">${esc(p.status)}</span></div><h3 style="margin-top:12px">${esc(p.title)}</h3><div class="metric-row"><div class="metric"><span>Exercício</span><strong>${p.year}</strong></div><div class="metric"><span>Estimativa</span><strong>${money(p.estimated_cost)}</strong></div><div class="metric"><span>Escolas</span><strong>${p.schools_count}</strong></div></div></section>`).join(''):''}</div><aside class="side-stack"><section class="info-card"><h3>${icon('info')}Fluxo futuro</h3><p>Demanda → Planejamento → Consolidação → Processo administrativo → Licitação/Contratação → Execução.</p></section></aside></div>`;
     return '';
   }
   function renderTimeline(items){
@@ -699,19 +763,83 @@
     }});
   }
 
+  // Aba "Planejamento" da demanda — usa os mesmos campos de planejamento futuro
+  // (future_year, planning_kind, planned_quantity, planned_unit) já aceitos pelo
+  // PUT /api/demands/{id} (mesma rota usada em "Editar análise"), só que num formulário
+  // dedicado e acessível direto na aba, em vez de misturado com a análise técnica.
+  const PLANNING_KINDS = ['Aquisição futura','Contratação futura','Obra futura','Projeto futuro','Serviço continuado'];
+  async function openEditPlanning(d, reload){
+    modal({title:'Planejamento Futuro',subtitle:`${d.code} · ${d.title}`,mode:'drawer',body:`<form id="planningLinkForm"><div class="form-grid">
+      <div class="field"><label>Exercício futuro</label><input class="input" type="number" min="2026" max="2035" name="future_year" value="${esc(d.future_year||'')}" placeholder="Ex.: 2027"></div>
+      <div class="field"><label>Tipo de necessidade</label><select class="select" name="planning_kind"><option value="">Não definido</option>${PLANNING_KINDS.map(k=>`<option ${k===d.planning_kind?'selected':''}>${esc(k)}</option>`).join('')}</select></div>
+      <div class="field"><label>Quantidade</label><input class="input" type="number" min="0" step="0.01" name="planned_quantity" value="${esc(d.planned_quantity||'')}"></div>
+      <div class="field"><label>Unidade de medida</label><input class="input" name="planned_unit" value="${esc(d.planned_unit||'')}" placeholder="un, m², serviço..."></div>
+      <div class="field span-2"><label>Estimativa de custo (R$)</label><input class="input" type="number" min="0" step="0.01" name="cost_estimate" value="${esc(d.cost_estimate||0)}"></div>
+    </div><p class="wizard-hint mt-12">Deixe o exercício em branco para remover o vínculo desta demanda com o planejamento futuro.</p></form>`,
+      footer:`<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="savePlanningLink">Salvar planejamento</button>`,onOpen(){
+      $('#savePlanningLink').addEventListener('click',async()=>{
+        const f=$('#planningLinkForm');
+        const payload=Object.fromEntries(new FormData(f).entries());
+        try{
+          await api(`/api/demands/${d.id}`,{method:'PUT',body:payload});
+          closeModal();
+          toast('Planejamento atualizado', payload.future_year?`Demanda destinada ao exercício ${payload.future_year}.`:'Vínculo com exercício futuro removido.');
+          await reload();
+        }catch(e){ toast('Não foi possível salvar', e.message, 'error'); }
+      });
+    }});
+  }
+
   async function renderDemandDetail(){
     setLoading();
-    const id=Number(document.body.dataset.entityId); let payload=await api(`/api/demands/${id}`); let active='summary';
+    const id=Number(document.body.dataset.entityId);
+    let [payload,staff]=await Promise.all([api(`/api/demands/${id}`), loadStaff().catch(()=>[])]);
+    payload.staff=staff; let active='summary';
     const render=()=>{
       const d=payload.demand, due=dueInfo(d);
       content.innerHTML=`<div class="breadcrumb"><a href="/demandas">Demandas</a><span>›</span><span>${esc(d.code)}</span></div>
         <div class="detail-head"><div><div class="detail-code-line"><span class="code-label">${esc(d.code)}</span><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span><span class="deadline ${due.cls}">${esc(due.text)}</span></div><h1>${esc(d.title)}</h1></div><div class="page-actions">${ctx.user.perm.can_edit_analysis?`<button class="btn btn-secondary" id="editDemand">${icon('edit')}Editar análise</button>`:''}<button class="btn btn-primary" id="quickUpdate">${icon('message')}Devolutiva</button></div></div>
-        <nav class="tabs" aria-label="Detalhes da demanda"><button class="tab ${active==='summary'?'active':''}" data-tab="summary">${icon('file')}Resumo</button><button class="tab ${active==='technical'?'active':''}" data-tab="technical">${icon('settings')}Análise Técnica</button><button class="tab ${active==='responses'?'active':''}" data-tab="responses">${icon('message')}Devolutivas</button><button class="tab ${active==='attachments'?'active':''}" data-tab="attachments">${icon('paperclip')}Anexos <span class="badge P3">${payload.attachments.length}</span></button><button class="tab ${active==='history'?'active':''}" data-tab="history">${icon('clock')}Histórico</button><button class="tab ${active==='planning'?'active':''}" data-tab="planning">${icon('calendar')}Planejamento</button></nav>
+        <nav class="tabs" aria-label="Detalhes da demanda"><button class="tab ${active==='summary'?'active':''}" data-tab="summary">${icon('file')}Resumo</button><button class="tab ${active==='technical'?'active':''}" data-tab="technical">${icon('settings')}Análise Técnica</button><button class="tab ${active==='responses'?'active':''}" data-tab="responses">${icon('message')}Devolutivas</button><button class="tab ${active==='attachments'?'active':''}" data-tab="attachments">${icon('paperclip')}Anexos <span class="badge P3">${payload.attachments.length}</span></button><button class="tab ${active==='history'?'active':''}" data-tab="history">${icon('clock')}Histórico</button><button class="tab ${active==='planning'?'active':''}" data-tab="planning">${icon('calendar')}Planejamento</button><button class="tab tab-accent" data-tab="providencias">${icon('send')}Providências</button></nav>
         <div id="tabContent">${detailTabContent(active,payload)}</div>`;
-      const reload=async()=>{payload=await api(`/api/demands/${id}`);render()};
-      $$('[data-tab]',content).forEach(b=>b.addEventListener('click',()=>{active=b.dataset.tab;render()}));
+      const reload=async()=>{payload=await api(`/api/demands/${id}`);payload.staff=staff;render()};
+      $$('[data-tab]',content).forEach(b=>b.addEventListener('click',()=>{
+        if(b.dataset.tab==='providencias'){ active='summary'; render(); setTimeout(()=>$('.prov-form-card')?.scrollIntoView({behavior:'smooth',block:'start'}),20); return; }
+        active=b.dataset.tab; render();
+      }));
       $('#editDemand')?.addEventListener('click',()=>openEditTechnical(d,reload));
       $('#editTechnical')?.addEventListener('click',()=>openEditTechnical(d,reload));
+      $('#editPlanningLink')?.addEventListener('click',()=>openEditPlanning(d,reload));
+      $$('#provTypeRow .prov-type-chip',content).forEach(chip=>chip.addEventListener('click',()=>{
+        const already=chip.classList.contains('active');
+        $$('#provTypeRow .prov-type-chip',content).forEach(c=>c.classList.remove('active'));
+        if(!already) chip.classList.add('active');
+      }));
+      const provAttachInput=$('#provAttachInput');
+      $('#provAttachBtn')?.addEventListener('click',()=>provAttachInput?.click());
+      provAttachInput?.addEventListener('change',()=>provAttachInput.files[0]&&upload(provAttachInput.files[0]));
+      const saveProv=async(sendUpdate)=>{
+        const type=$('#provTypeRow .prov-type-chip.active')?.dataset.provType||'';
+        const body={
+          prov_action_type:type,
+          prov_responsible:$('#provResponsible').value,
+          prov_due_date:$('#provDueDate').value,
+          prov_priority:$('#provPriority').value,
+          prov_note:$('#provNote').value,
+          prov_notify_school:$('#provNotify').checked
+        };
+        try{
+          await api(`/api/demands/${id}`,{method:'PUT',body});
+          if(sendUpdate){
+            const typeLabel=PROV_ACTION_TYPES.find(t=>t.key===type)?.label||'Providência';
+            const msg=(body.prov_note||'').trim() || `Providência registrada: ${typeLabel}${body.prov_responsible?` · Responsável: ${body.prov_responsible}`:''}${body.prov_due_date?` · Prazo: ${fmtDate(body.prov_due_date)}`:''}`;
+            await api(`/api/demands/${id}/updates`,{method:'POST',body:{kind:'Devolutiva',message:msg}});
+          }
+          toast(sendUpdate?'Providência salva e devolutiva enviada':'Providência salva');
+          await reload();
+        }catch(e){ toast('Não foi possível salvar',e.message,'error'); }
+      };
+      $('#saveProvidence')?.addEventListener('click',()=>saveProv(false));
+      $('#saveProvidenceNotify')?.addEventListener('click',()=>saveProv(true));
       const goResponses=()=>{active='responses';render();setTimeout(()=>$('#updateMessage')?.focus(),20)};
       $('#quickUpdate')?.addEventListener('click',goResponses);
       $('#sendUpdate')?.addEventListener('click',async()=>{const ta=$('#updateMessage');if(!ta.value.trim()){toast('Escreva uma devolutiva','O campo de mensagem está vazio.','error');return}try{await api(`/api/demands/${id}/updates`,{method:'POST',body:{kind:'Devolutiva',message:ta.value.trim()}});toast('Devolutiva registrada');await reload();active='responses';render();}catch(e){toast('Erro ao registrar',e.message,'error')}});

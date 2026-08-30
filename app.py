@@ -347,6 +347,22 @@ def init_db() -> None:
     if "active" not in user_cols:
         conn.execute("ALTER TABLE users ADD COLUMN active INTEGER NOT NULL DEFAULT 1")
 
+    demand_cols = {r["name"] for r in conn.execute("PRAGMA table_info(demands)").fetchall()}
+    if "prov_description" not in demand_cols:
+        conn.execute("ALTER TABLE demands ADD COLUMN prov_description TEXT")
+    if "prov_action_type" not in demand_cols:
+        conn.execute("ALTER TABLE demands ADD COLUMN prov_action_type TEXT")
+    if "prov_responsible" not in demand_cols:
+        conn.execute("ALTER TABLE demands ADD COLUMN prov_responsible TEXT")
+    if "prov_due_date" not in demand_cols:
+        conn.execute("ALTER TABLE demands ADD COLUMN prov_due_date TEXT")
+    if "prov_priority" not in demand_cols:
+        conn.execute("ALTER TABLE demands ADD COLUMN prov_priority TEXT")
+    if "prov_note" not in demand_cols:
+        conn.execute("ALTER TABLE demands ADD COLUMN prov_note TEXT")
+    if "prov_notify_school" not in demand_cols:
+        conn.execute("ALTER TABLE demands ADD COLUMN prov_notify_school INTEGER NOT NULL DEFAULT 0")
+
     if conn.execute("SELECT COUNT(*) c FROM schools").fetchone()["c"] == 0:
         schools = [
             ('CEMAEE Centro Municipal de Atendimento Educacional Especializado', 'CRISTIANO VITOR SOUZA', 'Rua José Bonifácio, s/n - Centro - Itaguaí/RJ - CEP: 23815-650', '21 99192-4296', 'cemaee@edu.itaguai.rj.gov.br', None, '7d044cda-ad4d-4466-8e68-856754057278'),
@@ -846,12 +862,12 @@ async def update_demand(request: Request, demand_id: int):
         conn.close(); raise HTTPException(403)
     allowed = ["title", "description", "category", "subcategory", "location", "impact", "affected_people", "risk", "blocks_activity"]
     if user["perm"]["can_edit_analysis"]:
-        allowed += ["priority", "status", "due_date", "responsible", "sector", "cost_estimate", "action_defined", "technical_opinion", "dependencies", "needs_visit", "needs_budget", "needs_material", "needs_contract", "future_year", "planning_kind", "planned_quantity", "planned_unit"]
+        allowed += ["priority", "status", "due_date", "responsible", "sector", "cost_estimate", "action_defined", "technical_opinion", "dependencies", "needs_visit", "needs_budget", "needs_material", "needs_contract", "future_year", "planning_kind", "planned_quantity", "planned_unit", "prov_description", "prov_action_type", "prov_responsible", "prov_due_date", "prov_priority", "prov_note", "prov_notify_school"]
     changes = []
     for key in allowed:
         if key in payload:
             new = payload[key]
-            if key in ("risk", "blocks_activity", "needs_visit", "needs_budget", "needs_material", "needs_contract"):
+            if key in ("risk", "blocks_activity", "needs_visit", "needs_budget", "needs_material", "needs_contract", "prov_notify_school"):
                 new = int(bool(new))
             if key in ("affected_people", "future_year") and new not in (None, ""):
                 new = int(new)
@@ -862,7 +878,7 @@ async def update_demand(request: Request, demand_id: int):
                 conn.execute(f"UPDATE demands SET {key}=? WHERE id=?", (new if new != "" else None, demand_id))
     conn.execute("UPDATE demands SET updated_at=? WHERE id=?", (now_iso(), demand_id))
     if changes:
-        labels = {"priority":"Prioridade", "status":"Status", "due_date":"Prazo", "responsible":"Responsável", "future_year":"Exercício futuro"}
+        labels = {"priority":"Prioridade", "status":"Status", "due_date":"Prazo", "responsible":"Responsável", "future_year":"Exercício futuro", "prov_action_type":"Tipo de ação", "prov_responsible":"Responsável pela providência", "prov_due_date":"Prazo da providência", "prov_priority":"Prioridade da providência", "prov_description":"Descrição da providência", "prov_note":"Observação da providência"}
         summary = "; ".join(f"{labels.get(k,k)}: {a or '—'} → {b or '—'}" for k,a,b in changes[:6])
         conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(?,?,?,?,?)", (demand_id, "Alteração", summary, user["name"], now_iso()))
     conn.commit(); conn.close()
@@ -923,6 +939,17 @@ def download_attachment(request: Request, attachment_id: int):
     path = UPLOAD_DIR / row["stored_name"]
     if not path.exists(): raise HTTPException(404)
     return FileResponse(path, filename=row["filename"], media_type=row["mime"] or "application/octet-stream")
+
+
+@app.get("/api/staff")
+def api_staff(request: Request):
+    require_user(request)
+    conn = db()
+    rows = conn.execute("""SELECT u.id, u.name, u.email, p.label profile_label
+                           FROM users u JOIN access_profiles p ON p.slug=u.role
+                           WHERE p.school_scoped=0 AND p.can_edit_analysis=1 AND u.active=1
+                           ORDER BY u.name""").fetchall()
+    conn.close(); return [dict(x) for x in rows]
 
 
 @app.get("/api/schools")
