@@ -246,6 +246,7 @@ def init_db() -> None:
         CREATE TABLE IF NOT EXISTS attachments (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             demand_id INTEGER NOT NULL,
+            category TEXT,
             filename TEXT NOT NULL,
             stored_name TEXT NOT NULL,
             mime TEXT,
@@ -362,6 +363,10 @@ def init_db() -> None:
         conn.execute("ALTER TABLE demands ADD COLUMN prov_note TEXT")
     if "prov_notify_school" not in demand_cols:
         conn.execute("ALTER TABLE demands ADD COLUMN prov_notify_school INTEGER NOT NULL DEFAULT 0")
+
+    attachment_cols = {r["name"] for r in conn.execute("PRAGMA table_info(attachments)").fetchall()}
+    if "category" not in attachment_cols:
+        conn.execute("ALTER TABLE attachments ADD COLUMN category TEXT")
 
     if conn.execute("SELECT COUNT(*) c FROM schools").fetchone()["c"] == 0:
         schools = [
@@ -907,7 +912,7 @@ async def add_update(request: Request, demand_id: int):
 
 
 @app.post("/api/demands/{demand_id}/attachments")
-async def upload_attachment(request: Request, demand_id: int, file: UploadFile = File(...)):
+async def upload_attachment(request: Request, demand_id: int, file: UploadFile = File(...), category: Optional[str] = Form(None)):
     user = require_user(request)
     conn = db()
     demand = conn.execute("SELECT school_id FROM demands WHERE id=?", (demand_id,)).fetchone()
@@ -925,8 +930,10 @@ async def upload_attachment(request: Request, demand_id: int, file: UploadFile =
     safe_ext = suffix[:10]
     stored = f"{demand_id}_{secrets.token_hex(10)}{safe_ext}"
     (UPLOAD_DIR / stored).write_bytes(content)
-    conn.execute("INSERT INTO attachments(demand_id,filename,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?)", (demand_id, file.filename or "arquivo", stored, file.content_type, len(content), now_iso()))
-    conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(?,?,?,?,?)", (demand_id, "Anexo", f"Arquivo anexado: {file.filename}", user["name"], now_iso()))
+    cat_text = category.strip() if category and category.strip() else None
+    conn.execute("INSERT INTO attachments(demand_id,category,filename,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?)", (demand_id, cat_text, file.filename or "arquivo", stored, file.content_type, len(content), now_iso()))
+    msg = f"Foto/Arquivo anexado ({cat_text}): {file.filename}" if cat_text else f"Arquivo anexado: {file.filename}"
+    conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(?,?,?,?,?)", (demand_id, "Anexo", msg, user["name"], now_iso()))
     conn.commit(); conn.close()
     return {"ok": True}
 
