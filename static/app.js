@@ -26,6 +26,39 @@
     {value:30, title:'Muitas pessoas', hint:'Vários alunos e funcionários'},
     {value:150, title:'Quase todo mundo', hint:'A escola inteira é afetada'}
   ];
+  // Agrupamento temático das categorias no assistente de registro (passo 1) — só para
+  // organizar a busca em abas (Infraestrutura/Manutenção/Serviços/Administrativo/Outros);
+  // não existe coluna "grupo" no banco, então isso é só uma classificação de exibição no
+  // front-end, sem alterar a tabela `categories` nem nenhuma API. Categoria não listada
+  // aqui cai automaticamente em "Outros".
+  const CATEGORY_GROUPS = {
+    'Acessibilidade':'infra','Alvenaria':'infra','Climatização':'infra','Cobertura/Telhado':'infra',
+    'Elétrica':'infra','Equipamentos':'infra','Estrutura':'infra','Hidráulica':'infra','Iluminação':'infra',
+    'Iluminação Externa':'infra','Iluminação Interna':'infra','Instalação':'infra','Isolamento':'infra',
+    'Mobiliário':'infra','Obra':'infra','Obra/Reparo':'infra','Pintura':'infra','Portas e janelas':'infra',
+    'Reforma':'infra','Refrigeração':'infra','Saneamento':'infra','Segurança':'infra','Serralheria':'infra',
+    'Área externa':'infra',
+    'Bombeiro Hidráulico':'manutencao','Capina':'manutencao','Conserto':'manutencao','Corte':'manutencao',
+    'Dedetização':'manutencao','Desalojamento de pombos':'manutencao','Desinfecção':'manutencao',
+    'Desratização':'manutencao','Jardinagem':'manutencao','Limpeza':'manutencao','Manutenção':'manutencao',
+    'Montagem':'manutencao','Poda de árvore':'manutencao','Poda e Roçada':'manutencao','Reparo':'manutencao',
+    'Serviço de solda':'manutencao','Substituição':'manutencao','Troca':'manutencao','Vacall':'manutencao',
+    'Agendamento':'servicos','Assistência':'servicos','Automação':'servicos','Avaliação':'servicos',
+    'Comunicado':'servicos','Consultoria':'servicos','Inspeção':'servicos','Inspeção Gás':'servicos',
+    'Levantamento':'servicos','Reciclagem':'servicos','Retirada':'servicos','Retorno':'servicos',
+    'Transporte':'servicos','Visita técnica':'servicos','Vistoria':'servicos',
+    'Aquisição':'administrativo','Boletim de Ocorrência':'administrativo','Conta Luz':'administrativo',
+    'Declaração':'administrativo','Informação':'administrativo','Relatório':'administrativo',
+    'Resposta':'administrativo','Solicitação':'administrativo'
+  };
+  const CATEGORY_TABS = [
+    {key:'usadas', label:'Mais usadas', icon:'star'},
+    {key:'infra', label:'Infraestrutura', icon:'building'},
+    {key:'manutencao', label:'Manutenção', icon:'wrench'},
+    {key:'servicos', label:'Serviços', icon:'clipboard'},
+    {key:'administrativo', label:'Administrativo', icon:'user'},
+    {key:'outros', label:'Outros', icon:'dots'}
+  ];
 
   const icon = name => `<svg aria-hidden="true"><use href="#i-${name}"></use></svg>`;
   const esc = (v='') => String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
@@ -113,7 +146,8 @@
   }
 
   async function openDemandForm(){
-    const schools = await loadSchools();
+    const [schools,catCounts] = await Promise.all([loadSchools(), api('/api/demands/category-counts')]);
+    const counts = catCounts.counts||{};
     const schoolOptions = ctx.user.perm.school_scoped
       ? `<option value="${ctx.user.school_id}">${esc(ctx.user.school_name||'Minha unidade')}</option>`
       : schools.map(s=>`<option value="${s.id}">${esc(s.name)}</option>`).join('');
@@ -121,10 +155,20 @@
       priority:'P3', reach:30, customReach:false, blocks_activity:false, risk:false, photo:null};
     const MAX_CATEGORIES = 3;
 
+    // "Mais frequentes" = as categorias mais usadas de fato no histórico de demandas
+    // (contagem real, mesma origem do filtro de Categoria na tela de Demandas) — nunca
+    // uma lista inventada. Com pouco ou nenhum uso ainda, cai de volta para a ordem
+    // cadastrada em Administração, então a seção nunca fica vazia.
+    const FREQUENT_N = 6;
+    const frequentCats = [...ctx.categories]
+      .sort((a,b)=>(counts[b]||0)-(counts[a]||0))
+      .slice(0,FREQUENT_N);
+    const categoryCard = c => `<button type="button" class="category-card" data-category="${esc(c)}" data-group="${esc(CATEGORY_GROUPS[c]||'outros')}" data-name="${esc(c.toLowerCase())}" aria-pressed="false" data-tooltip="${esc(CATEGORY_HINTS[c]||c)}"><span class="category-icon">${icon(CATEGORY_ICONS[c]||'clipboard')}</span><strong>${esc(c)}</strong></button>`;
+
     modal({
       title:'Registrar Demanda/CI',
-      subtitle:'Conte pra gente o que está acontecendo. São só 4 passos rápidos.',
-      mode:'drawer',
+      subtitle:'Conte pra gente o que está acontecendo. Sua demanda gera soluções.',
+      mode:'center',
       body:`<div class="stepper">
         <div class="step active" data-step-ind="1"><span class="step-num">1</span><span>O que houve</span></div>
         <div class="step" data-step-ind="2"><span class="step-num">2</span><span>Detalhes</span></div>
@@ -137,8 +181,24 @@
           <p class="wizard-question">Qual é o tipo de problema?</p>
           <p class="wizard-hint">Toque em até 3 opções que mais se parecem com o que você está vendo.</p>
           <p class="wizard-hint" id="categoryPickHint">Nenhum problema selecionado ainda.</p>
-          <div class="category-grid" id="categoryGrid" role="group" aria-label="Tipo de problema — escolha até 3">
-            ${ctx.categories.map(c=>`<button type="button" class="category-card" data-category="${esc(c)}" aria-pressed="false" data-tooltip="${esc(CATEGORY_HINTS[c]||c)}"><span class="category-icon">${icon(CATEGORY_ICONS[c]||'clipboard')}</span><strong>${esc(c)}</strong></button>`).join('')}
+          <div class="category-toolbar">
+            <div class="search-field">${icon('search')}<input class="input" id="categorySearch" placeholder="Pesquisar tipo de demanda..."></div>
+            <div class="category-tabs" id="categoryTabs" role="tablist">
+              ${CATEGORY_TABS.map((t,i)=>`<button type="button" class="category-tab${i===0?' active':''}" data-group-tab="${t.key}">${icon(t.icon)}${esc(t.label)}</button>`).join('')}
+            </div>
+          </div>
+          <div id="categorySections">
+            <div class="category-section" id="frequentSection">
+              <p class="category-section-title">${icon('star')}Mais frequentes</p>
+              <div class="category-grid">${frequentCats.map(categoryCard).join('')}</div>
+            </div>
+            <div class="category-section">
+              <p class="category-section-title" id="allCategoriesTitle">Todos os tipos de demanda</p>
+              <div class="category-grid" id="categoryGrid" role="group" aria-label="Tipo de problema — escolha até 3">
+                ${ctx.categories.map(categoryCard).join('')}
+              </div>
+              <p class="wizard-hint hidden" id="categoryEmptyHint">Nenhum tipo de demanda encontrado para essa busca.</p>
+            </div>
           </div>
         </section>
 
@@ -187,23 +247,29 @@
           else if(state.categories.length<MAX_CATEGORIES) hint.textContent=`${state.categories.length} de ${MAX_CATEGORIES} selecionados: ${state.categories.join(', ')}.`;
           else hint.textContent=`Limite de ${MAX_CATEGORIES} atingido: ${state.categories.join(', ')}. Toque em um selecionado para trocar.`;
         };
+        // Uma mesma categoria pode aparecer duas vezes na tela (em "Mais frequentes" e em
+        // "Todos os tipos de demanda"), então toda seleção precisa refletir em TODAS as
+        // instâncias com o mesmo data-category, não só no botão clicado.
+        const cardsFor=cat=>$$(`.category-card[data-category="${cat}"]`,root);
         const refreshCategoryOrder=()=>{
           $$('.category-card',root).forEach(b=>{
             const pos=state.categories.indexOf(b.dataset.category);
-            const badge=b.querySelector('.category-order');
-            if(pos>-1){ if(badge) badge.textContent=String(pos+1); }
+            let badge=b.querySelector('.category-order');
+            if(pos>-1){
+              if(!badge){ badge=document.createElement('span'); badge.className='category-order'; b.appendChild(badge); }
+              badge.textContent=String(pos+1);
+            } else if(badge){ badge.remove(); }
           });
         };
         $$('.category-card',root).forEach(b=>b.addEventListener('click',()=>{
           const cat=b.dataset.category;
           const idx=state.categories.indexOf(cat);
+          const dupCards=cardsFor(cat);
           if(idx>-1){
             state.categories.splice(idx,1);
             const itemIdx=state.items.findIndex(it=>it.category===cat);
             if(itemIdx>-1) state.items.splice(itemIdx,1);
-            b.classList.remove('selected');
-            b.setAttribute('aria-pressed','false');
-            b.querySelector('.category-order')?.remove();
+            dupCards.forEach(el=>{el.classList.remove('selected');el.setAttribute('aria-pressed','false');});
           } else {
             if(state.categories.length>=MAX_CATEGORIES){
               toast(`Escolha no máximo ${MAX_CATEGORIES}`,'Toque em um tipo já selecionado para liberar espaço.','error');
@@ -211,17 +277,48 @@
             }
             state.categories.push(cat);
             state.items.push({category:cat, location:'', description:'', title:''});
-            b.classList.add('selected');
-            b.setAttribute('aria-pressed','true');
-            if(!b.querySelector('.category-order')){
-              const span=document.createElement('span');
-              span.className='category-order';
-              b.appendChild(span);
-            }
+            dupCards.forEach(el=>{el.classList.add('selected');el.setAttribute('aria-pressed','true');});
           }
           refreshCategoryOrder();
           updateCategoryHint();
           syncNextEnabled();
+        }));
+
+        // Busca e abas por grupo temático (Mais usadas/Infraestrutura/Manutenção/...)
+        // filtram só a exibição dos cartões — não mexem no estado de seleção.
+        let activeGroup='usadas';
+        const applyCategoryFilter=()=>{
+          const q=($('#categorySearch',root)?.value||'').trim().toLowerCase();
+          const frequentSection=$('#frequentSection',root);
+          const allTitle=$('#allCategoriesTitle',root);
+          const emptyHint=$('#categoryEmptyHint',root);
+          const tabLabel=CATEGORY_TABS.find(t=>t.key===activeGroup)?.label||'Todos os tipos de demanda';
+          if(q){
+            frequentSection.classList.add('hidden');
+            allTitle.textContent=`Resultados para "${q}"`;
+          }else if(activeGroup==='usadas'){
+            frequentSection.classList.remove('hidden');
+            allTitle.textContent='Todos os tipos de demanda';
+          }else{
+            frequentSection.classList.add('hidden');
+            allTitle.textContent=tabLabel;
+          }
+          let visibleCount=0;
+          $$('#categoryGrid .category-card',root).forEach(card=>{
+            const matchesQ=!q||card.dataset.name.includes(q);
+            const matchesGroup=q||activeGroup==='usadas'||card.dataset.group===activeGroup;
+            const show=matchesQ&&matchesGroup;
+            card.classList.toggle('hidden',!show);
+            if(show) visibleCount++;
+          });
+          emptyHint.classList.toggle('hidden',visibleCount>0);
+        };
+        let searchTimer;
+        $('#categorySearch',root)?.addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(applyCategoryFilter,120);});
+        $$('[data-group-tab]',root).forEach(t=>t.addEventListener('click',()=>{
+          activeGroup=t.dataset.groupTab;
+          $$('[data-group-tab]',root).forEach(x=>x.classList.toggle('active',x===t));
+          applyCategoryFilter();
         }));
         form.elements.school_id?.addEventListener('change',syncNextEnabled);
 
@@ -390,21 +487,32 @@
       ['RESPONSABILIDADE',['unassigned']],
       ['CUSTO EM ABERTO',['open_cost']],
     ];
-    const statTile=c=>`<article class="stat-tile ${c[4]}" data-dashboard-filter="${esc(c[7])}" data-tooltip="${esc(c[6])}"><div class="stat-tile-icon">${icon(c[5])}</div><div class="stat-tile-body"><div class="stat-tile-value mono">${c[8]==='money'?money(c[2]):num(c[2])}</div><div class="stat-tile-label">${esc(c[1])}</div><div class="stat-tile-note">${esc(c[3])}</div></div></article>`;
-    const statsGroupsHtml=`<div class="stats-groups">${statGroups.map(([label,keys])=>`<div class="stat-group"><div class="stat-group-label">${esc(label)}</div><div class="stat-group-cards">${keys.map(k=>statTile(byKey[k])).join('')}</div></div>`).join('')}</div>`;
+    const statTile=c=>{
+      const alertCls = (c[0]==='unassigned' && c[2]>0) ? ' stat-tile-alert' : '';
+      return `<article class="stat-tile ${c[4]}${alertCls}" data-dashboard-filter="${esc(c[7])}" data-tooltip="${esc(c[6])}"><div class="stat-tile-icon">${icon(c[5])}</div><div class="stat-tile-body"><div class="stat-tile-value mono">${c[8]==='money'?money(c[2]):num(c[2])}</div><div class="stat-tile-label">${esc(c[1])}</div><div class="stat-tile-note">${esc(c[3])}</div></div></article>`;
+    };
+    const statsGroupsHtml=`<div class="stats-groups">${statGroups.map(([label,keys])=>{
+      const isCost = label==='CUSTO EM ABERTO';
+      const cards = `<div class="stat-group-label">${esc(label)}</div><div class="stat-group-cards">${keys.map(k=>statTile(byKey[k])).join('')}</div>`;
+      if(!isCost) return `<div class="stat-group">${cards}</div>`;
+      return `<div class="stat-group stat-group-cost"><div>${cards}</div><button class="btn-cost-detail" type="button" data-tooltip="Ver o detalhamento do custo em aberto por categoria">${icon('eye')}<span>Ver detalhes</span></button></div>`;
+    }).join('')}</div>`;
     const maxCat=Math.max(1,...data.categories.map(x=>x.qty));
+    const CAT_PALETTE=['#005A9C','#0f7b79','#1a7c44','#c67c00','#6f42c1','#b71c1c','#0d3c75','#4ade95'];
+    const totalCat=data.categories.reduce((sum,x)=>sum+x.qty,0)||1;
+    let catAcc=0;
+    const catGradient=data.categories.map((x,i)=>{const color=CAT_PALETTE[i%CAT_PALETTE.length];const start=catAcc/totalCat*360;catAcc+=x.qty;const end=catAcc/totalCat*360;return `${color} ${start}deg ${end}deg`;}).join(', ');
     const heroCopy = ctx.user.perm.school_scoped
       ? {eyebrow:'PRECISOU DE ALGO?', title:'Viu um problema na escola? Conte pra gente.', text:'Leva menos de 2 minutos. Escolha o tipo de problema, descreva com suas palavras e, se quiser, envie uma foto.'}
       : {eyebrow:'REGISTRO RÁPIDO', title:'Uma escola reportou algo? Registre em segundos.', text:'Use o assistente guiado para abrir uma demanda com categoria, urgência e impacto já organizados.'};
-    content.innerHTML = pageHeader('Visão Geral', ctx.user.perm.school_scoped ? `Acompanhe as demandas de ${ctx.user.school_name}.` : 'Status atual das demandas de infraestrutura em toda a Rede Municipal.',
-      `<a class="btn btn-secondary" href="/api/export/demands.csv" data-tooltip="Baixar a lista completa em CSV">${icon('download')}Exportar</a>`)+
-      `<section class="report-hero"><div class="report-hero-copy"><span class="eyebrow">${heroCopy.eyebrow}</span><h2>${heroCopy.title}</h2><p>${heroCopy.text}</p></div><button class="btn-report" data-open-demand data-tooltip="Abrir o assistente de registro em 4 passos">${icon('plus')}Registrar Demanda/CI</button></section>`+
+    content.innerHTML =
+      `<section class="report-hero"><a class="report-hero-export" href="/api/export/demands.csv" data-tooltip="Baixar a lista completa em CSV">${icon('download')}<span>Exportar</span></a><div class="report-hero-copy"><span class="eyebrow">${heroCopy.eyebrow}</span><h2>${heroCopy.title}</h2><p>${heroCopy.text}</p></div><button class="btn-report" data-open-demand data-tooltip="Abrir o assistente de registro em 4 passos">${icon('plus')}Registrar Demanda/CI</button></section>`+
       statsGroupsHtml+
       `<div class="content-grid">
         <section class="panel"><div class="panel-header"><div><h2>Precisa de atenção</h2><p>Priorizado por criticidade e prazo.</p></div><a class="link-btn" href="/demandas">Ver todas</a></div>
           <div class="attention-list">${data.attention.length?data.attention.map(d=>{const due=dueInfo(d);return `<a class="attention-item" href="/demandas/${d.id}"><span class="priority-dot ${d.priority}"></span><div><strong>${esc(d.title)}</strong><small>${esc(d.school_name)} · ${d.code}</small></div><span class="deadline ${due.cls}">${esc(due.text)}</span></a>`}).join(''):empty('Tudo em dia','Não há demandas críticas neste momento.')}</div>
         </section>
-        <section class="panel"><div class="panel-header"><div><h2>Demandas por categoria</h2><p>Concentração atual da carteira. Clique para ver as demandas.</p></div></div><div class="panel-body mini-chart">${data.categories.map(x=>`<div class="bar-row" data-dashboard-filter="category=${encodeURIComponent(x.category)}" data-tooltip="Ver demandas de ${esc(x.category)}"><label title="${esc(x.category)}">${esc(x.category)}</label><div class="bar-track"><div class="bar-fill" style="width:${Math.max(8,x.qty/maxCat*100)}%"></div></div><b>${x.qty}</b></div>`).join('')}</div></section>
+        <section class="panel"><div class="panel-header"><div><h2>Demandas por categoria</h2><p>Concentração atual da carteira. Clique para ver as demandas.</p></div></div><div class="panel-body">${data.categories.length?`<div class="category-donut-wrap"><div class="category-donut" style="background:conic-gradient(${catGradient})"><div class="category-donut-hole"><strong>${num(totalCat)}</strong><span>Total</span></div></div><div class="category-legend mini-chart">${data.categories.map((x,i)=>`<div class="bar-row" data-dashboard-filter="category=${encodeURIComponent(x.category)}" data-tooltip="Ver demandas de ${esc(x.category)}"><label title="${esc(x.category)}"><span class="legend-dot" style="background:${CAT_PALETTE[i%CAT_PALETTE.length]}"></span>${esc(x.category)}</label><div class="bar-track"><div class="bar-fill" style="width:${Math.max(8,x.qty/maxCat*100)}%;background:${CAT_PALETTE[i%CAT_PALETTE.length]}"></div></div><b>${x.qty}</b></div>`).join('')}</div></div><a class="link-btn category-see-all" href="/demandas" data-tooltip="Ver todas as demandas por categoria">Ver todas as categorias ${icon('arrow')}</a>`:empty('Sem categorias','Ainda não há demandas categorizadas.')}</div></section>
       </div>
       <section class="panel"><div class="panel-header"><div><h2>Atividade recente</h2><p>Últimas demandas atualizadas.</p></div><a class="link-btn" href="/demandas">Abrir lista completa</a></div>${renderDemandTable(data.recent,true)}</section>
       <section class="panel mt-16"><div class="panel-header"><div><h2>Indicador de execução</h2><p>Percentual das demandas registradas que já foram concluídas.</p></div><strong class="text-teal mono">${s.execution}%</strong></div><div class="panel-body"><div class="bar-track" style="height:14px"><div class="bar-fill" style="width:${Math.min(100,s.execution)}%"></div></div></div></section>`;
@@ -412,6 +520,27 @@
     $$('[data-dashboard-filter]').forEach(card=>card.addEventListener('click',()=>{
       const f=card.dataset.dashboardFilter;
       location.href=f?`/demandas?${f}`:'/demandas';
+    }));
+    $('.btn-cost-detail',content)?.addEventListener('click',()=>openCostDetail(data));
+  }
+
+  function openCostDetail(data){
+    const s=data.stats;
+    const breakdown=data.cost_breakdown||[];
+    const top=data.cost_top||[];
+    const maxB=Math.max(1,...breakdown.map(x=>x.cost||0));
+    const body=`
+      <div class="metric-row" style="grid-template-columns:repeat(2,1fr)">
+        <div class="metric"><span>Total em aberto</span><strong>${money(s.open_cost)}</strong></div>
+        <div class="metric"><span>Categorias com custo pendente</span><strong>${num(breakdown.length)}</strong></div>
+      </div>
+      ${breakdown.length?`<div class="mt-16"><h3 style="font-size:14px;margin:0 0 10px">Por categoria</h3><div class="mini-chart">${breakdown.map(c=>`<div class="bar-row" data-dashboard-filter="category=${encodeURIComponent(c.category)}" data-tooltip="Ver demandas de ${esc(c.category)}"><label title="${esc(c.category)}">${esc(c.category)}</label><div class="bar-track"><div class="bar-fill" style="width:${Math.max(8,(c.cost||0)/maxB*100)}%"></div></div><b>${money(c.cost||0)}</b></div>`).join('')}</div></div>`:''}
+      ${top.length?`<div class="mt-16"><h3 style="font-size:14px;margin:0 0 10px">Maiores custos em aberto</h3><div class="side-stack">${top.map(d=>`<a class="info-card" href="/demandas/${d.id}" style="display:block;text-decoration:none;color:inherit;margin-bottom:0;padding:14px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><strong style="font-size:13px">${esc(d.title)}</strong><span class="badge ${d.priority}">${d.priority}</span></div><p style="margin:4px 0 8px;color:var(--muted);font-size:11.5px">${esc(d.school_name)} · ${d.code}</p><strong class="mono">${money(d.cost_estimate||0)}</strong></a>`).join('')}</div></div>`:''}
+      ${!breakdown.length&&!top.length?empty('Sem custos em aberto','Não há demandas em aberto com custo estimado no momento.'):''}
+    `;
+    modal({title:'Custo em Aberto — Detalhamento',subtitle:'Estimativa do que ainda não foi concluído',mode:'drawer',body});
+    $$('#modalRoot [data-dashboard-filter]').forEach(row=>row.addEventListener('click',()=>{
+      location.href=`/demandas?${row.dataset.dashboardFilter}`;
     }));
   }
 
@@ -442,11 +571,18 @@
         <div class="field"><label>Categoria</label><select class="select" id="fCategory"><option value="">Todas</option>${ctx.categories.map(x=>`<option value="${esc(x)}" ${x===filters.category?'selected':''}>${esc(x)} (${num(counts[x]||0)})</option>`).join('')}</select></div>
         <button class="btn btn-secondary" id="clearFilters">${icon('filter')}Limpar</button>
       </section>
-      <div class="filter-chips">${[
-        filters.overdue?['overdueChip','Prazo vencido']:null,
-        filters.due_soon?['dueSoonChip','Vence em 7 dias']:null,
-        filters.unassigned?['unassignedChip','Sem responsável']:null,
-      ].filter(Boolean).map(([id,label])=>`<button class="chip active" id="${id}">${esc(label)} ×</button>`).join('')}<button class="chip" data-chip-priority="P1">P1 Urgentes (${num(ds.urgent)})</button><button class="chip" data-chip-status="Aguardando contratação">Aguardando contratação (${num(ds.contract)})</button><button class="chip" data-chip-status="Em execução">Em execução (${num(ds.progress)})</button><button class="chip" data-chip-status="Planejamento futuro">Planejamento futuro (${num(ds.future)})</button><button class="chip" data-chip-status="Concluída">Concluídas (${num(ds.completed)})</button></div>
+      <div class="quick-filters">
+        <div class="chip-group">${[
+          filters.overdue?['overdueChip','Prazo vencido']:null,
+          filters.due_soon?['dueSoonChip','Vence em 7 dias']:null,
+          filters.unassigned?['unassignedChip','Sem responsável']:null,
+        ].filter(Boolean).map(([id,label])=>`<button class="chip active" id="${id}">${esc(label)} ×</button>`).join('')}<button class="chip-v2 chip-red" data-chip-priority="P1">${icon('warning')}<span>P1 Urgentes</span><b>${num(ds.urgent)}</b></button><button class="chip-v2 chip-orange" data-chip-status="Aguardando contratação">${icon('clock')}<span>Aguardando contratação</span><b>${num(ds.contract)}</b></button><button class="chip-v2 chip-blue" data-chip-status="Em execução">${icon('trend')}<span>Em execução</span><b>${num(ds.progress)}</b></button><button class="chip-v2 chip-violet" data-chip-status="Planejamento futuro">${icon('calendar')}<span>Planejamento futuro</span><b>${num(ds.future)}</b></button><button class="chip-v2 chip-green" data-chip-status="Concluída" id="completedChip">${icon('check-circle')}<span>Concluídas</span><b>${num(ds.completed)}</b></button></div>
+        <div class="quick-filters-divider"></div>
+        <label class="toggle-field" data-tooltip="Mostra ou oculta demandas concluídas na tabela abaixo">
+          <div class="toggle-field-copy">${icon('eye')}<div><strong>Exibir concluídas</strong><small>Mostra ou oculta demandas concluídas.</small></div></div>
+          <span class="switch"><input type="checkbox" id="toggleCompleted" checked><span class="switch-track"></span></span>
+        </label>
+      </div>
       <section class="panel" id="demandsPanel"><div class="panel-header"><div><h2>Carteira de demandas</h2><p id="demandCount">Carregando...</p></div></div><div id="demandTable"></div></section>`;
     $('[data-open-demand]',content).addEventListener('click',openDemandForm);
     const load=async()=>{
@@ -458,8 +594,12 @@
       if(filters.unassigned) params.set('unassigned','1');
       $('#demandTable').innerHTML=`<div class="empty-state"><p>Atualizando lista...</p></div>`;
       const rows=await api('/api/demands?'+params.toString());
-      $('#demandCount').textContent=`${rows.length} registro${rows.length===1?'':'s'} encontrado${rows.length===1?'':'s'}`;
-      $('#demandTable').innerHTML=renderDemandTable(rows,false,true,{category:$('#fCategory').value,priority:$('#fPriority').value,status:$('#fStatus').value});
+      // "Exibir concluídas" é um filtro só de exibição, aplicado sobre os dados já
+      // carregados — não muda a consulta ao backend nem os outros filtros.
+      const showCompleted=$('#toggleCompleted')?.checked !== false;
+      const visibleRows=showCompleted?rows:rows.filter(d=>d.status!=='Concluída');
+      $('#demandCount').textContent=`${visibleRows.length} registro${visibleRows.length===1?'':'s'} encontrado${visibleRows.length===1?'':'s'}`;
+      $('#demandTable').innerHTML=renderDemandTable(visibleRows,false,true,{category:$('#fCategory').value,priority:$('#fPriority').value,status:$('#fStatus').value});
     };
     const THFILTER_OPTIONS={
       category:()=>ctx.categories.map(x=>({value:x,label:x})),
@@ -493,8 +633,15 @@
     let timer; $('#fQ').addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(load,250)});
     ['#fYear','#fStatus','#fPriority','#fCategory'].forEach(id=>$(id).addEventListener('change',load));
     $('#clearFilters').addEventListener('click',()=>{filters.overdue=false;filters.due_soon=false;filters.unassigned=false;['#fQ','#fStatus','#fPriority','#fCategory'].forEach(id=>$(id).value='');$('#fYear').value='2026';$('#overdueChip')?.remove();$('#dueSoonChip')?.remove();$('#unassignedChip')?.remove();load();});
-    $$('[data-chip-status]').forEach(b=>b.addEventListener('click',()=>{$('#fStatus').value=b.dataset.chipStatus;load()}));
+    $$('[data-chip-status]').forEach(b=>b.addEventListener('click',()=>{
+      $('#fStatus').value=b.dataset.chipStatus;
+      // Ao clicar em "Concluídas", garante que o toggle "Exibir concluídas" esteja
+      // ligado — senão o filtro de exibição esconderia o próprio resultado pedido.
+      if(b.dataset.chipStatus==='Concluída' && $('#toggleCompleted')) $('#toggleCompleted').checked=true;
+      load();
+    }));
     $$('[data-chip-priority]').forEach(b=>b.addEventListener('click',()=>{$('#fPriority').value=b.dataset.chipPriority;load()}));
+    $('#toggleCompleted')?.addEventListener('change',load);
     $('#overdueChip')?.addEventListener('click',()=>{filters.overdue=false;$('#overdueChip').remove();load()});
     $('#dueSoonChip')?.addEventListener('click',()=>{filters.due_soon=false;$('#dueSoonChip').remove();load()});
     $('#unassignedChip')?.addEventListener('click',()=>{filters.unassigned=false;$('#unassignedChip').remove();load()});
@@ -662,24 +809,116 @@
   }
 
   async function renderSchools(){
-    setLoading(); const schools=await loadSchools();
+    setLoading();
+    const query=new URLSearchParams(location.search);
+    const [schools,allDemands,dash,catCounts]=await Promise.all([loadSchools(), api('/api/demands'), api('/api/dashboard'), api('/api/demands/category-counts')]);
+    const ds=dash.stats;
+    const counts=catCounts.counts||{};
+    const schoolsById=new Map(schools.map(s=>[s.id,s]));
+    const filters={q:query.get('q')||'',year:query.get('year')||'2026',status:query.get('status')||'',priority:query.get('priority')||'',category:query.get('category')||''};
+    let showCompleted=true, critical=false;
     content.innerHTML=pageHeader('Unidades Escolares','Visão 360° do histórico de infraestrutura por Unidade Escolar.',
       `<div class="search-field" style="width:280px">${icon('search')}<input class="input" id="schoolQ" placeholder="Nome, direção ou código..."></div><button class="btn btn-secondary" id="schoolFilter">${icon('filter')}Ordenar por criticidade</button>`)
-      +`<div class="school-grid" id="schoolGrid">${schools.map(renderSchoolCard).join('')}</div>`;
-    let critical=false;
+      +`<section class="filters-card">
+        <div class="field"><label>Buscar</label><div class="search-field">${icon('search')}<input class="input" id="fQ" value="${esc(filters.q)}" placeholder="Código, demanda ou escola..."></div></div>
+        <div class="field"><label>Ano</label><select class="select" id="fYear"><option value="">Todos</option>${[2026,2025,2024].map(y=>`<option ${String(y)===filters.year?'selected':''}>${y}</option>`).join('')}</select></div>
+        <div class="field"><label>Status</label><select class="select" id="fStatus"><option value="">Todos</option>${ctx.statuses.map(x=>`<option ${x===filters.status?'selected':''}>${esc(x)}</option>`).join('')}</select></div>
+        <div class="field"><label>Prioridade</label><select class="select" id="fPriority"><option value="">Todas</option>${Object.keys(ctx.priorities).map(x=>`<option value="${x}" ${x===filters.priority?'selected':''}>${x} · ${priorityLabel(x)}</option>`).join('')}</select></div>
+        <div class="field"><label>Categoria</label><select class="select" id="fCategory"><option value="">Todas</option>${ctx.categories.map(x=>`<option value="${esc(x)}" ${x===filters.category?'selected':''}>${esc(x)} (${num(counts[x]||0)})</option>`).join('')}</select></div>
+        <button class="btn btn-secondary" id="clearFilters">${icon('filter')}Limpar</button>
+      </section>
+      <div class="quick-filters">
+        <div class="chip-group">
+          <button class="chip-v2 chip-red" data-chip-priority="P1">${icon('warning')}<span>P1 Urgentes</span><b>${num(ds.urgent)}</b></button>
+          <button class="chip-v2 chip-orange" data-chip-status="Aguardando contratação">${icon('clock')}<span>Aguardando contratação</span><b>${num(ds.contract)}</b></button>
+          <button class="chip-v2 chip-blue" data-chip-status="Em execução">${icon('trend')}<span>Em execução</span><b>${num(ds.progress)}</b></button>
+          <button class="chip-v2 chip-violet" data-chip-status="Planejamento futuro">${icon('calendar')}<span>Planejamento futuro</span><b>${num(ds.future)}</b></button>
+          <button class="chip-v2 chip-green" data-chip-status="Concluída" id="completedChip">${icon('check-circle')}<span>Concluídas</span><b>${num(ds.completed)}</b></button>
+        </div>
+        <div class="quick-filters-divider"></div>
+        <label class="toggle-field" data-tooltip="Mostra ou oculta demandas concluídas nos cartões e nos filtros acima">
+          <div class="toggle-field-copy">${icon('eye')}<div><strong>Exibir concluídas</strong><small>Mostra ou oculta demandas concluídas.</small></div></div>
+          <span class="switch"><input type="checkbox" id="toggleCompleted" checked><span class="switch-track"></span></span>
+        </label>
+      </div>
+      <div class="school-grid" id="schoolGrid"></div>`;
+    // Filtro do card de filtros — aplicado sobre as demandas reais já carregadas, agrupadas
+    // por escola. Uma unidade só é ocultada quando algum filtro de narrowing (status,
+    // prioridade, categoria ou busca) está ativo E ela não tem nenhuma demanda correspondente
+    // — sem filtro de narrowing, todas as unidades aparecem (mesmo as com zero demandas),
+    // igual ao comportamento original desta tela.
+    const yearOf=d=>(d.created_at||'').slice(0,4);
+    const matchesFilters=d=>{
+      if(filters.year && yearOf(d)!==filters.year) return false;
+      if(filters.status && d.status!==filters.status) return false;
+      if(filters.priority && d.priority!==filters.priority) return false;
+      if(filters.category && d.category!==filters.category) return false;
+      if(!showCompleted && d.status==='Concluída') return false;
+      if(filters.q){
+        const q=filters.q.trim().toLowerCase();
+        const schoolName=(schoolsById.get(d.school_id)?.name||'').toLowerCase();
+        if(!(d.code||'').toLowerCase().includes(q) && !(d.title||'').toLowerCase().includes(q) && !schoolName.includes(q)) return false;
+      }
+      return true;
+    };
     const apply=()=>{
-      const q=$('#schoolQ').value.trim().toLowerCase();
-      const filtered=q?schools.filter(s=>[s.name,s.director,s.code].some(v=>(v||'').toLowerCase().includes(q))):schools;
-      const arr=[...filtered].sort((a,b)=>critical?(b.urgent-a.urgent||b.total_demands-a.total_demands):a.name.localeCompare(b.name));
-      $('#schoolGrid').innerHTML=arr.length?arr.map(renderSchoolCard).join(''):empty('Nenhuma unidade encontrada','Ajuste os termos da busca.');
+      const narrowing=!!(filters.status||filters.priority||filters.category||filters.q);
+      const headerQ=$('#schoolQ').value.trim().toLowerCase();
+      const bySchool=new Map();
+      allDemands.forEach(d=>{ if(matchesFilters(d)){ if(!bySchool.has(d.school_id)) bySchool.set(d.school_id,[]); bySchool.get(d.school_id).push(d); } });
+      let list=schools.filter(s=>{
+        if(headerQ && ![s.name,s.director,s.code].some(v=>(v||'').toLowerCase().includes(headerQ))) return false;
+        if(narrowing && !(bySchool.get(s.id)||[]).length) return false;
+        return true;
+      });
+      list=[...list].sort((a,b)=>{
+        if(!critical) return a.name.localeCompare(b.name);
+        const ua=(bySchool.get(a.id)||[]).filter(d=>d.priority==='P1').length, ub=(bySchool.get(b.id)||[]).filter(d=>d.priority==='P1').length;
+        return ub-ua || (bySchool.get(b.id)||[]).length-(bySchool.get(a.id)||[]).length;
+      });
+      $('#schoolGrid').innerHTML=list.length?list.map(s=>renderSchoolCard(s,bySchool.get(s.id)||[])).join(''):empty('Nenhuma unidade encontrada','Ajuste os filtros ou o termo de busca.');
       bindSchools();
     };
+    function bindSchools(){$$('[data-school-id]').forEach(c=>c.addEventListener('click',()=>openSchool360(Number(c.dataset.schoolId))))}
     $('#schoolFilter').addEventListener('click',()=>{critical=!critical;$('#schoolFilter').classList.toggle('active',critical);apply();});
     let t;$('#schoolQ').addEventListener('input',()=>{clearTimeout(t);t=setTimeout(apply,200);});
-    function bindSchools(){$$('[data-school-id]').forEach(c=>c.addEventListener('click',()=>openSchool360(Number(c.dataset.schoolId))))}
-    bindSchools();
+    let t2;$('#fQ').addEventListener('input',()=>{clearTimeout(t2);t2=setTimeout(()=>{filters.q=$('#fQ').value;apply();},250);});
+    ['#fYear','#fStatus','#fPriority','#fCategory'].forEach(id=>$(id).addEventListener('change',()=>{
+      filters.year=$('#fYear').value; filters.status=$('#fStatus').value; filters.priority=$('#fPriority').value; filters.category=$('#fCategory').value;
+      apply();
+    }));
+    $('#clearFilters').addEventListener('click',()=>{
+      filters.q='';filters.status='';filters.priority='';filters.category='';filters.year='2026';
+      $('#fQ').value='';$('#fStatus').value='';$('#fPriority').value='';$('#fCategory').value='';$('#fYear').value='2026';
+      apply();
+    });
+    $$('[data-chip-status]').forEach(b=>b.addEventListener('click',()=>{
+      filters.status=b.dataset.chipStatus; $('#fStatus').value=filters.status;
+      if(b.dataset.chipStatus==='Concluída'){ showCompleted=true; $('#toggleCompleted').checked=true; }
+      apply();
+    }));
+    $$('[data-chip-priority]').forEach(b=>b.addEventListener('click',()=>{ filters.priority=b.dataset.chipPriority; $('#fPriority').value=filters.priority; apply(); }));
+    $('#toggleCompleted').addEventListener('change',()=>{ showCompleted=$('#toggleCompleted').checked; apply(); });
+    apply();
   }
-  function renderSchoolCard(s){const exec=s.total_demands?Math.round((s.completed||0)/s.total_demands*100):0;return `<article class="school-card" data-school-id="${s.id}"><div class="school-card-head"><div class="school-icon">${icon('school')}</div>${s.urgent?`<span class="badge P1">${s.urgent} urgente${s.urgent===1?'':'s'}</span>`:`<span class="badge P4">Sem urgências</span>`}</div><h3>${esc(s.name)}</h3><p>${esc(s.director||'Direção não informada')}</p><div class="school-stats"><div class="school-stat"><strong>${num(s.total_demands)}</strong><span>Demandas</span></div><div class="school-stat"><strong>${num(s.completed)}</strong><span>Concluídas</span></div><div class="school-stat"><strong>${exec}%</strong><span>Execução</span></div></div></article>`}
+  // Monta o texto do tooltip com a lista de demandas de uma unidade escolar, a partir
+  // dos dados reais já carregados (sem chamada extra de API por cartão/hover).
+  function schoolTooltipText(list){
+    if(!list||!list.length) return 'Nenhuma demanda registrada nesta unidade.';
+    const MAX=6;
+    const lines=list.slice(0,MAX).map(d=>`• ${fmtDate(d.created_at)} — ${d.title} — ${d.priority} · ${d.status}`);
+    if(list.length>MAX) lines.push(`+ ${list.length-MAX} demanda${list.length-MAX===1?'':'s'}`);
+    return lines.join('\n');
+  }
+  function renderSchoolCard(s,list){
+    list = list||[];
+    const total=list.length;
+    const completed=list.filter(d=>d.status==='Concluída').length;
+    const urgent=list.filter(d=>d.priority==='P1').length;
+    const exec=total?Math.round(completed/total*100):0;
+    const accentCls=urgent?'school-card-urgent':'school-card-ok';
+    return `<article class="school-card ${accentCls}" data-school-id="${s.id}" data-tooltip-list="${esc(schoolTooltipText(list))}"><div class="school-card-head"><div class="school-icon">${icon('school')}</div>${urgent?`<span class="badge P1">${urgent} urgente${urgent===1?'':'s'}</span>`:`<span class="badge P4">Sem urgências</span>`}</div><h3>${esc(s.name)}</h3><p>${esc(s.director||'Direção não informada')}</p><div class="school-stats"><div class="school-stat"><div class="school-stat-top">${icon('clipboard')}<span>Demandas</span></div><strong>${num(total)}</strong></div><div class="school-stat"><div class="school-stat-top">${icon('check-circle')}<span>Concluídas</span></div><strong>${num(completed)}</strong></div><div class="school-stat"><div class="school-stat-top">${icon('trend')}<span>Execução</span></div><strong>${exec}%</strong></div></div></article>`;
+  }
   async function openSchool360(id){const data=await api(`/api/schools/${id}`),s=data.school,rows=data.demands;modal({title:'Visão 360° da Unidade Escolar',subtitle:s.name,mode:'drawer',body:`<section class="info-card accent"><h3>${icon('school')}${esc(s.name)}</h3><div class="key-value"><div class="kv"><span>Direção</span><strong>${esc(s.director||'—')}</strong></div><div class="kv"><span>Contato</span><strong>${esc(s.phone||'—')} · ${esc(s.email||'—')}</strong></div><div class="kv"><span>Endereço</span><strong>${esc(s.address||'—')}</strong></div></div></section><section class="info-card"><h3>${icon('clipboard')}Histórico de demandas</h3>${rows.length?rows.map(d=>`<a class="attention-item" href="/demandas/${d.id}"><span class="priority-dot ${d.priority}"></span><div><strong>${esc(d.title)}</strong><small>${esc(d.code)} · ${esc(d.status)}</small></div><span class="badge ${d.priority}">${d.priority}</span></a>`).join(''):empty()}</section>`});}
 
   async function renderReports(){
@@ -1320,6 +1559,19 @@
   const gs=$('#globalSearch'), gr=$('#globalSearchResults'); let gst;
   gs?.addEventListener('input',()=>{clearTimeout(gst);const q=gs.value.trim();if(q.length<2){gr.hidden=true;return}gst=setTimeout(async()=>{try{const rows=await api(`/api/demands?q=${encodeURIComponent(q)}`);gr.innerHTML=rows.slice(0,6).map(d=>`<a class="search-result" href="/demandas/${d.id}"><span class="priority-dot ${d.priority}"></span><div><strong>${esc(d.title)}</strong><small>${esc(d.code)} · ${esc(d.school_name)}</small></div></a>`).join('') || `<div class="search-result"><div><strong>Nenhum resultado</strong><small>Tente outro termo.</small></div></div>`;gr.hidden=false;}catch{}},250)});
   document.addEventListener('click',e=>{if(!e.target.closest('.global-search-wrap'))gr.hidden=true;if(!e.target.closest('#userMenuButton')&&!e.target.closest('#userMenu'))$('#userMenu').hidden=true;if(!e.target.closest('#notificationButton')&&!e.target.closest('#notificationPanel'))$('#notificationPanel').hidden=true;});
+
+  // Clicar em qualquer célula (td) de uma linha de tabela de demandas abre os detalhes —
+  // reaproveita o atributo data-href já presente em cada <tr> de renderDemandTable().
+  // Delegado no container principal da página, então funciona tanto na tabela completa
+  // de Demandas quanto na tabela compacta "Atividade recente" do Painel, e continua
+  // funcionando depois de qualquer atualização de filtro (a tabela é recriada, o
+  // container que recebe o clique não). Clique em um link ou botão dentro da linha
+  // (ex.: o ícone de "Ver detalhes") continua indo direto para o próprio destino.
+  content.addEventListener('click',e=>{
+    if(e.target.closest('a,button')) return;
+    const tr=e.target.closest('tr[data-href]');
+    if(tr) location.href=tr.dataset.href;
+  });
 
   async function init(){
     try{

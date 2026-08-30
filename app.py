@@ -733,8 +733,21 @@ def api_dashboard(request: Request):
                                           date(d.due_date) ASC LIMIT 5""", params).fetchall()
     category_rows = conn.execute(f"SELECT d.category, COUNT(*) qty FROM demands d WHERE 1=1 {scope} GROUP BY d.category ORDER BY qty DESC LIMIT 6", params).fetchall()
     status_rows = conn.execute(f"SELECT d.status, COUNT(*) qty FROM demands d WHERE 1=1 {scope} GROUP BY d.status ORDER BY qty DESC LIMIT 7", params).fetchall()
+    # Detalhamento do "Custo em aberto" para o botão "Ver detalhes" do Painel — campos aditivos,
+    # não alteram nenhum campo que já era retornado por este endpoint.
+    cost_by_cat = {}
+    for d in open_data:
+        cat = d["category"] or "Sem categoria"
+        cost_by_cat[cat] = cost_by_cat.get(cat, 0) + (d["cost_estimate"] or 0)
+    cost_breakdown = sorted(
+        ({"category": k, "cost": v} for k, v in cost_by_cat.items() if v),
+        key=lambda x: -x["cost"]
+    )
+    cost_top_rows = conn.execute(f"""SELECT d.*, s.name school_name FROM demands d JOIN schools s ON s.id=d.school_id
+                                     WHERE d.status NOT IN ('Concluída','Cancelada') AND d.cost_estimate > 0 {scope}
+                                     ORDER BY d.cost_estimate DESC LIMIT 8""", params).fetchall()
     conn.close()
-    return {"stats": stats, "recent": [dict(x) for x in recent], "attention": [dict(x) for x in attention], "categories": [dict(x) for x in category_rows], "status_breakdown": [dict(x) for x in status_rows]}
+    return {"stats": stats, "recent": [dict(x) for x in recent], "attention": [dict(x) for x in attention], "categories": [dict(x) for x in category_rows], "status_breakdown": [dict(x) for x in status_rows], "cost_breakdown": cost_breakdown, "cost_top": [dict(x) for x in cost_top_rows]}
 
 
 @app.get("/api/demands/category-counts")
@@ -1150,9 +1163,12 @@ async def admin_update_category(request: Request, cat_id: int):
     if new_name != row["name"] and conn.execute("SELECT id FROM categories WHERE name=? AND id!=?", (new_name, cat_id)).fetchone():
         conn.close(); raise HTTPException(409, "Já existe uma categoria com esse nome")
     old_name = row["name"]
-    conn.execute("UPDATE categories SET name=?, icon=?, color=?, hint=?, active=? WHERE id=?",
+    # sort_order é opcional (usado para reordenar a lista de categorias); quando omitido,
+    # mantém o valor atual — não altera o comportamento do formulário de edição existente.
+    new_sort_order = int(payload["sort_order"]) if payload.get("sort_order") is not None else row["sort_order"]
+    conn.execute("UPDATE categories SET name=?, icon=?, color=?, hint=?, active=?, sort_order=? WHERE id=?",
                  (new_name, payload.get("icon") or row["icon"], payload.get("color") or row["color"],
-                  payload.get("hint", row["hint"]), int(bool(payload.get("active", row["active"]))), cat_id))
+                  payload.get("hint", row["hint"]), int(bool(payload.get("active", row["active"]))), new_sort_order, cat_id))
     if new_name != old_name:
         conn.execute("UPDATE demands SET category=? WHERE category=?", (new_name, old_name))
     conn.commit(); conn.close()
