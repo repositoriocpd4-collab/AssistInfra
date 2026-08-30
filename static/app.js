@@ -670,7 +670,8 @@
       const catColor=CATEGORY_COLORS[d.category]||'blue', catIcon=CATEGORY_ICONS[d.category]||'clipboard';
       const provType=PROV_ACTION_TYPES.find(t=>t.key===d.prov_action_type);
       const provStep = !d.prov_action_type ? 0 : (!d.prov_responsible ? 1 : (statusClass(d.status)==='completed' ? 4 : (statusClass(d.status)==='execution' ? 3 : 2)));
-      const staffOptions = (payload.staff||[]).map(s=>`<option value="${esc(s.name)}" ${s.name===d.prov_responsible?'selected':''}>${esc(s.name)}</option>`).join('');
+      const defaultResp = d.prov_responsible || (ctx.user ? ctx.user.name : '');
+      const staffOptions = (payload.staff||[]).map(s=>`<option value="${esc(s.name)}" ${s.name===defaultResp?'selected':''}>${esc(s.name)}</option>`).join('');
       return `<div class="detail-layout"><div>
       <section class="info-card accent"><h3>${icon('clipboard')}Descrição</h3><p>${esc(d.description)}</p></section>
       <div class="info-stat-row">
@@ -686,11 +687,11 @@
         <p class="wizard-hint">Registre a ação tomada para essa demanda e mantenha a escola informada.</p>
         <p class="wizard-question mt-16">Tipo de ação</p>
         <div class="prov-type-row" id="provTypeRow">${PROV_ACTION_TYPES.map(t=>`<button type="button" class="prov-type-chip ${d.prov_action_type===t.key?'active':''}" data-prov-type="${t.key}" style="--chip-color:var(--${t.color});--chip-soft:var(--${t.color}-soft)"><span class="prov-type-icon">${icon(t.icon)}</span>${esc(t.label)}</button>`).join('')}</div>
-        <div class="form-grid mt-16">
+        <div class="prov-form-grid mt-16">
           <div class="field"><label>Responsável</label><select class="select" id="provResponsible"><option value="">Selecionar responsável...</option>${staffOptions}</select></div>
           <div class="field"><label>Prazo</label><input class="input" type="date" id="provDueDate" value="${esc(d.prov_due_date||'')}"></div>
           <div class="field"><label>Prioridade</label><select class="select" id="provPriority"><option value="">Selecionar...</option>${PROV_PRIORITIES.map(p=>`<option ${p===d.prov_priority?'selected':''}>${p}</option>`).join('')}</select></div>
-          <div class="field span-2"><label>Observação</label><textarea class="textarea" id="provNote" placeholder="Detalhe a providência tomada ou o encaminhamento dado...">${esc(d.prov_note||'')}</textarea></div>
+          <div class="field span-3"><label>Observação</label><textarea class="textarea" id="provNote" placeholder="Detalhe a providência tomada ou o encaminhamento dado...">${esc(d.prov_note||'')}</textarea></div>
         </div>
         <div class="prov-form-footer">
           <button type="button" class="attach-btn" id="provAttachBtn">${icon('paperclip')}Anexar documento</button>

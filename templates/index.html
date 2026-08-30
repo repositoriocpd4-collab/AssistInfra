@@ -87,14 +87,15 @@
       {% if page != 'dashboard' %}
       <button class="nav-item nav-back" id="navBack" type="button" data-tooltip="Voltar para a página anterior · tecla B"><svg style="transform:rotate(180deg)"><use href="#i-chevron"></use></svg><span>Voltar</span><kbd class="key-hint">B</kbd></button>
       {% endif %}
+      <div class="side-divider"></div>
       <nav class="nav-list">
         <a class="nav-item {% if page == 'dashboard' %}active{% endif %}" href="/" data-tooltip="Visão geral, alertas e indicadores · tecla P"><svg><use href="#i-grid"></use></svg><span>Painel</span><kbd class="key-hint">P</kbd></a>
         <a class="nav-item {% if page in ['demands','demand-detail'] %}active{% endif %}" href="/demandas" data-tooltip="Demandas atuais de todas as unidades permitidas · tecla D"><svg><use href="#i-clipboard"></use></svg><span>Demandas</span><kbd class="key-hint">D</kbd></a>
+        <a class="nav-item {% if page == 'schools' %}active{% endif %}" href="/escolas" data-tooltip="Visão 360° e histórico por Unidade Escolar · tecla E"><svg><use href="#i-school"></use></svg><span>Unidades Escolares</span><kbd class="key-hint">E</kbd></a>
         <a class="nav-item {% if page == 'kanban' %}active{% endif %}" href="/kanban" data-tooltip="Quadro visual por etapa ou prioridade, com arrastar e soltar · tecla K"><svg><use href="#i-kanban"></use></svg><span>Quadro Kanban</span><kbd class="key-hint">K</kbd></a>
         {% if user.perm.can_view_planning %}
         <a class="nav-item {% if page == 'planning' %}active{% endif %}" href="/planejamento" data-tooltip="Demandas futuras, consolidação, aquisição e licitação · tecla F"><svg><use href="#i-calendar"></use></svg><span>Planejamento Futuro</span><kbd class="key-hint">F</kbd></a>
         {% endif %}
-        <a class="nav-item {% if page == 'schools' %}active{% endif %}" href="/escolas" data-tooltip="Visão 360° e histórico por Unidade Escolar · tecla E"><svg><use href="#i-school"></use></svg><span>Unidades Escolares</span><kbd class="key-hint">E</kbd></a>
         {% if user.perm.can_view_reports or user.perm.can_manage_admin %}
         <div class="side-divider"></div>
         {% if user.perm.can_view_reports %}
@@ -107,6 +108,7 @@
         <div class="side-divider"></div>
         <a class="nav-item {% if page == 'about' %}active{% endif %}" href="/sobre" data-tooltip="Versão, tecnologia, perfis e roteiro do sistema · tecla S"><svg><use href="#i-info"></use></svg><span>Sobre o Sistema</span><kbd class="key-hint">S</kbd></a>
         <button class="nav-item" id="shortcutsHelp" type="button" data-tooltip="Ver todos os atalhos de teclado · tecla ?"><svg><use href="#i-help"></use></svg><span>Central de Ajuda</span><kbd class="key-hint">?</kbd></button>
+        <div class="side-divider"></div>
         <a class="nav-item" href="/logout" data-tooltip="Encerrar a sessão atual"><svg><use href="#i-logout"></use></svg><span>Sair</span></a>
       </nav>
     </div>
