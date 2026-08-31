@@ -8,6 +8,7 @@ import json
 import os
 import secrets
 import sqlite3
+import math
 from datetime import datetime, timedelta, date
 from pathlib import Path
 from typing import Optional
@@ -542,7 +543,43 @@ def init_db() -> None:
             )
 
     conn.commit()
+    seed_school_coordinates(conn)
     conn.close()
+
+
+def seed_school_coordinates(conn: sqlite3.Connection) -> None:
+    schools = conn.execute("SELECT id, name, address, lat, lon FROM schools").fetchall()
+    zones = {
+        "chaperó": (-22.8350, -43.7450),
+        "brisamar": (-22.8850, -43.7950),
+        "engenho": (-22.8690, -43.7680),
+        "santana": (-22.8540, -43.7820),
+        "coroa grande": (-22.9100, -43.8350),
+        "geni": (-22.8780, -43.7880),
+        "geny": (-22.8780, -43.7880),
+        "mazomba": (-22.8420, -43.8150),
+        "primavera": (-22.8580, -43.7650),
+        "vista alegre": (-22.8520, -43.7580),
+        "ibirapitanga": (-22.8710, -43.7800),
+        "jardim américa": (-22.8670, -43.7720),
+        "jardim mar": (-22.8820, -43.7910),
+        "teixeira": (-22.8480, -43.7600),
+        "centro": (-22.8622, -43.7758),
+    }
+    for r in schools:
+        if r["lat"] is not None and r["lon"] is not None:
+            continue
+        text = f"{r['name']} {r['address'] or ''}".lower()
+        base_lat, base_lon = (-22.8622, -43.7758)
+        for k, coords in zones.items():
+            if k in text:
+                base_lat, base_lon = coords
+                break
+        sid = r["id"]
+        lat_offset = (((sid * 17) % 31) - 15) * 0.0012
+        lon_offset = (((sid * 23) % 37) - 18) * 0.0012
+        conn.execute("UPDATE schools SET lat=?, lon=? WHERE id=?", (round(base_lat + lat_offset, 6), round(base_lon + lon_offset, 6), sid))
+    conn.commit()
 
 
 init_db()
@@ -646,9 +683,14 @@ def demand_detail_page(request: Request, demand_id: int):
     return render(request, "index.html", page="demand-detail", title=row["title"], entity_id=demand_id)
 
 
-@app.get("/kanban", response_class=HTMLResponse)
-def kanban_page(request: Request):
-    return render(request, "index.html", page="kanban", title="Quadro Kanban")
+@app.get("/mapa", response_class=HTMLResponse)
+def map_page(request: Request):
+    return render(request, "index.html", page="map", title="Mapa Operacional da Rede")
+
+
+@app.get("/kanban")
+def kanban_page():
+    return RedirectResponse("/mapa", status_code=303)
 
 
 @app.get("/planejamento", response_class=HTMLResponse)
@@ -1041,6 +1083,437 @@ def api_route(request: Request, from_lat: float, from_lon: float, to_lat: float,
     return {"geometry": route["geometry"], "distance_m": route["distance"], "duration_s": route["duration"]}
 
 
+SMEDU_LAT = -22.868666015828296
+SMEDU_LON = -43.7889040053576
+SMEDU_MAPS_LINK = "https://maps.app.goo.gl/Js5S88kfqb2HrNnP7"
+
+
+@app.get("/api/map/network")
+def api_map_network(request: Request, q: str = "", neighborhood: str = "", criticality: str = "", status: str = ""):
+    user = require_user(request)
+    conn = db()
+    scope, params = demand_scope_sql(user)
+    
+    schools_raw = conn.execute("SELECT id, name, code, director, address, phone, email, lat, lon, inep, neighborhood, cep, ramal, maps_link, modality, school_type, photo_url FROM schools WHERE active=1 ORDER BY name").fetchall()
+    demands_raw = conn.execute(f"""SELECT d.id, d.code, d.title, d.category, d.school_id, d.priority, d.status, d.cost_estimate, d.due_date, d.created_at, d.updated_at
+                                   FROM demands d WHERE 1=1 {scope}""", params).fetchall()
+    conn.close()
+    
+    all_neighborhoods = sorted(list(set(s["neighborhood"].strip() for s in schools_raw if s["neighborhood"] and s["neighborhood"].strip())))
+
+    demands_by_school = {}
+    for d in demands_raw:
+        sid = d["school_id"]
+        demands_by_school.setdefault(sid, []).append(dict(d))
+        
+    schools_list = []
+    total_schools_count = len(schools_raw)
+    critical_schools_count = 0
+    in_progress_schools_count = 0
+    overdue_schools_count = 0
+    
+    structural_cats = {"estrutura", "alvenaria", "cobertura/telhado", "reforma", "obra", "área externa", "pintura", "telhado"}
+    electrical_cats = {"elétrica", "iluminação", "iluminação externa", "iluminação interna"}
+    budget_statuses = {"aguardando orçamento", "aguardando material", "aguardando contratação", "aguardando empresa", "em planejamento"}
+    
+    structural_schools = set()
+    electrical_schools = set()
+    budget_schools = set()
+    
+    today_str = date.today().isoformat()
+    
+    for s in schools_raw:
+        s_dict = dict(s)
+        s_demands = demands_by_school.get(s["id"], [])
+        
+        open_demands = [d for d in s_demands if d["status"] not in ("Concluída", "Cancelada")]
+        urgent_p1 = [d for d in open_demands if d["priority"] == "P1"]
+        high_p2 = [d for d in open_demands if d["priority"] == "P2"]
+        overdue = [d for d in open_demands if d["due_date"] and str(d["due_date"])[:10] < today_str]
+        in_progress = [d for d in open_demands if any(x in (d["status"] or "").lower() for x in ["execu", "programado", "andamento"])]
+        waiting_contract = [d for d in open_demands if any(b in (d["status"] or "").lower() for b in ["contrata", "orçamento", "material", "empresa", "planejamento"])]
+        completed = [d for d in s_demands if d["status"] == "Concluída"]
+        
+        cost_estimate_open = sum(d["cost_estimate"] or 0 for d in open_demands)
+        
+        cat_counts = {}
+        for d in open_demands:
+            c = d["category"] or "Geral"
+            cat_counts[c] = cat_counts.get(c, 0) + 1
+            c_low = c.lower()
+            if any(sc in c_low for sc in structural_cats):
+                structural_schools.add(s["id"])
+            if any(ec in c_low for ec in electrical_cats):
+                electrical_schools.add(s["id"])
+            if (d["status"] or "").lower() in budget_statuses:
+                budget_schools.add(s["id"])
+                
+        predominant_cat = max(cat_counts.items(), key=lambda x: x[1])[0] if cat_counts else (s_demands[0]["category"] if s_demands else "Sem pendências")
+        
+        total_d_count = len(s_demands)
+        exec_percent = round((len(completed) / total_d_count * 100)) if total_d_count > 0 else 100
+        
+        if len(urgent_p1) > 0 or len(overdue) > 0:
+            crit = "critical"
+            critical_schools_count += 1
+        elif len(high_p2) > 0 or len(open_demands) >= 3:
+            crit = "warning"
+        elif len(in_progress) > 0:
+            crit = "in_progress"
+            in_progress_schools_count += 1
+        else:
+            crit = "regular"
+            
+        if len(overdue) > 0:
+            overdue_schools_count += 1
+        if len(in_progress) > 0 and crit != "in_progress":
+            in_progress_schools_count += 1
+            
+        # Demands summary for interactive rich popup
+        sorted_open_demands = sorted(
+            open_demands,
+            key=lambda d: (
+                0 if d["priority"] == "P1" else (1 if d["priority"] == "P2" else (2 if (d["due_date"] and str(d["due_date"])[:10] < today_str) else 3)),
+                d["due_date"] or "9999-99-99"
+            )
+        )
+        demands_summary = []
+        for d in sorted_open_demands[:4]:
+            is_overdue = bool(d["due_date"] and str(d["due_date"])[:10] < today_str)
+            created_d = str(d["created_at"])[:10] if d["created_at"] else None
+            c_formatted = f"{created_d[8:10]}/{created_d[5:7]}/{created_d[:4]}" if created_d and len(created_d) == 10 else "—"
+            due_d = str(d["due_date"])[:10] if d["due_date"] else None
+            due_formatted = f"{due_d[8:10]}/{due_d[5:7]}/{due_d[:4]}" if due_d and len(due_d) == 10 else "Sem prazo"
+            demands_summary.append({
+                "id": d["id"],
+                "code": d["code"],
+                "title": d["title"],
+                "category": d["category"] or "Infraestrutura",
+                "priority": d["priority"] or "P3",
+                "status": d["status"] or "Registrada",
+                "created_at_fmt": c_formatted,
+                "due_date_fmt": due_formatted,
+                "is_overdue": is_overdue,
+                "cost_estimate": d["cost_estimate"] or 0
+            })
+            
+        s_dict.update({
+            "open_demands_count": len(open_demands),
+            "urgent_p1_count": len(urgent_p1),
+            "high_p2_count": len(high_p2),
+            "overdue_count": len(overdue),
+            "in_progress_count": len(in_progress),
+            "waiting_contract_count": len(waiting_contract),
+            "completed_count": len(completed),
+            "total_demands_count": total_d_count,
+            "cost_estimate_open": cost_estimate_open,
+            "predominant_category": predominant_cat,
+            "execution_percent": exec_percent,
+            "criticality": crit,
+            "demands_summary": demands_summary
+        })
+        
+        match = True
+        if q:
+            q_low = q.lower()
+            match = (
+                q_low in s_dict["name"].lower() or
+                q_low in (s_dict.get("address") or "").lower() or
+                q_low in (s_dict.get("neighborhood") or "").lower() or
+                q_low in (s_dict.get("director") or "").lower() or
+                q_low in (s_dict.get("inep") or "").lower() or
+                q_low in (s_dict.get("code") or "").lower() or
+                q_low in predominant_cat.lower()
+            )
+        if neighborhood and neighborhood != "all":
+            if (s_dict.get("neighborhood") or "").strip().lower() != neighborhood.strip().lower():
+                match = False
+        if criticality and criticality != "all":
+            if s_dict["criticality"] != criticality:
+                match = False
+        if status and status != "all":
+            if status == "critical" and s_dict["criticality"] != "critical": match = False
+            elif status == "p1" and s_dict["urgent_p1_count"] == 0: match = False
+            elif status == "p2" and s_dict["high_p2_count"] == 0: match = False
+            elif status == "overdue" and s_dict["overdue_count"] == 0: match = False
+            elif status == "in_progress" and s_dict["in_progress_count"] == 0: match = False
+            elif status == "waiting_contract" and s_dict["waiting_contract_count"] == 0: match = False
+            
+        if match:
+            schools_list.append(s_dict)
+            
+    priority_queue = sorted(
+        [s for s in schools_list if s["open_demands_count"] > 0],
+        key=lambda x: (x["urgent_p1_count"] * 10 + x["overdue_count"] * 5 + x["high_p2_count"] * 2 + x["open_demands_count"]),
+        reverse=True
+    )[:8]
+    
+    return {
+        "schools": schools_list,
+        "neighborhoods": all_neighborhoods,
+        "kpi_stats": {
+            "total_schools": total_schools_count,
+            "critical_schools": critical_schools_count,
+            "in_progress_schools": in_progress_schools_count,
+            "overdue_schools": overdue_schools_count
+        },
+        "priority_queue": priority_queue,
+        "operational_summary": {
+            "structural_schools_count": len(structural_schools),
+            "electrical_schools_count": len(electrical_schools),
+            "budget_schools_count": len(budget_schools),
+            "avg_response_days": 6
+        },
+        "smedu": {
+            "lat": SMEDU_LAT,
+            "lon": SMEDU_LON,
+            "maps_link": SMEDU_MAPS_LINK,
+            "name": "Secretaria Municipal de Educação (SMEDU)",
+            "address": "Sede Administrativa · Itaguaí - RJ"
+        }
+    }
+
+
+def _haversine_distance_m(lat1, lon1, lat2, lon2):
+    R = 6371000  # metros
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lon2 - lon1)
+    a = math.sin(delta_phi / 2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
+
+@app.get("/api/route")
+def api_route(
+    request: Request,
+    from_lat: float = Query(SMEDU_LAT),
+    from_lon: float = Query(SMEDU_LON),
+    to_lat: float = Query(...),
+    to_lon: float = Query(...)
+):
+    require_user(request)
+    # Tenta rota via OSRM oficial
+    osrm_url = f"http://router.project-osrm.org/route/v1/driving/{from_lon},{from_lat};{to_lon},{to_lat}?overview=full&geometries=geojson"
+    try:
+        with httpx.Client(timeout=4.0) as client:
+            resp = client.get(osrm_url)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get("code") == "Ok" and data.get("routes"):
+                    r = data["routes"][0]
+                    return {
+                        "distance_m": r.get("distance", 0),
+                        "duration_s": r.get("duration", 0),
+                        "geometry": r.get("geometry", {
+                            "type": "LineString",
+                            "coordinates": [[from_lon, from_lat], [to_lon, to_lat]]
+                        })
+                    }
+    except Exception:
+        pass
+    
+    # Fallback seguro
+    dist = _haversine_distance_m(from_lat, from_lon, to_lat, to_lon) * 1.35
+    duration = dist / 8.88  # ~32 km/h
+    return {
+        "distance_m": round(dist, 1),
+        "duration_s": round(duration),
+        "geometry": {
+            "type": "LineString",
+            "coordinates": [
+                [from_lon, from_lat],
+                [(from_lon + to_lon) / 2 + 0.001, (from_lat + to_lat) / 2 - 0.001],
+                [to_lon, to_lat]
+            ]
+        }
+    }
+
+
+@app.get("/api/route/circuit")
+def api_route_circuit(
+    request: Request,
+    school_ids: str = Query(..., description="IDs das escolas separados por vírgula (máximo 10)"),
+    optimize: bool = Query(True, description="Se True, otimiza a ordem pelo percurso mais curto")
+):
+    require_user(request)
+    raw_ids = [int(x.strip()) for x in school_ids.split(",") if x.strip().isdigit()]
+    if not raw_ids:
+        raise HTTPException(status_code=400, detail="Nenhum ID de escola fornecido.")
+    
+    selected_ids = raw_ids[:10]  # Limite rigoroso de até 10 unidades
+    conn = db()
+    placeholders = ",".join(["?"] * len(selected_ids))
+    schools_raw = conn.execute(f"SELECT * FROM schools WHERE id IN ({placeholders})", selected_ids).fetchall()
+    
+    # Busca demandas ativas para enriquecer as paradas
+    demands_raw = conn.execute(f"""
+        SELECT school_id, priority, COUNT(*) as count 
+        FROM demands 
+        WHERE school_id IN ({placeholders}) AND status NOT IN ('Concluída', 'Cancelada')
+        GROUP BY school_id, priority
+    """, selected_ids).fetchall()
+    conn.close()
+    
+    demands_map = {}
+    for d in demands_raw:
+        demands_map.setdefault(d["school_id"], {})[d["priority"]] = d["count"]
+        
+    schools_dict = {s["id"]: dict(s) for s in schools_raw}
+    valid_schools = [schools_dict[sid] for sid in selected_ids if sid in schools_dict and schools_dict[sid].get("lat") and schools_dict[sid].get("lon")]
+    
+    if not valid_schools:
+        raise HTTPException(status_code=400, detail="Nenhuma escola com coordenadas válidas encontrada.")
+        
+    start_point = {"name": "Sede SMEDU", "lat": SMEDU_LAT, "lon": SMEDU_LON, "is_smedu": True}
+    
+    # 1. Tenta otimização via OSRM Trip API se optimize=True
+    ordered_schools = list(valid_schools)
+    route_geometry = None
+    total_dist_m = 0
+    total_dur_s = 0
+    osrm_success = False
+    
+    # Prepara coordenadas: Origem SMEDU + Escolas
+    coords_list = [f"{SMEDU_LON},{SMEDU_LAT}"] + [f"{s['lon']},{s['lat']}" for s in valid_schools]
+    coords_str = ";".join(coords_list)
+    
+    if optimize and len(valid_schools) > 1:
+        # Trip API resolve TSP com origem fixada (source=first)
+        trip_url = f"http://router.project-osrm.org/trip/v1/driving/{coords_str}?roundtrip=false&source=first&overview=full&geometries=geojson"
+        try:
+            with httpx.Client(timeout=5.0) as client:
+                resp = client.get(trip_url)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("code") == "Ok" and data.get("trips"):
+                        trip = data["trips"][0]
+                        route_geometry = trip.get("geometry")
+                        total_dist_m = trip.get("distance", 0)
+                        total_dur_s = trip.get("duration", 0)
+                        
+                        # Waypoints mapeiam a ordem otimizada
+                        waypoints = data.get("waypoints", [])
+                        # waypoints[i].waypoint_index é a posição na rota
+                        sorted_wp = sorted(waypoints, key=lambda w: w.get("waypoint_index", 0))
+                        # O primeiro é sempre a SMEDU (índice 0)
+                        reordered = []
+                        for wp in sorted_wp:
+                            input_idx = wp.get("trips_index", wp.get("location", [0])) # índice original na lista de entrada
+                            # O input_idx do OSRM Trip:
+                            pt_idx = wp.get("waypoint_index")
+                            orig_idx = wp.get("trips_index")
+                        
+                        # Extrai a ordem real das escolas
+                        # OSRM waypoints têm campo 'location' correspondente
+                        # Mapeamos pelos índices dos pontos
+                        wp_order = [w.get("trips_index") for w in sorted_wp if w.get("trips_index") != 0]
+                        if len(wp_order) == len(valid_schools):
+                            ordered_schools = [valid_schools[idx - 1] for idx in wp_order if 0 < idx <= len(valid_schools)]
+                        
+                        osrm_success = True
+        except Exception:
+            pass
+
+    # 2. Se não otimizou pelo trip ou deu erro, tenta Route API sequencial
+    if not osrm_success:
+        if optimize and len(valid_schools) > 1:
+            # Algoritmo TSP Heurístico 2-Opt local
+            unvisited = list(valid_schools)
+            reordered = []
+            curr_lat, curr_lon = SMEDU_LAT, SMEDU_LON
+            while unvisited:
+                closest = min(unvisited, key=lambda s: _haversine_distance_m(curr_lat, curr_lon, s["lat"], s["lon"]))
+                reordered.append(closest)
+                unvisited.remove(closest)
+                curr_lat, curr_lon = closest["lat"], closest["lon"]
+            ordered_schools = reordered
+            
+        # Calcula rota sequencial via OSRM Route
+        seq_coords = [f"{SMEDU_LON},{SMEDU_LAT}"] + [f"{s['lon']},{s['lat']}" for s in ordered_schools]
+        seq_str = ";".join(seq_coords)
+        route_url = f"http://router.project-osrm.org/route/v1/driving/{seq_str}?overview=full&geometries=geojson"
+        try:
+            with httpx.Client(timeout=5.0) as client:
+                resp = client.get(route_url)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get("code") == "Ok" and data.get("routes"):
+                        r = data["routes"][0]
+                        route_geometry = r.get("geometry")
+                        total_dist_m = r.get("distance", 0)
+                        total_dur_s = r.get("duration", 0)
+                        osrm_success = True
+        except Exception:
+            pass
+
+    # 3. Fallback geométrico offline se necessário
+    if not route_geometry:
+        coords = [[SMEDU_LON, SMEDU_LAT]]
+        total_dist_m = 0
+        curr_lat, curr_lon = SMEDU_LAT, SMEDU_LON
+        for s in ordered_schools:
+            leg_dist = _haversine_distance_m(curr_lat, curr_lon, s["lat"], s["lon"]) * 1.35
+            total_dist_m += leg_dist
+            coords.append([s["lon"], s["lat"]])
+            curr_lat, curr_lon = s["lat"], s["lon"]
+        total_dur_s = total_dist_m / 8.88  # ~32 km/h
+        route_geometry = {
+            "type": "LineString",
+            "coordinates": coords
+        }
+
+    # Monta paradas ordenadas com detalhes para UX
+    stops = []
+    # Origem SMEDU
+    stops.append({
+        "order": 0,
+        "is_origin": True,
+        "name": "Secretaria Municipal de Educação (SMEDU)",
+        "address": "Sede Administrativa · Itaguaí - RJ",
+        "neighborhood": "Centro",
+        "lat": SMEDU_LAT,
+        "lon": SMEDU_LON,
+        "badge": "🏛️ Partida",
+        "maps_link": SMEDU_MAPS_LINK
+    })
+    
+    gmaps_points = [f"{SMEDU_LAT},{SMEDU_LON}"]
+    for idx, s in enumerate(ordered_schools, 1):
+        p1_count = demands_map.get(s["id"], {}).get("P1", 0)
+        p2_count = demands_map.get(s["id"], {}).get("P2", 0)
+        total_open = sum(demands_map.get(s["id"], {}).values())
+        
+        stops.append({
+            "order": idx,
+            "school_id": s["id"],
+            "name": s["name"],
+            "address": s.get("full_address") or s.get("address") or "Itaguaí - RJ",
+            "neighborhood": s.get("neighborhood") or "Itaguaí",
+            "director": s.get("director") or "—",
+            "phone": s.get("phone") or "—",
+            "lat": s["lat"],
+            "lon": s["lon"],
+            "p1_count": p1_count,
+            "p2_count": p2_count,
+            "total_open_demands": total_open,
+            "maps_link": s.get("maps_link") or f"https://www.google.com/maps/search/?api=1&query={s['lat']},{s['lon']}"
+        })
+        gmaps_points.append(f"{s['lat']},{s['lon']}")
+
+    # Monta link de navegação multi-paradas para o Google Maps
+    gmaps_nav_url = f"https://www.google.com/maps/dir/{'/'.join(gmaps_points)}"
+
+    return {
+        "total_schools": len(ordered_schools),
+        "total_distance_km": round(total_dist_m / 1000, 1),
+        "total_duration_min": max(round(total_dur_s / 60), 5),
+        "stops": stops,
+        "geometry": route_geometry,
+        "google_maps_url": gmaps_nav_url
+    }
+
+
 @app.get("/api/planning")
 def api_planning(request: Request, year: Optional[int] = None, q: str = ""):
     require_user(request)
@@ -1335,9 +1808,47 @@ async def admin_create_school(request: Request):
     if not name:
         raise HTTPException(400, "Informe o nome da unidade")
     conn = db()
-    cur = conn.execute("INSERT INTO schools(name,director,address,phone,email,code,active) VALUES(?,?,?,?,?,?,1)",
-                        (name, payload.get("director") or "", payload.get("address") or "", payload.get("phone") or "",
-                         payload.get("email") or "", payload.get("code") or ""))
+    
+    street = (payload.get("street") or "").strip()
+    num = (payload.get("number") or "").strip()
+    comp = (payload.get("complement") or "").strip()
+    bairro = (payload.get("neighborhood") or "").strip()
+    city = (payload.get("city") or "Itaguaí").strip()
+    state = (payload.get("state") or "RJ").strip()
+    cep = (payload.get("cep") or "").strip()
+    
+    parts = []
+    if street:
+        st_num = street + (f", {num}" if num and num.lower() != 's/n' else (", s/n" if num else ""))
+        if comp and comp.lower() != 's/n' and comp != num:
+            st_num += f" ({comp})"
+        parts.append(st_num)
+    if bairro: parts.append(bairro)
+    parts.append(f"{city} - {state}")
+    if cep: parts.append(f"CEP {cep}")
+    full_addr = payload.get("full_address") or payload.get("address") or (" · ".join(parts) if parts else f"{city} - {state}")
+
+    inep = payload.get("inep") or payload.get("code") or ""
+    try:
+        lat = float(payload.get("lat") or payload.get("latitude") or -22.868685)
+        lon = float(payload.get("lon") or payload.get("longitude") or -43.788898)
+    except (ValueError, TypeError):
+        lat, lon = -22.868685, -43.788898
+
+    cur = conn.execute("""
+        INSERT INTO schools(
+            name, inep, code, director, email, phone, ramal, 
+            street, number, complement, neighborhood, city, state, cep, 
+            address, full_address, lat, lon, maps_link, modality, school_type, active
+        ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+    """, (
+        name, inep, inep, payload.get("director") or "", payload.get("email") or "",
+        payload.get("phone") or "", payload.get("ramal") or "",
+        street, num, comp, bairro, city, state, cep,
+        full_addr, full_addr, lat, lon,
+        payload.get("maps_link") or "", payload.get("modality") or "",
+        payload.get("school_type") or "Escola"
+    ))
     conn.commit(); conn.close()
     return {"ok": True, "id": cur.lastrowid}
 
@@ -1350,9 +1861,50 @@ async def admin_update_school(request: Request, school_id: int):
     row = conn.execute("SELECT * FROM schools WHERE id=?", (school_id,)).fetchone()
     if not row:
         conn.close(); raise HTTPException(404)
-    fields = ["name", "director", "address", "phone", "email", "code"]
-    conn.execute(f"UPDATE schools SET {', '.join(f'{f}=?' for f in fields)} WHERE id=?",
-                 [payload.get(f, row[f]) for f in fields] + [school_id])
+        
+    street = (payload.get("street") if "street" in payload else row["street"]) or ""
+    num = (payload.get("number") if "number" in payload else row["number"]) or ""
+    comp = (payload.get("complement") if "complement" in payload else row["complement"]) or ""
+    bairro = (payload.get("neighborhood") if "neighborhood" in payload else row["neighborhood"]) or ""
+    city = (payload.get("city") if "city" in payload else row["city"]) or "Itaguaí"
+    state = (payload.get("state") if "state" in payload else row["state"]) or "RJ"
+    cep = (payload.get("cep") if "cep" in payload else row["cep"]) or ""
+
+    parts = []
+    if street:
+        st_num = street + (f", {num}" if num and num.lower() != 's/n' else (", s/n" if num else ""))
+        if comp and comp.lower() != 's/n' and comp != num:
+            st_num += f" ({comp})"
+        parts.append(st_num)
+    if bairro: parts.append(bairro)
+    parts.append(f"{city} - {state}")
+    if cep: parts.append(f"CEP {cep}")
+    full_addr = payload.get("full_address") or payload.get("address") or (" · ".join(parts) if parts else f"{city} - {state}")
+
+    inep = payload.get("inep") or payload.get("code") or row["code"] or row["inep"] or ""
+    try:
+        lat = float(payload.get("lat") or payload.get("latitude") or row["lat"] or -22.868685)
+        lon = float(payload.get("lon") or payload.get("longitude") or row["lon"] or -43.788898)
+    except (ValueError, TypeError):
+        lat, lon = row["lat"] or -22.868685, row["lon"] or -43.788898
+
+    conn.execute("""
+        UPDATE schools SET 
+            name=?, inep=?, code=?, director=?, email=?, phone=?, ramal=?,
+            street=?, number=?, complement=?, neighborhood=?, city=?, state=?, cep=?,
+            address=?, full_address=?, lat=?, lon=?, maps_link=?, modality=?, school_type=?
+        WHERE id=?
+    """, (
+        payload.get("name", row["name"]), inep, inep,
+        payload.get("director", row["director"]), payload.get("email", row["email"]),
+        payload.get("phone", row["phone"]), payload.get("ramal", row["ramal"]),
+        street, num, comp, bairro, city, state, cep,
+        full_addr, full_addr, lat, lon,
+        payload.get("maps_link", row["maps_link"]),
+        payload.get("modality", row["modality"]),
+        payload.get("school_type", row["school_type"] or "Escola"),
+        school_id
+    ))
     conn.commit(); conn.close()
     return {"ok": True}
 

@@ -702,52 +702,28 @@
     if (name === 'summary') {
       const catColor = CATEGORY_COLORS[d.category] || 'blue', catIcon = CATEGORY_ICONS[d.category] || 'clipboard';
       const provType = PROV_ACTION_TYPES.find(t => t.key === d.prov_action_type);
-      const provStep = !d.prov_action_type ? 0 : (!d.prov_responsible ? 1 : (statusClass(d.status) === 'completed' ? 4 : (statusClass(d.status) === 'execution' ? 3 : 2)));
-      const defaultResp = d.prov_responsible || (ctx.user ? ctx.user.name : '');
+      const isCompleted = statusClass(d.status) === 'completed';
+      const isExecution = statusClass(d.status) === 'execution';
+      const hasResponsible = Boolean((d.prov_responsible || d.responsible || '').trim());
+      const hasAction = Boolean(d.prov_action_type || (d.status && !['Nova', 'Recebida'].includes(d.status)));
+      const provStep = isCompleted ? 4 : (isExecution ? 3 : (hasResponsible ? 2 : (hasAction ? 1 : 0)));
+      const defaultResp = d.prov_responsible || d.responsible || (ctx.user ? ctx.user.name : '');
       const staffOptions = (payload.staff || []).map(s => `<option value="${esc(s.name)}" ${s.name === defaultResp ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
       return `<div class="detail-layout"><div>
-      <section class="info-card accent"><h3>${icon('clipboard')}Descrição</h3><p>${esc(d.description)}</p></section>
-      <div class="info-stat-row">
-        <div class="info-stat"><span class="info-stat-icon" style="background:var(--${catColor}-soft);color:var(--${catColor})">${icon(catIcon)}</span><div><span>Categoria</span><strong>${esc(d.category)}</strong></div></div>
-        <div class="info-stat"><span class="info-stat-icon" style="background:var(--blue-soft);color:var(--blue)">${icon('money')}</span><div><span>Custo estimado</span><strong>${money(d.cost_estimate)}</strong></div></div>
-        <div class="info-stat"><span class="info-stat-icon" style="background:var(--violet-soft);color:var(--violet)">${icon('users')}</span><div><span>Pessoas afetadas</span><strong>${num(d.affected_people)}</strong></div></div>
-      </div>
-      ${d.subcategory ? `<p class="wizard-hint mt-12">Também identificado como: <strong>${esc(d.subcategory)}</strong></p>` : ''}
-      <section class="info-card mt-16"><h3>${icon('warning')}Impacto</h3><p>${esc(d.impact || 'Impacto não detalhado.')}</p></section>
-
-      <section class="info-card mt-16 prov-form-card">
-        <h3>${icon('send')}Providência / Encaminhamento</h3>
-        <p class="wizard-hint">Registre a ação tomada para essa demanda e mantenha a escola informada.</p>
-        <p class="wizard-question mt-16">Tipo de ação</p>
-        <div class="prov-type-row" id="provTypeRow">${PROV_ACTION_TYPES.map(t => `<button type="button" class="prov-type-chip ${d.prov_action_type === t.key ? 'active' : ''}" data-prov-type="${t.key}" style="--chip-color:var(--${t.color});--chip-soft:var(--${t.color}-soft)"><span class="prov-type-icon">${icon(t.icon)}</span>${esc(t.label)}</button>`).join('')}</div>
-        <div class="prov-form-grid mt-16">
-          <div class="field"><label>Responsável</label><select class="select" id="provResponsible"><option value="">Selecionar responsável...</option>${staffOptions}</select></div>
-          <div class="field"><label>Prazo</label><input class="input" type="date" id="provDueDate" value="${esc(d.prov_due_date || '')}"></div>
-          <div class="field"><label>Prioridade</label><select class="select" id="provPriority"><option value="">Selecionar...</option>${PROV_PRIORITIES.map(p => `<option ${p === d.prov_priority ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
-          <div class="field"><label>Status da Demanda</label><select class="select" id="provStatus">${ctx.statuses.map(s => `<option ${s === d.status ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></div>
-          <div class="field span-4"><label>Observação</label><textarea class="textarea" id="provNote" placeholder="Detalhe a providência tomada ou o encaminhamento dado...">${esc(d.prov_note || '')}</textarea></div>
-        </div>
-        <div class="prov-form-footer">
-          <button type="button" class="attach-btn" id="provAttachBtn">${icon('paperclip')}Anexar documento</button>
-          <input type="file" id="provAttachInput" hidden>
-          <label class="prov-notify-row"><span>Notificar escola</span><span class="switch"><input type="checkbox" id="provNotify" ${d.prov_notify_school ? 'checked' : ''}><span class="switch-track"></span></span></label>
-        </div>
-        <div class="prov-form-actions">
-          <button type="button" class="btn btn-secondary" id="saveProvidence">${icon('bookmark')}Salvar providência</button>
-          <button type="button" class="btn btn-primary" id="saveProvidenceNotify">${icon('send')}Salvar e enviar devolutiva</button>
-        </div>
-      </section>
-
-      <section class="info-card mt-16 flow-card">
+      <!-- FLUXO DA PROVIDÊNCIA NO TOPO -->
+      <section class="info-card flow-card accent">
         <div class="flow-card-head">
-          <h3>${icon('trend')}Fluxo da providência</h3>
+          <div>
+            <h3 style="margin:0">${icon('trend')}Fluxo da providência</h3>
+            <p class="wizard-hint" style="margin:4px 0 0">Acompanhe o ciclo de atendimento e execute as ações de avanço em 1 clique.</p>
+          </div>
           <span class="flow-status-tag ${provStep === 4 ? 'done' : ''}">${provStep === 4 ? 'Concluído' : `Etapa ${provStep} de 4`}</span>
         </div>
         <div class="flow-stepper mt-16">
           <div class="flow-step ${provStep >= 1 ? 'done' : ''} ${provStep === 1 ? 'active' : ''}" data-step-action="1" style="cursor:pointer" data-tooltip="Clique para focar no registro da providência">
             <div class="flow-step-marker"><span class="flow-step-num">1</span><span class="flow-step-badge">${icon('building')}</span></div>
             <strong>Providência registrada</strong>
-            <small>${d.prov_action_type ? esc(provType?.label || d.prov_action_type) : 'Definir ação'}</small>
+            <small>${d.prov_action_type ? esc(provType?.label || d.prov_action_type) : (provStep >= 1 ? 'Em triagem/análise' : 'Definir ação')}</small>
           </div>
           <div class="flow-connector ${provStep >= 2 ? 'done' : ''}"></div>
           <div class="flow-step ${provStep >= 2 ? 'done' : ''} ${provStep === 2 ? 'active' : ''}" data-step-action="2" style="cursor:pointer" data-tooltip="Clique para designar responsável">
@@ -770,20 +746,88 @@
         </div>
 
         ${ctx.user.perm.can_edit_analysis ? `
-        <div class="flow-actions-bar mt-16">
-          <span class="flow-actions-title">Ações rápidas de avanço:</span>
-          <div class="flow-actions-btns">
+        <div class="flow-actions-bar mt-16" style="padding-top:14px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <span class="flow-actions-title" style="font-weight:600;font-size:12.5px;color:var(--ink)">Ações rápidas de avanço:</span>
+          <div class="flow-actions-btns" style="display:flex;gap:8px;flex-wrap:wrap">
             ${provStep < 2 ? `<button type="button" class="btn btn-secondary btn-sm" id="btnFlowAssign">${icon('user')}Assumir Responsabilidade</button>` : ''}
-            ${provStep < 3 ? `<button type="button" class="btn btn-secondary btn-sm" id="btnFlowStart">${icon('bolt')}Iniciar Execução</button>` : ''}
-            ${provStep < 4 ? `<button type="button" class="btn btn-primary btn-sm" id="btnFlowComplete">${icon('check-circle')}Concluir Providência</button>` : ''}
-            ${provStep === 4 ? `<button type="button" class="btn btn-secondary btn-sm" id="btnFlowReopen">${icon('clock')}Reabrir Providência</button>` : ''}
+            ${provStep < 3 && !isCompleted ? `<button type="button" class="btn btn-secondary btn-sm" id="btnFlowStart">${icon('bolt')}Iniciar Execução</button>` : ''}
+            ${!isCompleted ? `<button type="button" class="btn btn-primary btn-sm" id="btnFlowComplete">${icon('check-circle')}Concluir Providência</button>` : ''}
+            ${isCompleted ? `<button type="button" class="btn btn-secondary btn-sm" id="btnFlowReopen">${icon('clock')}Reabrir Demanda</button>` : ''}
           </div>
         </div>
         ` : ''}
       </section>
+
+      <!-- DADOS DA SOLICITAÇÃO RECOLHÍVEIS / OCULTÁVEIS -->
+      <details class="demand-details-accordion mt-16">
+        <summary class="details-summary">
+          <div class="summary-left">
+            <span class="summary-icon">${icon('clipboard')}</span>
+            <div>
+              <strong style="font-size:13px;color:var(--ink)">Dados da Solicitação & Impacto</strong>
+              <div style="display:flex;gap:8px;align-items:center;margin-top:2px">
+                <span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span>
+                <span style="font-size:11.5px;color:var(--muted)">${esc(d.category)} · ${money(d.cost_estimate)}</span>
+              </div>
+            </div>
+          </div>
+          <span class="summary-toggle-btn">${icon('chevron')} Detalhes</span>
+        </summary>
+        <div class="details-expanded-body">
+          <div class="info-stat-row">
+            <div class="info-stat"><span class="info-stat-icon" style="background:var(--${catColor}-soft);color:var(--${catColor})">${icon(catIcon)}</span><div><span>Categoria</span><strong>${esc(d.category)}</strong></div></div>
+            <div class="info-stat"><span class="info-stat-icon" style="background:var(--blue-soft);color:var(--blue)">${icon('money')}</span><div><span>Custo estimado</span><strong>${money(d.cost_estimate)}</strong></div></div>
+            <div class="info-stat"><span class="info-stat-icon" style="background:var(--violet-soft);color:var(--violet)">${icon('users')}</span><div><span>Pessoas afetadas</span><strong>${num(d.affected_people)}</strong></div></div>
+          </div>
+          <div class="info-card mt-12" style="background:var(--surface);border:1px solid var(--line);box-shadow:none">
+            <h4 style="margin:0 0 6px;font-size:12.5px;color:var(--muted)">${icon('clipboard')} Descrição detalhada</h4>
+            <p style="margin:0;font-size:13.5px;line-height:1.6">${esc(d.description)}</p>
+          </div>
+          ${d.subcategory ? `<p class="wizard-hint mt-12">Também identificado como: <strong>${esc(d.subcategory)}</strong></p>` : ''}
+          <div class="info-card mt-12" style="background:var(--surface);border:1px solid var(--line);box-shadow:none">
+            <h4 style="margin:0 0 6px;font-size:12.5px;color:var(--muted)">${icon('warning')} Impacto informado</h4>
+            <p style="margin:0;font-size:13.5px;line-height:1.6">${esc(d.impact || 'Impacto não detalhado.')}</p>
+          </div>
+        </div>
+      </details>
+
+      <!-- FORMULÁRIO DE PROVIDÊNCIA E ENCAMINHAMENTO -->
+      <section class="info-card mt-16 prov-form-card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+          <div>
+            <h3 style="margin:0">${icon('send')}Providência / Encaminhamento</h3>
+            <p class="wizard-hint" style="margin:4px 0 0">Defina o responsável, tipologia de ação e prazo previsto.</p>
+          </div>
+        </div>
+        <p class="wizard-question mt-16">Tipo de ação</p>
+        <div class="prov-type-row" id="provTypeRow">${PROV_ACTION_TYPES.map(t => `<button type="button" class="prov-type-chip ${d.prov_action_type === t.key ? 'active' : ''}" data-prov-type="${t.key}" style="--chip-color:var(--${t.color});--chip-soft:var(--${t.color}-soft)"><span class="prov-type-icon">${icon(t.icon)}</span>${esc(t.label)}</button>`).join('')}</div>
+        <div class="prov-form-grid mt-16">
+          <div class="field"><label>Responsável</label><select class="select" id="provResponsible"><option value="">Selecionar responsável...</option>${staffOptions}</select></div>
+          <div class="field"><label>Prazo previsto</label><input class="input" type="date" id="provDueDate" value="${esc(d.prov_due_date || d.due_date || '')}"></div>
+          <div class="field"><label>Prioridade da providência</label><select class="select" id="provPriority"><option value="">Selecionar...</option>${PROV_PRIORITIES.map(p => `<option ${p === d.prov_priority ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
+          <div class="field"><label>Status da Demanda</label><select class="select" id="provStatus">${ctx.statuses.map(s => `<option ${s === d.status ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></div>
+          <div class="field span-4"><label>Observação / Encaminhamento</label><textarea class="textarea" id="provNote" placeholder="Detalhe a providência tomada ou o encaminhamento dado...">${esc(d.prov_note || '')}</textarea></div>
+        </div>
+        <div class="prov-form-footer mt-16" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding-top:14px;border-top:1px solid var(--line)">
+          <button type="button" class="attach-btn" id="provAttachBtn">${icon('paperclip')}Anexar documento</button>
+          <input type="file" id="provAttachInput" hidden>
+          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <label class="prov-notify-row" style="cursor:pointer;margin:0" data-tooltip="Envia automaticamente um registro de devolutiva para a unidade escolar">
+              <span>Notificar escola</span>
+              <span class="switch"><input type="checkbox" id="provNotify" ${d.prov_notify_school ? 'checked' : ''}><span class="switch-track"></span></span>
+            </label>
+            <button type="button" class="btn btn-primary" id="saveProvidence" style="min-width:170px">
+              ${icon('bookmark')}Salvar Providência
+            </button>
+          </div>
+        </div>
+      </section>
     </div><aside class="side-stack">
       <section class="info-card"><h3>${icon('school')}Unidade Escolar</h3><div class="key-value"><div class="kv"><span>Unidade</span><strong>${esc(d.school_name)}</strong></div><div class="kv"><span>Direção</span><strong>${esc(d.director || '—')}</strong></div><div class="kv"><span>Local da ocorrência</span><strong>${esc(d.location || '—')}</strong></div><div class="kv"><span>Endereço</span><strong>${esc(d.address || '—')}</strong></div></div></section>
-      <section class="info-card providence-status"><h3>${icon('send')}Status da providência</h3>${provType ? `<div class="prov-status-type" style="--chip-color:var(--${provType.color});--chip-soft:var(--${provType.color}-soft)"><span class="prov-type-icon">${icon(provType.icon)}</span>${esc(provType.label)}</div><div class="key-value mt-12"><div class="kv"><span>Responsável</span><strong>${esc(d.prov_responsible || 'Não definido')}</strong></div><div class="kv"><span>Prazo</span><strong>${fmtDate(d.prov_due_date)}</strong></div><div class="kv"><span>Prioridade</span><strong>${esc(d.prov_priority || 'Não definida')}</strong></div></div>` : `<p>Nenhuma providência registrada ainda.</p>`}</section>
+      <section class="info-card providence-status">
+        <h3>${icon('send')}Status da providência</h3>
+        ${provType ? `<div class="prov-status-type" style="--chip-color:var(--${provType.color});--chip-soft:var(--${provType.color}-soft)"><span class="prov-type-icon">${icon(provType.icon)}</span>${esc(provType.label)}</div><div class="key-value mt-12"><div class="kv"><span>Responsável</span><strong>${esc(d.prov_responsible || d.responsible || 'Não definido')}</strong></div><div class="kv"><span>Prazo</span><strong>${fmtDate(d.prov_due_date || d.due_date)}</strong></div><div class="kv"><span>Prioridade</span><strong>${esc(d.prov_priority || d.priority || 'Não definida')}</strong></div></div>` : `<div class="prov-empty-state" style="padding:4px 0"><p class="text-muted" style="font-size:12px;margin:0 0 10px">Nenhum encaminhamento registrado ainda.</p><div style="display:flex;gap:6px;align-items:center"><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span></div></div>`}
+      </section>
       <section class="info-card"><h3>${icon('warning')}Sinais de atenção</h3>${d.risk ? `<div class="impact-item">${icon('warning')}<span>Há risco informado à comunidade escolar.</span></div>` : ''}${d.blocks_activity ? `<div class="impact-item">${icon('clock')}<span>Impacta ou impede atividade escolar.</span></div>` : ''}${!d.risk && !d.blocks_activity ? `<p>Nenhum sinal crítico registrado.</p>` : ''}</section>
     </aside></div>`;
     }
@@ -860,6 +904,64 @@
     });
   }
 
+  function openCompleteDemandModal(d, reload) {
+    modal({
+      title: 'Concluir Providência',
+      subtitle: `${d.code} · ${d.title}`,
+      mode: 'center',
+      body: `<form id="completeDemandForm">
+        <div class="form-grid">
+          <div class="field span-2">
+            <label>Parecer / Resumo da Conclusão *</label>
+            <textarea class="textarea" id="completeResolution" name="resolution" required placeholder="Descreva os serviços ou providências executadas para solucionar a demanda..." style="min-height:100px">${esc(d.action_defined || d.prov_note || '')}</textarea>
+          </div>
+          <div class="field span-2">
+            <label class="prov-notify-row" style="padding:10px 14px;background:var(--surface-soft);border-radius:var(--radius-md);border:1px solid var(--line);cursor:pointer">
+              <div>
+                <strong>Enviar devolutiva de conclusão à escola</strong>
+                <p style="margin:2px 0 0;font-size:11.5px;color:var(--muted)">A unidade escolar receberá o aviso de que o serviço foi finalizado no histórico.</p>
+              </div>
+              <span class="switch"><input type="checkbox" id="completeNotifySchool" checked><span class="switch-track"></span></span>
+            </label>
+          </div>
+        </div>
+      </form>`,
+      footer: `<button type="button" class="btn btn-secondary" data-close>Cancelar</button><button type="button" class="btn btn-primary" id="btnConfirmComplete">${icon('check-circle')} Confirmar Conclusão</button>`,
+      onOpen() {
+        $('#btnConfirmComplete').addEventListener('click', async () => {
+          const form = $('#completeDemandForm');
+          if (!form.reportValidity()) return;
+          const resolution = ($('#completeResolution').value || '').trim();
+          const notify = $('#completeNotifySchool').checked;
+          try {
+            await api(`/api/demands/${d.id}`, {
+              method: 'PUT',
+              body: {
+                status: 'Concluída',
+                action_defined: resolution || d.action_defined || 'Serviço concluído',
+                prov_note: resolution || d.prov_note
+              }
+            });
+            if (notify && resolution) {
+              await api(`/api/demands/${d.id}/updates`, {
+                method: 'POST',
+                body: {
+                  kind: 'Devolutiva',
+                  message: `Demanda concluída: ${resolution}`
+                }
+              });
+            }
+            closeModal();
+            toast('Demanda Concluída com Sucesso', 'A escola foi notificada e o atendimento foi encerrado.');
+            await reload();
+          } catch (e) {
+            toast('Erro ao concluir demanda', e.message, 'error');
+          }
+        });
+      }
+    });
+  }
+
   async function renderDemandDetail() {
     setLoading();
     const id = Number(document.body.dataset.entityId);
@@ -869,33 +971,147 @@
       const d = payload.demand, due = dueInfo(d);
       content.innerHTML = `<div class="breadcrumb"><a href="/demandas">Demandas</a><span>›</span><span>${esc(d.code)}</span></div>
         <div class="detail-head"><div><div class="detail-code-line"><span class="code-label">${esc(d.code)}</span><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span><span class="deadline ${due.cls}">${esc(due.text)}</span></div><h1>${esc(d.title)}</h1></div><div class="page-actions">${ctx.user.perm.can_edit_analysis ? `<button class="btn btn-secondary" id="editDemand">${icon('edit')}Editar análise</button>` : ''}<button class="btn btn-primary" id="quickUpdate">${icon('message')}Devolutiva</button></div></div>
-        <nav class="tabs" aria-label="Detalhes da demanda"><button class="tab ${active === 'summary' ? 'active' : ''}" data-tab="summary">${icon('file')}Resumo</button><button class="tab ${active === 'technical' ? 'active' : ''}" data-tab="technical">${icon('settings')}Análise Técnica</button><button class="tab ${active === 'responses' ? 'active' : ''}" data-tab="responses">${icon('message')}Devolutivas</button><button class="tab ${active === 'attachments' ? 'active' : ''}" data-tab="attachments">${icon('paperclip')}Anexos <span class="badge P3">${payload.attachments.length}</span></button><button class="tab ${active === 'history' ? 'active' : ''}" data-tab="history">${icon('clock')}Histórico</button><button class="tab ${active === 'planning' ? 'active' : ''}" data-tab="planning">${icon('calendar')}Planejamento</button><button class="tab tab-accent" data-tab="providencias">${icon('send')}Providências</button></nav>
+        <nav class="tabs" aria-label="Detalhes da demanda">
+          <button class="tab ${active === 'summary' ? 'active' : ''}" data-tab="summary">${icon('file')}Resumo</button>
+          <button class="tab ${active === 'technical' ? 'active' : ''}" data-tab="technical">${icon('settings')}Análise Técnica</button>
+          <button class="tab ${active === 'responses' ? 'active' : ''}" data-tab="responses">${icon('message')}Devolutivas</button>
+          <button class="tab ${active === 'attachments' ? 'active' : ''}" data-tab="attachments">${icon('paperclip')}Anexos <span class="badge P3">${payload.attachments.length}</span></button>
+          <button class="tab ${active === 'history' ? 'active' : ''}" data-tab="history">${icon('clock')}Histórico</button>
+          <button class="tab ${active === 'planning' ? 'active' : ''}" data-tab="planning">${icon('calendar')}Planejamento</button>
+        </nav>
         <div id="tabContent">${detailTabContent(active, payload)}</div>`;
+
       const reload = async () => { payload = await api(`/api/demands/${id}`); payload.staff = staff; render() };
+
       $$('[data-tab]', content).forEach(b => b.addEventListener('click', () => {
-        if (b.dataset.tab === 'providencias') { active = 'summary'; render(); setTimeout(() => $('.prov-form-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 20); return; }
         active = b.dataset.tab; render();
       }));
+
       $('#editDemand')?.addEventListener('click', () => openEditTechnical(d, reload));
       $('#editTechnical')?.addEventListener('click', () => openEditTechnical(d, reload));
       $('#editPlanningLink')?.addEventListener('click', () => openEditPlanning(d, reload));
+
+      // Stepper click actions
+      $$('[data-step-action]', content).forEach(el => {
+        el.addEventListener('click', () => {
+          const action = Number(el.dataset.stepAction);
+          if (action === 1 || action === 2) {
+            $('.prov-form-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (action === 2) $('#provResponsible')?.focus();
+          } else if (action === 3) {
+            if (statusClass(d.status) !== 'execution' && statusClass(d.status) !== 'completed') {
+              $('#btnFlowStart')?.click();
+            }
+          } else if (action === 4) {
+            if (statusClass(d.status) !== 'completed') {
+              openCompleteDemandModal(d, reload);
+            }
+          }
+        });
+      });
+
+      // Ações rápidas de avanço do fluxo
+      $('#btnFlowAssign')?.addEventListener('click', async () => {
+        const userResp = (ctx.user?.name || '').trim() || 'Gestor da Infraestrutura';
+        const newStatus = ['Nova', 'Recebida'].includes(d.status) ? 'Em análise técnica' : d.status;
+        const actionType = d.prov_action_type || (d.category?.toLowerCase().includes('obra') ? 'obra' : 'manutencao');
+        try {
+          await api(`/api/demands/${d.id}`, {
+            method: 'PUT',
+            body: {
+              responsible: userResp,
+              prov_responsible: userResp,
+              prov_action_type: actionType,
+              status: newStatus
+            }
+          });
+          await api(`/api/demands/${d.id}/updates`, {
+            method: 'POST',
+            body: {
+              kind: 'Alteração',
+              message: `Responsabilidade assumida por ${userResp}. Status atualizado para "${newStatus}".`
+            }
+          });
+          toast('Responsabilidade Assumida', `${userResp} é agora o responsável pela demanda.`);
+          await reload();
+        } catch (e) {
+          toast('Erro ao assumir demanda', e.message, 'error');
+        }
+      });
+
+      $('#btnFlowStart')?.addEventListener('click', async () => {
+        const userResp = d.prov_responsible || d.responsible || (ctx.user?.name || '').trim() || 'Equipe de Infraestrutura';
+        const actionType = d.prov_action_type || 'manutencao';
+        try {
+          await api(`/api/demands/${d.id}`, {
+            method: 'PUT',
+            body: {
+              status: 'Em execução',
+              responsible: userResp,
+              prov_responsible: userResp,
+              prov_action_type: actionType
+            }
+          });
+          await api(`/api/demands/${d.id}/updates`, {
+            method: 'POST',
+            body: {
+              kind: 'Status',
+              message: `Execução iniciada pelo setor responsável (${userResp}).`
+            }
+          });
+          toast('Execução Iniciada', 'Demanda marcada como "Em execução".');
+          await reload();
+        } catch (e) {
+          toast('Erro ao iniciar execução', e.message, 'error');
+        }
+      });
+
+      $('#btnFlowComplete')?.addEventListener('click', () => openCompleteDemandModal(d, reload));
+
+      $('#btnFlowReopen')?.addEventListener('click', async () => {
+        try {
+          await api(`/api/demands/${d.id}`, {
+            method: 'PUT',
+            body: { status: 'Em triagem' }
+          });
+          await api(`/api/demands/${d.id}/updates`, {
+            method: 'POST',
+            body: {
+              kind: 'Status',
+              message: 'Demanda reaberta para reavaliação ou complementação de serviço.'
+            }
+          });
+          toast('Demanda Reaberta', 'Status retornado para "Em triagem".');
+          await reload();
+        } catch (e) {
+          toast('Erro ao reabrir demanda', e.message, 'error');
+        }
+      });
+
+      // Chips de tipo de providência
       $$('#provTypeRow .prov-type-chip', content).forEach(chip => chip.addEventListener('click', () => {
         const already = chip.classList.contains('active');
         $$('#provTypeRow .prov-type-chip', content).forEach(c => c.classList.remove('active'));
         if (!already) chip.classList.add('active');
       }));
+
       const provAttachInput = $('#provAttachInput');
       $('#provAttachBtn')?.addEventListener('click', () => provAttachInput?.click());
       provAttachInput?.addEventListener('change', () => provAttachInput.files[0] && upload(provAttachInput.files[0]));
+
       const saveProv = async (sendUpdate) => {
         const type = $('#provTypeRow .prov-type-chip.active')?.dataset.provType || '';
+        const selectedStatus = $('#provStatus')?.value || d.status;
+        const selectedResp = $('#provResponsible')?.value || '';
         const body = {
           prov_action_type: type,
-          prov_responsible: $('#provResponsible').value,
-          prov_due_date: $('#provDueDate').value,
-          prov_priority: $('#provPriority').value,
-          prov_note: $('#provNote').value,
-          prov_notify_school: $('#provNotify').checked
+          prov_responsible: selectedResp,
+          responsible: selectedResp || d.responsible,
+          status: selectedStatus,
+          prov_due_date: $('#provDueDate')?.value || null,
+          prov_priority: $('#provPriority')?.value || null,
+          prov_note: $('#provNote')?.value || '',
+          prov_notify_school: $('#provNotify')?.checked ? 1 : 0
         };
         try {
           await api(`/api/demands/${id}`, { method: 'PUT', body });
@@ -904,18 +1120,51 @@
             const msg = (body.prov_note || '').trim() || `Providência registrada: ${typeLabel}${body.prov_responsible ? ` · Responsável: ${body.prov_responsible}` : ''}${body.prov_due_date ? ` · Prazo: ${fmtDate(body.prov_due_date)}` : ''}`;
             await api(`/api/demands/${id}/updates`, { method: 'POST', body: { kind: 'Devolutiva', message: msg } });
           }
-          toast(sendUpdate ? 'Providência salva e devolutiva enviada' : 'Providência salva');
+          toast(sendUpdate ? 'Providência salva e devolutiva enviada' : 'Providência salva com sucesso');
           await reload();
         } catch (e) { toast('Não foi possível salvar', e.message, 'error'); }
       };
-      $('#saveProvidence')?.addEventListener('click', () => saveProv(false));
-      $('#saveProvidenceNotify')?.addEventListener('click', () => saveProv(true));
+
+      $('#saveProvidence')?.addEventListener('click', () => {
+        const notify = Boolean($('#provNotify')?.checked);
+        saveProv(notify);
+      });
+
       const goResponses = () => { active = 'responses'; render(); setTimeout(() => $('#updateMessage')?.focus(), 20) };
       $('#quickUpdate')?.addEventListener('click', goResponses);
-      $('#sendUpdate')?.addEventListener('click', async () => { const ta = $('#updateMessage'); if (!ta.value.trim()) { toast('Escreva uma devolutiva', 'O campo de mensagem está vazio.', 'error'); return } try { await api(`/api/demands/${id}/updates`, { method: 'POST', body: { kind: 'Devolutiva', message: ta.value.trim() } }); toast('Devolutiva registrada'); await reload(); active = 'responses'; render(); } catch (e) { toast('Erro ao registrar', e.message, 'error') } });
+      $('#sendUpdate')?.addEventListener('click', async () => {
+        const ta = $('#updateMessage');
+        if (!ta.value.trim()) { toast('Escreva uma devolutiva', 'O campo de mensagem está vazio.', 'error'); return }
+        try {
+          await api(`/api/demands/${id}/updates`, { method: 'POST', body: { kind: 'Devolutiva', message: ta.value.trim() } });
+          toast('Devolutiva registrada');
+          await reload();
+          active = 'responses';
+          render();
+        } catch (e) { toast('Erro ao registrar', e.message, 'error') }
+      });
+
       const zone = $('#uploadZone'); const input = $('#attachmentInput');
-      if (zone && input) { zone.addEventListener('click', () => input.click()); input.addEventListener('change', () => input.files[0] && upload(input.files[0]));['dragover', 'dragenter'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.add('drag') }));['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.remove('drag') })); zone.addEventListener('drop', e => e.dataTransfer.files[0] && upload(e.dataTransfer.files[0])); }
-      async function upload(file) { const fd = new FormData(); fd.append('file', file); try { toast('Enviando anexo', file.name); await api(`/api/demands/${id}/attachments`, { method: 'POST', body: fd }); payload = await api(`/api/demands/${id}`); active = 'attachments'; render(); toast('Anexo enviado', file.name) } catch (e) { toast('Falha no envio', e.message, 'error') } }
+      if (zone && input) {
+        zone.addEventListener('click', () => input.click());
+        input.addEventListener('change', () => input.files[0] && upload(input.files[0]));
+        ['dragover', 'dragenter'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.add('drag') }));
+        ['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.remove('drag') }));
+        zone.addEventListener('drop', e => e.dataTransfer.files[0] && upload(e.dataTransfer.files[0]));
+      }
+
+      async function upload(file) {
+        const fd = new FormData();
+        fd.append('file', file);
+        try {
+          toast('Enviando anexo', file.name);
+          await api(`/api/demands/${id}/attachments`, { method: 'POST', body: fd });
+          payload = await api(`/api/demands/${id}`);
+          active = 'attachments';
+          render();
+          toast('Anexo enviado', file.name);
+        } catch (e) { toast('Falha no envio', e.message, 'error') }
+      }
     };
     render();
   }
@@ -1121,7 +1370,763 @@
     const accentCls = urgent ? 'school-card-urgent' : 'school-card-ok';
     return `<article class="school-card ${accentCls}" data-school-id="${s.id}" data-tooltip-list="${esc(schoolTooltipText(list))}"><div class="school-card-head"><div class="school-icon">${icon('school')}</div>${urgent ? `<span class="badge P1">${urgent} urgente${urgent === 1 ? '' : 's'}</span>` : `<span class="badge P4">Sem urgências</span>`}</div><h3>${esc(s.name)}</h3><p>${esc(s.director || 'Direção não informada')}</p><div class="school-stats"><div class="school-stat"><div class="school-stat-top">${icon('clipboard')}<span>Demandas</span></div><strong>${num(total)}</strong></div><div class="school-stat"><div class="school-stat-top">${icon('check-circle')}<span>Concluídas</span></div><strong>${num(completed)}</strong></div><div class="school-stat"><div class="school-stat-top">${icon('trend')}<span>Execução</span></div><strong>${exec}%</strong></div></div></article>`;
   }
-  async function openSchool360(id) { const data = await api(`/api/schools/${id}`), s = data.school, rows = data.demands; modal({ title: 'Visão 360° da Unidade Escolar', subtitle: s.name, mode: 'drawer', body: `<section class="info-card accent"><h3>${icon('school')}${esc(s.name)}</h3><div class="key-value"><div class="kv"><span>Direção</span><strong>${esc(s.director || '—')}</strong></div><div class="kv"><span>Contato</span><strong>${esc(s.phone || '—')} · ${esc(s.email || '—')}</strong></div><div class="kv"><span>Endereço</span><strong>${esc(s.address || '—')}</strong></div></div></section><section class="info-card"><h3>${icon('clipboard')}Histórico de demandas</h3>${rows.length ? rows.map(d => `<a class="attention-item" href="/demandas/${d.id}"><span class="priority-dot ${d.priority}"></span><div><strong>${esc(d.title)}</strong><small>${esc(d.code)} · ${esc(d.status)}</small></div><span class="badge ${d.priority}">${d.priority}</span></a>`).join('') : empty()}</section>` }); }
+  async function openSchool360(id) {
+    const schoolId = parseInt(id, 10);
+    if (isNaN(schoolId) || !schoolId) {
+      toast('Aviso', 'Identificador de escola inválido.', 'warning');
+      return;
+    }
+    const data = await api(`/api/schools/${schoolId}`), s = data.school, rows = data.demands;
+    modal({
+      title: 'Visão 360° da Unidade Escolar',
+      subtitle: s.name,
+      mode: 'drawer',
+      body: `<section class="info-card accent">
+        <h3>${icon('school')}${esc(s.name)}</h3>
+        <div class="key-value">
+          <div class="kv"><span>Código INEP</span><strong>${esc(s.inep || s.code || '—')}</strong></div>
+          <div class="kv"><span>Direção</span><strong>${esc(s.director || '—')}</strong></div>
+          <div class="kv"><span>Contato / Ramal</span><strong>${esc(s.phone || '—')}${s.ramal ? ` (Ramal ${s.ramal})` : ''}</strong></div>
+          <div class="kv"><span>E-mail</span><strong>${esc(s.email || '—')}</strong></div>
+          <div class="kv"><span>Bairro / Região</span><strong>${esc(s.neighborhood || '—')}</strong></div>
+          <div class="kv"><span>Endereço Completo</span><strong>${esc(s.address || '—')}</strong></div>
+          ${s.modality ? `<div class="kv"><span>Modalidade</span><strong>${esc(s.modality)}</strong></div>` : ''}
+          ${s.maps_link ? `<div class="kv"><span>Localização</span><strong><a href="${esc(s.maps_link)}" target="_blank" rel="noopener noreferrer" style="color:var(--primary);text-decoration:underline;display:inline-flex;align-items:center;gap:4px">${icon('globe')} Ver no Google Maps ↗</a></strong></div>` : ''}
+        </div>
+      </section>
+      <section class="info-card mt-16">
+        <h3>${icon('clipboard')}Histórico de demandas (${rows.length})</h3>
+        ${rows.length ? rows.map(d => `<a class="attention-item" href="/demandas/${d.id}"><span class="priority-dot ${d.priority}"></span><div><strong>${esc(d.title)}</strong><small>${esc(d.code)} · ${esc(d.status)} · ${fmtDate(d.created_at)}</small></div><span class="badge ${d.priority}">${d.priority}</span></a>`).join('') : empty('Nenhuma demanda registrada', 'Esta unidade escolar não possui chamados abertos no momento.')}
+      </section>`
+    });
+  }
+
+  window.appOpenSchool360 = (id) => openSchool360(id);
+
+  async function renderNetworkMap() {
+    setLoading();
+    let currentCrit = 'all';
+    let currentStatus = 'all';
+    let currentNeighborhood = 'all';
+    let currentQ = '';
+    let mapInstance = null;
+    let networkData = null;
+    let selectedCircuitSchoolIds = [];
+    let circuitData = null;
+    let circuitModeActive = false;
+    let circuitMarkers = [];
+
+    const fetchAndRender = async () => {
+      const url = `/api/map/network?q=${encodeURIComponent(currentQ)}&neighborhood=${encodeURIComponent(currentNeighborhood)}&criticality=${encodeURIComponent(currentCrit)}&status=${encodeURIComponent(currentStatus)}`;
+      networkData = await api(url);
+      renderUI(networkData);
+    };
+
+    const renderUI = (data) => {
+      const kpi = data.kpi_stats;
+      const schools = data.schools;
+      const priorityQueue = data.priority_queue;
+      const op = data.operational_summary;
+      const neighborhoods = data.neighborhoods || [];
+
+      content.innerHTML = `
+        <div class="map-page-wrapper">
+          <div class="map-page-header">
+            <div>
+              <h1 class="map-page-title">Mapa Operacional da Rede</h1>
+              <p class="map-page-subtitle">Visão territorial e roteirizador logístico de vistorias</p>
+            </div>
+            <div class="map-header-controls">
+              <div class="map-search-input-wrap">
+                ${icon('search')}
+                <input type="search" id="mapSearchInput" class="input map-search-input" placeholder="Buscar escola ou endereço..." value="${esc(currentQ)}">
+              </div>
+              <div class="map-filter-select-wrap">
+                ${icon('building')}
+                <select id="mapNeighborhoodSelect" class="select map-select">
+                  <option value="all" ${currentNeighborhood === 'all' ? 'selected' : ''}>Bairro (Todos)</option>
+                  ${neighborhoods.map(b => `
+                    <option value="${esc(b)}" ${currentNeighborhood === b ? 'selected' : ''}>📍 ${esc(b)}</option>
+                  `).join('')}
+                </select>
+              </div>
+              <div class="map-filter-select-wrap">
+                ${icon('filter')}
+                <select id="mapCritSelect" class="select map-select">
+                  <option value="all" ${currentCrit === 'all' ? 'selected' : ''}>Criticidade (Todas)</option>
+                  <option value="critical" ${currentCrit === 'critical' ? 'selected' : ''}>🔴 Situação Crítica</option>
+                  <option value="warning" ${currentCrit === 'warning' ? 'selected' : ''}>🟠 Atenção / Alto Impacto</option>
+                  <option value="in_progress" ${currentCrit === 'in_progress' ? 'selected' : ''}>🔵 Em Atendimento</option>
+                  <option value="regular" ${currentCrit === 'regular' ? 'selected' : ''}>🟢 Situação Regular</option>
+                </select>
+              </div>
+              <div class="map-filter-select-wrap">
+                ${icon('layers')}
+                <select id="mapStatusSelect" class="select map-select">
+                  <option value="all" ${currentStatus === 'all' ? 'selected' : ''}>Status (Todos)</option>
+                  <option value="critical" ${currentStatus === 'critical' ? 'selected' : ''}>Situação Crítica</option>
+                  <option value="p1" ${currentStatus === 'p1' ? 'selected' : ''}>Prioridade P1</option>
+                  <option value="p2" ${currentStatus === 'p2' ? 'selected' : ''}>Prioridade P2</option>
+                  <option value="overdue" ${currentStatus === 'overdue' ? 'selected' : ''}>Prazos Vencidos</option>
+                  <option value="in_progress" ${currentStatus === 'in_progress' ? 'selected' : ''}>Em execução</option>
+                  <option value="waiting_contract" ${currentStatus === 'waiting_contract' ? 'selected' : ''}>Aguardando contratação</option>
+                </select>
+              </div>
+              
+              <div class="map-actions-group">
+                <button type="button" id="btnToggleCircuitMode" class="btn-circuit-toggle ${circuitModeActive || selectedCircuitSchoolIds.length > 0 ? 'active' : ''}" title="Clique para escolher livremente até 10 unidades escolares para o circuito">
+                  ${icon('school')} Escolher Unidades <span class="circuit-badge">${selectedCircuitSchoolIds.length}/10</span>
+                </button>
+                <button type="button" id="btnQuickTop5Circuit" class="btn-quick-top5" title="Adicionar automaticamente as 5 escolas mais críticas">
+                  ${icon('bolt')} Sugestão Top 5
+                </button>
+                <a href="/api/export/demands.csv" class="btn primary map-export-btn" download>
+                  ${icon('download')} Exportar
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div class="map-kpi-grid">
+            <div class="map-kpi-card">
+              <div class="kpi-card-icon icon-blue">${icon('building')}</div>
+              <div class="kpi-card-content">
+                <span class="kpi-card-num">${kpi.total_schools}</span>
+                <span class="kpi-card-label">Unidades Escolares</span>
+              </div>
+            </div>
+            <div class="map-kpi-card ${kpi.critical_schools > 0 ? 'kpi-alert-red' : ''}">
+              <div class="kpi-card-icon icon-red">${icon('warning')}</div>
+              <div class="kpi-card-content">
+                <span class="kpi-card-num text-red">${kpi.critical_schools}</span>
+                <span class="kpi-card-label">Situação Crítica</span>
+              </div>
+            </div>
+            <div class="map-kpi-card">
+              <div class="kpi-card-icon icon-cyan">${icon('user')}</div>
+              <div class="kpi-card-content">
+                <span class="kpi-card-num text-blue">${kpi.in_progress_schools}</span>
+                <span class="kpi-card-label">Em Atendimento</span>
+              </div>
+            </div>
+            <div class="map-kpi-card ${kpi.overdue_schools > 0 ? 'kpi-alert-orange' : ''}">
+              <div class="kpi-card-icon icon-orange">${icon('clock')}</div>
+              <div class="kpi-card-content">
+                <span class="kpi-card-num text-orange">${kpi.overdue_schools}</span>
+                <span class="kpi-card-label">Prazos Vencidos</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="map-body-layout mt-16">
+            <div class="map-viewport-wrapper">
+              <div id="networkMapContainer" class="map-container-box"></div>
+              <div class="map-floating-legend">
+                <div class="legend-row"><span class="legend-dot dot-critical"></span><span>Crítico</span></div>
+                <div class="legend-row"><span class="legend-dot dot-warning"></span><span>Atenção</span></div>
+                <div class="legend-row"><span class="legend-dot dot-progress"></span><span>Em acompanhamento</span></div>
+                <div class="legend-row"><span class="legend-dot dot-regular"></span><span>Regular</span></div>
+              </div>
+            </div>
+
+            <aside class="map-sidebar-stack">
+              <section class="info-card map-priority-card">
+                <div class="map-card-head">
+                  <div class="head-title">${icon('bookmark')}<strong>Prioridade de Atendimento</strong></div>
+                  <a href="/demandas" class="head-link">Ver todas</a>
+                </div>
+                <div class="priority-queue-list mt-12">
+                  ${priorityQueue.length ? priorityQueue.map(s => {
+                    let badgeLabel = 'Crítica';
+                    let badgeClass = 'badge-crit-red';
+                    let iconType = 'warning';
+                    let subtext = `${s.urgent_p1_count} urgente${s.urgent_p1_count === 1 ? '' : 's'}`;
+                    if (s.urgent_p1_count > 0) {
+                      badgeLabel = 'Crítica';
+                      badgeClass = 'badge-crit-red';
+                      iconType = 'warning';
+                      subtext = `${s.urgent_p1_count} urgente${s.urgent_p1_count === 1 ? '' : 's'}`;
+                    } else if (s.overdue_count > 0) {
+                      badgeLabel = 'Prazos vencidos';
+                      badgeClass = 'badge-crit-orange';
+                      iconType = 'clock';
+                      subtext = `${s.overdue_count} vencida${s.overdue_count === 1 ? '' : 's'}`;
+                    } else if (s.waiting_contract_count > 0) {
+                      badgeLabel = 'Em atendimento';
+                      badgeClass = 'badge-crit-blue';
+                      iconType = 'user';
+                      subtext = 'Aguardando contratação';
+                    } else if (s.in_progress_count > 0) {
+                      badgeLabel = 'Em execução';
+                      badgeClass = 'badge-crit-green';
+                      iconType = 'wrench';
+                      subtext = 'Visita técnica / Execução';
+                    } else {
+                      badgeLabel = 'Atenção';
+                      badgeClass = 'badge-crit-orange';
+                      iconType = 'info';
+                      subtext = `${s.open_demands_count} pendência${s.open_demands_count === 1 ? '' : 's'}`;
+                    }
+                    const isInCircuit = selectedCircuitSchoolIds.includes(s.id);
+                    return `
+                      <div class="priority-item" data-focus-school="${s.id}">
+                        <div class="priority-item-icon ${badgeClass}">${icon(iconType)}</div>
+                        <div class="priority-item-info">
+                          <strong class="priority-item-name">${esc(s.name)}</strong>
+                          <span class="priority-item-sub">${esc(subtext)}</span>
+                        </div>
+                        <button type="button" class="btn-add-circuit-pill ${isInCircuit ? 'in-circuit' : ''}" onclick="event.stopPropagation(); window.appToggleCircuitSchool(${s.id});" title="${isInCircuit ? 'Remover do circuito' : 'Adicionar ao circuito'}">
+                          ${isInCircuit ? '✓ Rota' : '+ Rota'}
+                        </button>
+                        <span class="priority-badge ${badgeClass}">${badgeLabel}</span>
+                        <div class="priority-chevron">${icon('chevron')}</div>
+                      </div>
+                    `;
+                  }).join('') : `<div class="empty-state" style="padding:16px"><p>Nenhuma escola com pendência crítica.</p></div>`}
+                </div>
+              </section>
+
+              <section class="info-card map-summary-card mt-16">
+                <div class="map-card-head">
+                  <div class="head-title">${icon('trend')}<strong>Resumo Operacional</strong></div>
+                </div>
+                <div class="op-summary-rows mt-12">
+                  <div class="op-summary-row">
+                    <span class="op-icon">${icon('building')}</span>
+                    <div><strong>${op.structural_schools_count}</strong> escolas com demandas estruturais</div>
+                  </div>
+                  <div class="op-summary-row">
+                    <span class="op-icon text-orange">${icon('bolt')}</span>
+                    <div><strong>${op.electrical_schools_count}</strong> com prioridade elétrica</div>
+                  </div>
+                  <div class="op-summary-row">
+                    <span class="op-icon text-muted">${icon('file')}</span>
+                    <div><strong>${op.budget_schools_count}</strong> aguardando orçamento / contratação</div>
+                  </div>
+                  <div class="op-summary-row">
+                    <span class="op-icon text-blue">${icon('clock')}</span>
+                    <div>Tempo médio de atendimento: <strong>${op.avg_response_days} dias</strong></div>
+                  </div>
+                </div>
+              </section>
+            </aside>
+          </div>
+
+          <div id="circuitPlannerDockContainer"></div>
+
+          <div class="map-quick-filters mt-16">
+            <button type="button" class="quick-filter-chip ${currentStatus === 'all' && currentCrit === 'all' ? 'active' : ''}" data-quick-filter="all">
+              ${icon('grid')} Todas
+            </button>
+            <button type="button" class="quick-filter-chip chip-crit ${currentCrit === 'critical' ? 'active' : ''}" data-quick-crit="critical">
+              <span class="chip-dot dot-critical"></span> Críticas
+            </button>
+            <button type="button" class="quick-filter-chip ${currentStatus === 'p1' ? 'active' : ''}" data-quick-status="p1">
+              ${icon('warning')} P1
+            </button>
+            <button type="button" class="quick-filter-chip ${currentStatus === 'p2' ? 'active' : ''}" data-quick-status="p2">
+              ${icon('bolt')} P2
+            </button>
+            <button type="button" class="quick-filter-chip ${currentStatus === 'overdue' ? 'active' : ''}" data-quick-status="overdue">
+              ${icon('clock')} Vencidas
+            </button>
+            <button type="button" class="quick-filter-chip ${currentStatus === 'in_progress' ? 'active' : ''}" data-quick-status="in_progress">
+              ${icon('arrow')} Em execução
+            </button>
+            <button type="button" class="quick-filter-chip ${currentStatus === 'waiting_contract' ? 'active' : ''}" data-quick-status="waiting_contract">
+              ${icon('user')} Aguardando contratação
+            </button>
+          </div>
+        </div>
+      `;
+
+      initMap(schools);
+      bindMapEvents();
+      renderCircuitDock();
+    };
+
+    let currentMarkers = [];
+    const SMEDU_LAT = -22.868666015828296;
+    const SMEDU_LON = -43.7889040053576;
+    const SMEDU_MAPS_LINK = 'https://maps.app.goo.gl/Js5S88kfqb2HrNnP7';
+
+    const initMap = (schools) => {
+      if (typeof maplibregl === 'undefined') {
+        const container = document.getElementById('networkMapContainer');
+        if (container) container.innerHTML = `<div class="alert info" style="margin:20px">Carregando OpenFreeMap...</div>`;
+        setTimeout(() => initMap(schools), 300);
+        return;
+      }
+      
+      const mapDiv = document.getElementById('networkMapContainer');
+      if (!mapDiv) return;
+
+      mapInstance = new maplibregl.Map({
+        container: 'networkMapContainer',
+        style: 'https://tiles.openfreemap.org/styles/liberty',
+        center: [-43.788904, -22.868666],
+        zoom: 12.5,
+        attributionControl: false
+      });
+      window._currentMapInstance = mapInstance;
+
+      mapInstance.addControl(new maplibregl.NavigationControl({ showCompass: true, showZoom: true }), 'top-right');
+      mapInstance.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: 'metric' }), 'bottom-left');
+
+      mapInstance.on('load', () => {
+        const smeduPinEl = document.createElement('div');
+        smeduPinEl.className = 'smedu-route-pin';
+        smeduPinEl.innerHTML = `🏛️ SMEDU · Sede`;
+        smeduPinEl.style.cursor = 'pointer';
+
+        const smeduPopup = new maplibregl.Popup({ offset: 12, maxWidth: '280px', className: 'custom-leaflet-popup' })
+          .setHTML(`
+            <div class="map-popup-card" style="padding:14px">
+              <h4 style="margin:0 0 4px;font-size:13px;color:#005A9C;font-weight:800">🏛️ Secretaria Municipal de Educação</h4>
+              <p style="margin:0 0 8px;font-size:11px;color:var(--muted)">Sede Administrativa Oficial de Itaguaí</p>
+              <div style="font-size:11px;line-height:1.4;margin-bottom:8px">
+                <div><strong>Coordenadas:</strong> -22.868666, -43.788904</div>
+                <div><strong>Ponto Zero:</strong> Origem oficial de todas as rotas e vistorias</div>
+              </div>
+              <a href="${SMEDU_MAPS_LINK}" target="_blank" rel="noopener noreferrer" class="popup-btn popup-btn-primary" style="display:inline-flex;width:100%">${icon('globe')} Abrir Google Maps</a>
+            </div>
+          `);
+
+        new maplibregl.Marker({ element: smeduPinEl })
+          .setLngLat([SMEDU_LON, SMEDU_LAT])
+          .setPopup(smeduPopup)
+          .addTo(mapInstance);
+
+        renderMarkers(schools);
+
+        if (selectedCircuitSchoolIds.length > 0) {
+          calculateAndRenderCircuit();
+        }
+      });
+    };
+
+    const renderMarkers = (schools) => {
+      currentMarkers.forEach(m => m.remove());
+      currentMarkers = [];
+
+      schools.forEach(s => {
+        if (!s.lat || !s.lon) return;
+
+        const count = s.open_demands_count || 0;
+        const crit = s.criticality || 'regular';
+        
+        let markerHtml = '';
+        if (crit === 'critical') {
+          markerHtml = `<div class="custom-map-pin pin-critical"><span class="pin-inner">${count > 0 ? count : '⚠️'}</span><div class="pin-pulse"></div></div>`;
+        } else if (crit === 'warning') {
+          markerHtml = `<div class="custom-map-pin pin-warning"><span class="pin-inner">${count > 0 ? count : '!'}</span></div>`;
+        } else if (crit === 'in_progress') {
+          markerHtml = `<div class="custom-map-pin pin-progress"><span class="pin-inner">${count > 0 ? count : '▶'}</span></div>`;
+        } else {
+          markerHtml = `<div class="custom-map-pin pin-regular"><span class="pin-inner">${count > 0 ? count : '✓'}</span></div>`;
+        }
+
+        const el = document.createElement('div');
+        el.className = 'custom-leaflet-marker-wrap';
+        el.innerHTML = markerHtml;
+
+        const photoUrl = s.photo_url || `https://static-maps.yandex.ru/1.x/?ll=${s.lon},${s.lat}&z=17&l=sat&size=450,220`;
+        const dList = s.demands_summary || [];
+        let demandsHtml = dList.length === 0 ? `<div class="popup-demand-empty">✨ <strong>Rede 100% Regularizada</strong></div>` : dList.map(d => {
+            const prioClass = d.priority === 'P1' ? 'prio-p1' : (d.priority === 'P2' ? 'prio-p2' : 'prio-p3');
+            const prioBadge = d.priority === 'P1' ? 'badge-crit-critical' : (d.priority === 'P2' ? 'badge-crit-warning' : 'badge-crit-regular');
+            return `<div class="popup-demand-card ${prioClass}"><div class="pdc-top"><span class="pdc-cat">${esc(d.category)}</span><span class="pdc-badge ${prioBadge}">${d.priority}</span></div><div class="pdc-title">${esc(d.title)}</div></div>`;
+        }).join('');
+
+        const isInCircuit = selectedCircuitSchoolIds.includes(s.id);
+        const popupContent = `
+          <div class="popup-photo-banner">
+            <img src="${photoUrl}" alt="${esc(s.name)}" loading="lazy" onerror="this.onerror=null; this.src='https://static-maps.yandex.ru/1.x/?ll=${s.lon},${s.lat}&z=17&l=sat&size=450,220';">
+            ${s.maps_link ? `
+              <a href="${esc(s.maps_link)}" target="_blank" rel="noopener noreferrer" class="popup-streetview-tag" title="Abrir no Google Street View">
+                ${icon('camera')} Google Street View ↗
+              </a>
+            ` : ''}
+          </div>
+          <div class="map-popup-card">
+            <div class="popup-head">
+              <h4 class="popup-title">${esc(s.name)}</h4>
+              <span class="popup-badge badge-crit-${crit}">${crit === 'critical' ? '🔴 Crítico' : (crit === 'warning' ? '🟠 Atenção' : (crit === 'in_progress' ? '🔵 Em atendimento' : '🟢 Regular'))}</span>
+            </div>
+            <p class="popup-address">${esc(s.address || 'Itaguaí - RJ')}</p>
+            
+            <div class="popup-stats-grid">
+              <div class="pstat"><span class="pstat-val">${s.open_demands_count}</span><span class="pstat-lbl">Demandas</span></div>
+              <div class="pstat"><span class="pstat-val text-red">${s.urgent_p1_count}</span><span class="pstat-lbl">Urgentes P1</span></div>
+              <div class="pstat"><span class="pstat-val text-orange">${s.overdue_count}</span><span class="pstat-lbl">Vencidas</span></div>
+              <div class="pstat"><span class="pstat-val text-blue">${s.execution_percent}%</span><span class="pstat-lbl">Execução</span></div>
+            </div>
+
+            <!-- RESUMO OPERACIONAL DE DEMANDAS COM DATAS -->
+            <div class="popup-demands-container">
+              <div class="popup-demands-head">
+                <span class="popup-demands-head-title">${icon('clipboard')} Demandas em Aberto</span>
+                <span class="popup-demands-count-tag">${s.open_demands_count} ativa(s)</span>
+              </div>
+              ${demandsHtml}
+            </div>
+
+            <!-- INFORMAÇÕES INSTITUCIONAIS -->
+            <div class="popup-info-grid">
+              <div class="pig-item"><span>Bairro</span><strong>${esc(s.neighborhood || 'Itaguaí')}</strong></div>
+              <div class="pig-item"><span>Direção</span><strong>${esc(s.director || '—')}</strong></div>
+              <div class="pig-item"><span>Contato</span><strong>${esc(s.phone || '—')}</strong></div>
+              <div class="pig-item"><span>Custo Estimado</span><strong>${money(s.cost_estimate_open)}</strong></div>
+            </div>
+
+            <div class="popup-actions mt-8">
+              <button type="button" class="popup-btn ${isInCircuit ? 'popup-btn-primary' : 'popup-btn-secondary'}" onclick="window.appToggleCircuitSchool(${s.id})" title="${isInCircuit ? 'Remover do Circuito' : 'Adicionar ao Circuito de Vistorias'}">
+                ${isInCircuit ? '✓ No Circuito' : '+ Circuito'}
+              </button>
+              <a href="/demandas?school_id=${s.id}" class="popup-btn popup-btn-primary">${icon('clipboard')} Demandas</a>
+              <button type="button" class="popup-btn popup-btn-secondary" onclick="window.appOpenSchool360(${s.id})">${icon('school')} 360°</button>
+              <button type="button" class="popup-btn popup-btn-route" onclick="window.appRouteSchool(${s.lat}, ${s.lon})">${icon('trend')} Rota 1:1</button>
+              ${s.maps_link ? `<a href="${esc(s.maps_link)}" target="_blank" rel="noopener noreferrer" class="popup-btn" style="flex:0 0 auto;padding:5px 8px" title="Abrir no Google Maps">${icon('globe')}</a>` : ''}
+            </div>
+          </div>
+        `;
+
+        const popup = new maplibregl.Popup({
+          offset: 14,
+          closeButton: true,
+          maxWidth: '340px',
+          className: 'custom-leaflet-popup'
+        }).setHTML(popupContent);
+
+        popup.on('open', () => {
+          if (mapInstance) {
+            mapInstance.easeTo({
+              center: [s.lon, s.lat],
+              offset: [0, -100],
+              duration: 350
+            });
+          }
+        });
+
+        el.addEventListener('click', () => {
+          if (mapInstance) {
+            mapInstance.easeTo({
+              center: [s.lon, s.lat],
+              offset: [0, -100],
+              duration: 350
+            });
+          }
+        });
+
+        const marker = new maplibregl.Marker({ element: el })
+          .setLngLat([s.lon, s.lat])
+          .setPopup(popup)
+          .addTo(mapInstance);
+        
+        currentMarkers.push(marker);
+        s._marker = marker;
+        s._popup = popup;
+      });
+    };
+
+    window.appToggleCircuitSchool = (schoolId) => {
+      const idx = selectedCircuitSchoolIds.indexOf(schoolId);
+      if (idx >= 0) {
+        selectedCircuitSchoolIds.splice(idx, 1);
+        toast('Circuito de Vistorias', 'Unidade removida do circuito.');
+      } else {
+        if (selectedCircuitSchoolIds.length >= 10) {
+          toast('Limite Atingido', 'Você já selecionou o limite máximo de 10 unidades para este circuito.', 'warning');
+          return;
+        }
+        selectedCircuitSchoolIds.push(schoolId);
+        toast('Circuito de Vistorias', `Unidade adicionada! (${selectedCircuitSchoolIds.length}/10 selecionadas)`, 'success');
+      }
+      circuitModeActive = selectedCircuitSchoolIds.length > 0;
+      updateCircuitUI();
+      if (selectedCircuitSchoolIds.length > 0) calculateAndRenderCircuit(); else clearCircuitMapLayers();
+    };
+
+    window.appQuickTopCircuit = (count = 5) => {
+      const topSchools = (networkData?.priority_queue || []).filter(s => s.lat && s.lon).slice(0, count).map(s => s.id);
+      if (!topSchools.length) { toast('Circuito', 'Nenhuma unidade crítica com coordenadas encontrada.', 'warning'); return; }
+      selectedCircuitSchoolIds = topSchools;
+      circuitModeActive = true;
+      toast('Circuito Otimizado', `Adicionadas as ${selectedCircuitSchoolIds.length} unidades mais críticas ao circuito!`, 'success');
+      updateCircuitUI();
+      calculateAndRenderCircuit();
+    };
+
+    window.appClearCircuit = () => {
+      selectedCircuitSchoolIds = [];
+      circuitData = null;
+      circuitModeActive = false;
+      clearCircuitMapLayers();
+      updateCircuitUI();
+      toast('Circuito Resetado', 'O circuito de vistorias foi limpo.');
+    };
+
+    window.appOptimizeCircuitOrder = () => calculateAndRenderCircuit(true);
+
+    window.appOpenGoogleMapsCircuit = () => {
+      if (circuitData?.google_maps_url) window.open(circuitData.google_maps_url, '_blank');
+      else toast('Google Maps', 'Calcule o circuito primeiro para gerar o link de navegação.', 'warning');
+    };
+
+    const clearCircuitMapLayers = () => {
+      const map = window._currentMapInstance || mapInstance;
+      if (map) {
+        if (map.getLayer('circuit-route-layer-glow')) map.removeLayer('circuit-route-layer-glow');
+        if (map.getLayer('circuit-route-layer')) map.removeLayer('circuit-route-layer');
+        if (map.getSource('circuit-route-source')) map.removeSource('circuit-route-source');
+      }
+      circuitMarkers.forEach(m => m.remove());
+      circuitMarkers = [];
+      if (networkData?.schools) renderMarkers(networkData.schools);
+    };
+
+    const updateCircuitUI = () => {
+      const badge = document.querySelector('#btnToggleCircuitMode .circuit-badge');
+      if (badge) badge.textContent = `${selectedCircuitSchoolIds.length}/10`;
+
+      const btn = document.getElementById('btnToggleCircuitMode');
+      if (btn) {
+        if (selectedCircuitSchoolIds.length > 0) btn.classList.add('active');
+        else btn.classList.remove('active');
+      }
+
+      document.querySelectorAll('.btn-add-circuit-pill').forEach(el => {
+        const pItem = el.closest('[data-focus-school]');
+        if (pItem) {
+          const sid = Number(pItem.dataset.focusSchool);
+          if (selectedCircuitSchoolIds.includes(sid)) { el.classList.add('in-circuit'); el.innerHTML = '✓ Rota'; }
+          else { el.classList.remove('in-circuit'); el.innerHTML = '+ Rota'; }
+        }
+      });
+      renderCircuitDock();
+    };
+
+    const calculateAndRenderCircuit = async (optimize = true) => {
+      if (!selectedCircuitSchoolIds.length) return;
+      toast('Otimizando Circuito', `Calculando trajeto para ${selectedCircuitSchoolIds.length} paradas a partir da SMEDU...`);
+      try {
+        const res = await api(`/api/route/circuit?school_ids=${selectedCircuitSchoolIds.join(',')}&optimize=${optimize}`);
+        circuitData = res;
+        renderCircuitDock();
+        renderCircuitOnMap(res);
+        toast('Circuito Calculado', `Distância total: ${res.total_distance_km} km · Tempo: ${res.total_duration_min} min (${res.stops.length - 1} escolas)`, 'success');
+      } catch (err) { toast('Erro no circuito', err.message, 'error'); }
+    };
+
+    const renderCircuitOnMap = (res) => {
+      const map = window._currentMapInstance || mapInstance;
+      if (!map) return;
+      document.querySelectorAll('.maplibregl-popup').forEach(p => p.remove());
+
+      if (map.getSource('circuit-route-source')) map.getSource('circuit-route-source').setData(res.geometry);
+      else {
+        map.addSource('circuit-route-source', { type: 'geojson', data: res.geometry });
+        map.addLayer({
+          id: 'circuit-route-layer-glow',
+          type: 'line',
+          source: 'circuit-route-source',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#0288D1', 'line-width': 8, 'line-opacity': 0.4 }
+        });
+        map.addLayer({
+          id: 'circuit-route-layer',
+          type: 'line',
+          source: 'circuit-route-source',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#005A9C', 'line-width': 5 }
+        });
+      }
+
+      circuitMarkers.forEach(m => m.remove());
+      circuitMarkers = [];
+
+      res.stops.forEach((stop, idx) => {
+        const pin = document.createElement('div');
+        pin.className = 'circuit-pin-marker';
+        if (stop.is_origin) {
+          pin.style.background = '#005A9C';
+          pin.innerHTML = `🏛️`;
+        } else {
+          pin.innerHTML = `${stop.order}`;
+          if (stop.p1_count > 0) pin.style.background = '#e53935';
+          else if (stop.p2_count > 0) pin.style.background = '#fb8c00';
+          else pin.style.background = '#005A9C';
+        }
+
+        const stopPopup = new maplibregl.Popup({ offset: 16, maxWidth: '280px', className: 'custom-leaflet-popup' })
+          .setHTML(`
+            <div class="map-popup-card" style="padding:12px">
+              <div style="font-size:10px;font-weight:800;color:var(--primary);text-transform:uppercase;margin-bottom:2px">
+                ${stop.is_origin ? 'Ponto de Partida Oficial' : `Parada #${stop.order} do Circuito`}
+              </div>
+              <h4 style="margin:0 0 4px;font-size:13px;color:var(--ink);font-weight:800">${esc(stop.name)}</h4>
+              <p style="margin:0 0 6px;font-size:11px;color:var(--muted)">${esc(stop.address)}</p>
+              ${!stop.is_origin ? `
+                <div style="display:flex;gap:4px;margin-bottom:8px">
+                  ${stop.p1_count > 0 ? `<span class="cstop-tag-p1">🔴 ${stop.p1_count} P1 Urgente</span>` : ''}
+                  <span class="cstop-tag-demands">📋 ${stop.total_open_demands} demanda(s)</span>
+                </div>
+                <div style="font-size:10.5px;color:var(--muted);margin-bottom:8px">
+                  <div><strong>Direção:</strong> ${esc(stop.director)}</div>
+                  <div><strong>Contato:</strong> ${esc(stop.phone)}</div>
+                </div>
+              ` : ''}
+              <div style="display:flex;gap:6px">
+                <a href="${stop.maps_link}" target="_blank" rel="noopener noreferrer" class="popup-btn popup-btn-primary">${icon('globe')} Google Maps</a>
+                ${!stop.is_origin ? `<button type="button" class="popup-btn popup-btn-secondary" onclick="window.appToggleCircuitSchool(${stop.school_id})">Remover</button>` : ''}
+              </div>
+            </div>
+          `);
+
+        const m = new maplibregl.Marker({ element: pin })
+          .setLngLat([stop.lon, stop.lat])
+          .setPopup(stopPopup)
+          .addTo(map);
+
+        circuitMarkers.push(m);
+      });
+
+      const coords = res.geometry.coordinates;
+      if (coords?.length) {
+        map.fitBounds(coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0])), { padding: 60, maxZoom: 14.5 });
+      }
+    };
+
+    const renderCircuitDock = () => {
+      const container = document.getElementById('circuitPlannerDockContainer');
+      if (!container) return;
+
+      if (!selectedCircuitSchoolIds.length) {
+        container.innerHTML = '';
+        return;
+      }
+
+      const stops = circuitData?.stops || [];
+      const dist = circuitData?.total_distance_km || 0;
+      const dur = circuitData?.total_duration_min || 0;
+
+      container.innerHTML = `
+        <div class="circuit-planner-dock">
+          <div class="circuit-dock-header">
+            <div class="circuit-dock-title">
+              ${icon('trend')} Circuito de Vistorias em Campo
+              <span class="circuit-badge" style="background:var(--primary);color:#fff;padding:2px 8px;border-radius:10px">${selectedCircuitSchoolIds.length}/10 unidades</span>
+            </div>
+
+            <div class="circuit-kpis-bar">
+              <div class="ckpi-item">
+                <span class="ckpi-lbl">Distância Total</span>
+                <span class="ckpi-val">${dist} km</span>
+              </div>
+              <div class="ckpi-item">
+                <span class="ckpi-lbl">Tempo em Trânsito</span>
+                <span class="ckpi-val">${dur} min</span>
+              </div>
+              <div class="ckpi-item">
+                <span class="ckpi-lbl">Vistorias</span>
+                <span class="ckpi-val">${selectedCircuitSchoolIds.length} paradas</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- LINHA DO TEMPO DE PARADAS -->
+          <div class="circuit-timeline-list">
+            <!-- ORIGEM SMEDU -->
+            <div class="circuit-stop-card is-smedu">
+              <div class="circuit-stop-num">🏛️</div>
+              <div class="circuit-stop-info">
+                <strong class="circuit-stop-name">Secretaria Municipal de Educação (SMEDU)</strong>
+                <span class="circuit-stop-sub">Ponto de Partida Oficial · Centro</span>
+              </div>
+            </div>
+
+            <!-- PARADAS DAS ESCOLAS -->
+            ${stops.filter(s => !s.is_origin).map(s => `
+              <div class="circuit-stop-card">
+                <div class="circuit-stop-num" style="${s.p1_count > 0 ? 'background:#e53935' : (s.p2_count > 0 ? 'background:#fb8c00' : '')}">${s.order}</div>
+                <div class="circuit-stop-info">
+                  <strong class="circuit-stop-name">${esc(s.name)}</strong>
+                  <span class="circuit-stop-sub">${esc(s.neighborhood)} · ${esc(s.director)}</span>
+                  <div class="circuit-stop-tags">
+                    ${s.p1_count > 0 ? `<span class="cstop-tag-p1">🔴 ${s.p1_count} P1</span>` : ''}
+                    <span class="cstop-tag-demands">📋 ${s.total_open_demands} pendência(s)</span>
+                  </div>
+                </div>
+                <button type="button" class="circuit-stop-remove" onclick="window.appToggleCircuitSchool(${s.school_id})" title="Remover do circuito">✕</button>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="circuit-dock-footer">
+            <div class="btn-group">
+              <button type="button" class="btn primary" onclick="window.appOptimizeCircuitOrder()">
+                ${icon('refresh')} Otimizar Trajeto Mais Rápido
+              </button>
+              <button type="button" class="btn success" onclick="window.appOpenGoogleMapsCircuit()" style="background:#2e7d32;color:#fff">
+                ${icon('globe')} 📱 Abrir no Google Maps GPS ↗
+              </button>
+            </div>
+            <div class="btn-group">
+              <button type="button" class="btn secondary" onclick="window.print()" title="Imprimir roteiro de vistorias">
+                ${icon('download')} Imprimir Guia
+              </button>
+              <button type="button" class="btn secondary" onclick="window.appClearCircuit()">
+                ✕ Limpar Circuito
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    };
+
+    window.appRouteSchool = async (toLat, toLon) => {
+      currentMarkers.forEach(m => { if (m.getPopup?.()?.isOpen()) m.getPopup().remove(); });
+      try {
+        const res = await api(`/api/route?from_lat=${SMEDU_LAT}&from_lon=${SMEDU_LON}&to_lat=${toLat}&to_lon=${toLon}`);
+        const map = window._currentMapInstance || mapInstance;
+        if (map) {
+          if (map.getSource('route-source')) map.getSource('route-source').setData(res.geometry);
+          else {
+            map.addSource('route-source', { type: 'geojson', data: res.geometry });
+            map.addLayer({ id: 'route-layer', type: 'line', source: 'route-source', paint: { 'line-color': '#005A9C', 'line-width': 5, 'line-dasharray': [2, 2] } });
+          }
+          const coords = res.geometry.coordinates;
+          map.fitBounds(coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0])), { padding: 60 });
+        }
+      } catch (err) { toast('Erro na rota', err.message, 'error'); }
+    };
+
+    const bindMapEvents = () => {
+      let searchTimeout;
+      $('#mapSearchInput')?.addEventListener('input', (e) => { clearTimeout(searchTimeout); currentQ = e.target.value; searchTimeout = setTimeout(fetchAndRender, 250); });
+      $('#btnToggleCircuitMode')?.addEventListener('click', () => { if (!selectedCircuitSchoolIds.length) window.appQuickTopCircuit(5); else document.querySelector('.circuit-planner-dock')?.scrollIntoView({ behavior: 'smooth' }); });
+      $('#btnQuickTop5Circuit')?.addEventListener('click', () => window.appQuickTopCircuit(5));
+      $$('[data-quick-filter]').forEach(b => b.addEventListener('click', () => { currentStatus = 'all'; currentCrit = 'all'; fetchAndRender(); }));
+      $$('[data-focus-school]').forEach(el => {
+        el.addEventListener('click', () => {
+          const sid = Number(el.dataset.focusSchool);
+          const school = networkData?.schools?.find(s => s.id === sid);
+          if (school && mapInstance) {
+            mapInstance.flyTo({
+              center: [school.lon, school.lat],
+              zoom: 15.5,
+              essential: true
+            });
+            if (school._popup) {
+              school._popup.addTo(mapInstance);
+            }
+          }
+        });
+      });
+    };
+
+    await fetchAndRender();
+  }
 
   async function renderReports() {
     setLoading(); const dash = await api('/api/dashboard');
@@ -1333,47 +2338,178 @@
 
   async function renderAdminEscolas(body) {
     const rows = await api('/api/schools?include_inactive=1');
-    body.innerHTML = `<section class="panel"><div class="panel-header"><div><h2>Unidades Escolares</h2><p>Cadastro, ativação e exclusão de unidades escolares.</p></div><button class="btn btn-primary" id="newSchool">${icon('plus')}Nova unidade</button></div><div class="panel-body">
-      <div class="table-wrap"><table class="data-table"><thead><tr><th>Unidade</th><th>Direção</th><th>Contato</th><th>Situação</th><th>Ações</th></tr></thead><tbody>
-      ${rows.length ? rows.map(s => `<tr class="${s.active ? '' : 'row-inactive'}"><td><strong>${esc(s.name)}</strong>${s.code ? `<small>${esc(s.code)}</small>` : ''}</td><td>${esc(s.director || '—')}</td><td>${esc(s.phone || '—')}${s.email ? ` · ${esc(s.email)}` : ''}</td><td>${statePill(!!s.active)}</td><td class="row-actions"><button class="icon-btn" data-edit="${s.id}" data-tooltip="Editar" aria-label="Editar">${icon('edit')}</button><button class="icon-btn" data-toggle="${s.id}" data-tooltip="${s.active ? 'Desativar' : 'Ativar'}" aria-label=\"${s.active ? 'Desativar' : 'Ativar'}\">${icon(s.active ? 'x' : 'check-circle')}</button><button class="icon-btn" data-del="${s.id}" data-tooltip="Excluir" aria-label="Excluir">${icon('x')}</button></td></tr>`).join('') : `<tr><td colspan="5">${empty('Nenhuma unidade cadastrada')}</td></tr>`}
-      </tbody></table></div>
-    </div></section>`;
-    $('#newSchool').addEventListener('click', () => openSchoolForm(null, body));
-    $$('[data-edit]', body).forEach(b => b.addEventListener('click', () => openSchoolForm(rows.find(r => r.id === Number(b.dataset.edit)), body)));
-    $$('[data-toggle]', body).forEach(b => b.addEventListener('click', async () => {
-      const s = rows.find(r => r.id === Number(b.dataset.toggle));
-      try { const res = await api(`/api/admin/schools/${s.id}/toggle-active`, { method: 'POST' }); toast(res.active ? 'Unidade ativada' : 'Unidade desativada'); schoolsCache = null; renderAdminEscolas(body); }
-      catch (e) { toast('Não foi possível atualizar', e.message, 'error'); }
-    }));
-    $$('[data-del]', body).forEach(b => b.addEventListener('click', async () => {
-      const s = rows.find(r => r.id === Number(b.dataset.del));
-      const ok = await confirmAction('Excluir unidade', `Excluir "${s.name}"? Só é possível quando não houver demandas ou usuários vinculados a ela.`, { confirmLabel: 'Excluir' });
-      if (!ok) return;
-      try { await api(`/api/admin/schools/${s.id}`, { method: 'DELETE' }); toast('Unidade excluída'); schoolsCache = null; renderAdminEscolas(body); }
-      catch (e) { toast('Não foi possível excluir', e.message, 'error'); }
-    }));
+    let q = '';
+
+    function paintTable() {
+      const filtered = rows.filter(s => {
+        if (!q) return true;
+        const low = q.toLowerCase();
+        return (
+          (s.name || '').toLowerCase().includes(low) ||
+          (s.inep || s.code || '').toLowerCase().includes(low) ||
+          (s.neighborhood || '').toLowerCase().includes(low) ||
+          (s.director || '').toLowerCase().includes(low) ||
+          (s.address || '').toLowerCase().includes(low)
+        );
+      });
+
+      body.innerHTML = `
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Unidades Escolares (${rows.length})</h2>
+              <p>Cadastro oficial, georreferenciamento, contatos institucionais e gestão de unidades.</p>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <input type="search" id="adminSchoolSearch" class="input" placeholder="Buscar por nome, INEP ou bairro..." value="${esc(q)}" style="min-width:240px;height:38px">
+              <button class="btn btn-primary" id="newSchool">${icon('plus')}Nova unidade</button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Unidade Escolar / INEP</th>
+                    <th>Tipo & Modalidade</th>
+                    <th>Bairro & Endereço</th>
+                    <th>Direção & Contato</th>
+                    <th>Situação</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${filtered.length ? filtered.map(s => `
+                    <tr class="${s.active ? '' : 'row-inactive'}">
+                      <td>
+                        <strong>${esc(s.name)}</strong>
+                        <div style="display:flex;gap:6px;margin-top:3px">
+                          <span class="badge P4" style="font-family:var(--font-mono)">INEP: ${esc(s.inep || s.code || '—')}</span>
+                          ${s.maps_link ? `<a href="${esc(s.maps_link)}" target="_blank" rel="noopener noreferrer" style="color:var(--primary);display:inline-flex;align-items:center;gap:2px;font-size:11px" title="Ver no Google Maps">${icon('globe')} Mapa ↗</a>` : ''}
+                        </div>
+                      </td>
+                      <td>
+                        <span class="badge" style="background:var(--blue-soft);color:var(--blue)">${esc(s.school_type || 'Escola')}</span>
+                        <small style="display:block;margin-top:3px;color:var(--muted)">${esc(s.modality || 'Regular')}</small>
+                      </td>
+                      <td>
+                        <strong>${esc(s.neighborhood || 'Itaguaí')}</strong>
+                        <small style="display:block;margin-top:2px;color:var(--muted);max-width:260px" title="${esc(s.address || '')}">${esc(s.address || '—')}</small>
+                      </td>
+                      <td>
+                        <strong>${esc(s.director || '—')}</strong>
+                        <small style="display:block;margin-top:2px;color:var(--muted)">${esc(s.phone || '—')}${s.ramal ? ` (R. ${s.ramal})` : ''}</small>
+                        ${s.email ? `<small style="display:block;color:var(--primary)">${esc(s.email)}</small>` : ''}
+                      </td>
+                      <td>${statePill(!!s.active)}</td>
+                      <td class="row-actions">
+                        <button class="icon-btn" data-edit="${s.id}" data-tooltip="Editar" aria-label="Editar">${icon('edit')}</button>
+                        <button class="icon-btn" data-toggle="${s.id}" data-tooltip="${s.active ? 'Desativar' : 'Ativar'}" aria-label="${s.active ? 'Desativar' : 'Ativar'}">${icon(s.active ? 'x' : 'check-circle')}</button>
+                        <button class="icon-btn" data-del="${s.id}" data-tooltip="Excluir" aria-label="Excluir">${icon('x')}</button>
+                      </td>
+                    </tr>
+                  `).join('') : `<tr><td colspan="6">${empty('Nenhuma unidade encontrada')}</td></tr>`}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      `;
+
+      $('#adminSchoolSearch')?.addEventListener('input', (e) => {
+        q = e.target.value;
+        paintTable();
+      });
+
+      $('#newSchool')?.addEventListener('click', () => openSchoolForm(null, body));
+      $$('[data-edit]', body).forEach(b => b.addEventListener('click', () => openSchoolForm(rows.find(r => r.id === Number(b.dataset.edit)), body)));
+      $$('[data-toggle]', body).forEach(b => b.addEventListener('click', async () => {
+        const s = rows.find(r => r.id === Number(b.dataset.toggle));
+        try { 
+          const res = await api(`/api/admin/schools/${s.id}/toggle-active`, { method: 'POST' }); 
+          toast(res.active ? 'Unidade ativada' : 'Unidade desativada'); 
+          schoolsCache = null; 
+          renderAdminEscolas(body); 
+        } catch (e) { toast('Não foi possível atualizar', e.message, 'error'); }
+      }));
+      $$('[data-del]', body).forEach(b => b.addEventListener('click', async () => {
+        const s = rows.find(r => r.id === Number(b.dataset.del));
+        const ok = await confirmAction('Excluir unidade', `Excluir "${s.name}"? Só é possível quando não houver demandas ou usuários vinculados a ela.`, { confirmLabel: 'Excluir' });
+        if (!ok) return;
+        try { 
+          await api(`/api/admin/schools/${s.id}`, { method: 'DELETE' }); 
+          toast('Unidade excluída'); 
+          schoolsCache = null; 
+          renderAdminEscolas(body); 
+        } catch (e) { toast('Não foi possível excluir', e.message, 'error'); }
+      }));
+    }
+
+    paintTable();
   }
 
   function openSchoolForm(school, body) {
     const editing = !!school;
     modal({
-      title: editing ? 'Editar unidade escolar' : 'Nova unidade escolar', mode: 'drawer', body: `<form id="schoolForm"><div class="form-grid">
-      <div class="field span-2"><label>Nome *</label><input class="input" name="name" required maxlength="140" value="${esc(school?.name || '')}"></div>
-      <div class="field"><label>Código</label><input class="input" name="code" maxlength="30" value="${esc(school?.code || '')}"></div>
-      <div class="field"><label>Direção</label><input class="input" name="director" maxlength="140" value="${esc(school?.director || '')}"></div>
-      <div class="field"><label>Telefone</label><input class="input" name="phone" maxlength="30" value="${esc(school?.phone || '')}"></div>
-      <div class="field"><label>E-mail</label><input class="input" type="email" name="email" maxlength="140" value="${esc(school?.email || '')}"></div>
-      <div class="field span-2"><label>Endereço</label><input class="input" name="address" maxlength="220" value="${esc(school?.address || '')}"></div>
-    </div></form>`,
-      footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="saveSchool">${editing ? 'Salvar' : 'Criar unidade'}</button>`,
+      title: editing ? 'Editar Unidade Escolar' : 'Nova Unidade Escolar',
+      subtitle: editing ? school.name : 'Cadastro completo da rede municipal de Itaguaí',
+      mode: 'drawer',
+      body: `<form id="schoolForm">
+        <div class="form-grid">
+          <!-- SEÇÃO 1: IDENTIFICAÇÃO -->
+          <div class="field span-2"><strong style="color:var(--ink);font-size:14px;display:flex;align-items:center;gap:6px">${icon('school')} Identificação Básica</strong></div>
+          <div class="field span-2"><label>Nome da Unidade Escolar *</label><input class="input" name="name" required maxlength="160" placeholder="Ex: E. M. Prefeito Otoni Rocha" value="${esc(school?.name || '')}"></div>
+          <div class="field"><label>Código INEP</label><input class="input" name="inep" maxlength="30" placeholder="Ex: 33158711" value="${esc(school?.inep || school?.code || '')}"></div>
+          <div class="field"><label>Tipo de Unidade</label>
+            <select class="select" name="school_type">
+              <option value="Escola" ${school?.school_type === 'Escola' ? 'selected' : ''}>Escola</option>
+              <option value="Creche" ${school?.school_type === 'Creche' ? 'selected' : ''}>Creche</option>
+              <option value="CIEP" ${school?.school_type === 'CIEP' ? 'selected' : ''}>CIEP</option>
+              <option value="CEMAEE" ${school?.school_type === 'CEMAEE' ? 'selected' : ''}>CEMAEE</option>
+              <option value="Outro" ${school?.school_type === 'Outro' ? 'selected' : ''}>Outro</option>
+            </select>
+          </div>
+          <div class="field span-2"><label>Modalidade de Ensino</label><input class="input" name="modality" maxlength="120" placeholder="Ex: Pré ao 9º Ano, Berçário NI e NII, etc." value="${esc(school?.modality || '')}"></div>
+
+          <!-- SEÇÃO 2: GESTÃO & CONTATOS -->
+          <div class="field span-2 mt-12"><strong style="color:var(--ink);font-size:14px;display:flex;align-items:center;gap:6px">${icon('user')} Gestão e Contatos</strong></div>
+          <div class="field span-2"><label>Nome do(a) Diretor(a)</label><input class="input" name="director" maxlength="140" placeholder="Ex: Tania Maria da Silva Medeiros" value="${esc(school?.director || '')}"></div>
+          <div class="field"><label>E-mail Institucional</label><input class="input" type="email" name="email" maxlength="140" placeholder="escola@edu.itaguai.rj.gov.br" value="${esc(school?.email || '')}"></div>
+          <div class="field"><label>Telefone</label><input class="input" name="phone" maxlength="50" placeholder="(21) 3782-9000" value="${esc(school?.phone || '')}"></div>
+          <div class="field"><label>Ramal Interno</label><input class="input" name="ramal" maxlength="20" placeholder="Ex: 3070" value="${esc(school?.ramal || '')}"></div>
+          <div class="field"><label>Link Google Maps</label><input class="input" type="url" name="maps_link" maxlength="255" placeholder="https://maps.app.goo.gl/..." value="${esc(school?.maps_link || '')}"></div>
+
+          <!-- SEÇÃO 3: ENDEREÇO & GEORREFERENCIAMENTO -->
+          <div class="field span-2 mt-12"><strong style="color:var(--ink);font-size:14px;display:flex;align-items:center;gap:6px">${icon('building')} Endereço e Localização</strong></div>
+          <div class="field span-2"><label>Logradouro / Rua</label><input class="input" name="street" maxlength="160" placeholder="Ex: Rua José Bonifácio" value="${esc(school?.street || '')}"></div>
+          <div class="field"><label>Número</label><input class="input" name="number" maxlength="30" placeholder="s/n ou nº" value="${esc(school?.number || 's/n')}"></div>
+          <div class="field"><label>Complemento</label><input class="input" name="complement" maxlength="80" placeholder="Ex: Qd. 39, Lote 12" value="${esc(school?.complement || '')}"></div>
+          <div class="field"><label>Bairro / Região</label><input class="input" name="neighborhood" maxlength="80" placeholder="Ex: Centro, Brisamar, etc." value="${esc(school?.neighborhood || '')}"></div>
+          <div class="field"><label>CEP</label><input class="input" name="cep" maxlength="20" placeholder="23815-650" value="${esc(school?.cep || '')}"></div>
+          <div class="field"><label>Município</label><input class="input" name="city" maxlength="60" value="${esc(school?.city || 'Itaguaí')}"></div>
+          <div class="field"><label>Estado (UF)</label><input class="input" name="state" maxlength="10" value="${esc(school?.state || 'RJ')}"></div>
+          
+          <div class="field"><label>Latitude Decimal</label><input class="input" name="latitude" maxlength="30" placeholder="-22.868685" value="${esc(school?.lat ?? school?.latitude ?? '')}"></div>
+          <div class="field"><label>Longitude Decimal</label><input class="input" name="longitude" maxlength="30" placeholder="-43.788898" value="${esc(school?.lon ?? school?.longitude ?? '')}"></div>
+          
+          <div class="field span-2"><label>Endereço Completo Formatado</label><input class="input" name="full_address" maxlength="240" placeholder="Deixe em branco para gerar automaticamente" value="${esc(school?.address || school?.full_address || '')}"></div>
+        </div>
+      </form>`,
+      footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="saveSchool">${editing ? 'Salvar Alterações' : 'Cadastrar Unidade'}</button>`,
       onOpen() {
         $('#saveSchool').addEventListener('click', async () => {
           const f = $('#schoolForm'); if (!f.reportValidity()) return;
           const payload = Object.fromEntries(new FormData(f).entries());
+          payload.code = payload.inep;
+          payload.lat = payload.latitude ? parseFloat(payload.latitude) : null;
+          payload.lon = payload.longitude ? parseFloat(payload.longitude) : null;
           try {
             if (editing) await api(`/api/admin/schools/${school.id}`, { method: 'PUT', body: payload });
             else await api('/api/admin/schools', { method: 'POST', body: payload });
-            closeModal(); toast(editing ? 'Unidade atualizada' : 'Unidade criada'); schoolsCache = null; renderAdminEscolas(body);
+            closeModal(); 
+            toast(editing ? 'Unidade atualizada com sucesso' : 'Unidade cadastrada com sucesso'); 
+            schoolsCache = null; 
+            renderAdminEscolas(body);
           } catch (e) { toast('Não foi possível salvar', e.message, 'error'); }
         });
       }
@@ -1743,9 +2879,9 @@
     { key: 'N', label: 'Registrar Demanda/CI', action: () => openDemandForm() },
     { key: 'P', label: 'Ir para o Painel', href: '/' },
     { key: 'D', label: 'Ir para Demandas', href: '/demandas' },
-    { key: 'K', label: 'Ir para o Quadro Kanban', href: '/kanban' },
-    ...(ctx.user.perm.can_view_planning ? [{ key: 'F', label: 'Ir para Planejamento Futuro', href: '/planejamento' }] : []),
     { key: 'E', label: 'Ir para Unidades Escolares', href: '/escolas' },
+    { key: 'M', label: 'Ir para o Mapa da Rede', href: '/mapa' },
+    ...(ctx.user.perm.can_view_planning ? [{ key: 'F', label: 'Ir para Planejamento Futuro', href: '/planejamento' }] : []),
     ...(ctx.user.perm.can_view_reports ? [{ key: 'R', label: 'Ir para Relatórios', href: '/relatorios' }] : []),
     ...(ctx.user.perm.can_manage_admin ? [{ key: 'A', label: 'Ir para Administração', href: '/administracao' }] : []),
     { key: 'S', label: 'Ir para Sobre o Sistema', href: '/sobre' },
@@ -1777,13 +2913,6 @@
   gs?.addEventListener('input', () => { clearTimeout(gst); const q = gs.value.trim(); if (q.length < 2) { gr.hidden = true; return } gst = setTimeout(async () => { try { const rows = await api(`/api/demands?q=${encodeURIComponent(q)}`); gr.innerHTML = rows.slice(0, 6).map(d => `<a class="search-result" href="/demandas/${d.id}"><span class="priority-dot ${d.priority}"></span><div><strong>${esc(d.title)}</strong><small>${esc(d.code)} · ${esc(d.school_name)}</small></div></a>`).join('') || `<div class="search-result"><div><strong>Nenhum resultado</strong><small>Tente outro termo.</small></div></div>`; gr.hidden = false; } catch { } }, 250) });
   document.addEventListener('click', e => { if (!e.target.closest('.global-search-wrap')) gr.hidden = true; if (!e.target.closest('#userMenuButton') && !e.target.closest('#userMenu')) $('#userMenu').hidden = true; if (!e.target.closest('#notificationButton') && !e.target.closest('#notificationPanel')) $('#notificationPanel').hidden = true; });
 
-  // Clicar em qualquer célula (td) de uma linha de tabela de demandas abre os detalhes —
-  // reaproveita o atributo data-href já presente em cada <tr> de renderDemandTable().
-  // Delegado no container principal da página, então funciona tanto na tabela completa
-  // de Demandas quanto na tabela compacta "Atividade recente" do Painel, e continua
-  // funcionando depois de qualquer atualização de filtro (a tabela é recriada, o
-  // container que recebe o clique não). Clique em um link ou botão dentro da linha
-  // (ex.: o ícone de "Ver detalhes") continua indo direto para o próprio destino.
   content.addEventListener('click', e => {
     if (e.target.closest('a,button')) return;
     const tr = e.target.closest('tr[data-href]');
@@ -1795,7 +2924,7 @@
       if (page === 'dashboard') await renderDashboard();
       else if (page === 'demands') await renderDemands();
       else if (page === 'demand-detail') await renderDemandDetail();
-      else if (page === 'kanban') await renderKanban();
+      else if (page === 'map' || page === 'kanban') await renderNetworkMap();
       else if (page === 'planning') await renderPlanning();
       else if (page === 'schools') await renderSchools();
       else if (page === 'reports') await renderReports();
