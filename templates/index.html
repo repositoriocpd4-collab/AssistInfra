@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#005A9C">
   <title>{{ title }} · Agenda Integrada</title>
   <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/styles.css?v=govbr-53">
+  <link rel="stylesheet" href="/static/styles.css?v=govbr-57">
 </head>
 <body data-page="{{ page }}"{% if entity_id %} data-entity-id="{{ entity_id }}"{% endif %}>
   <svg aria-hidden="true" class="svg-sprite">
@@ -192,6 +192,6 @@
     window.APP_CONTEXT = {{ {'page': page, 'entityId': entity_id if entity_id else None, 'user': user, 'priorities': priorities, 'statuses': statuses, 'categories': categories, 'categoryMeta': category_meta, 'kanbanStages': kanban_stages}|tojson }};
   </script>
   <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
-  <script src="/static/app.js?v=govbr-46"></script>
+  <script src="/static/app.js?v=govbr-55"></script>
 </body>
 </html>

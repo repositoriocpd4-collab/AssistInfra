@@ -1820,6 +1820,36 @@ svg {
    border: 1px solid #bee8d3
 }
 
+.alert.warning {
+   background: var(--orange-soft);
+   color: #8a5300;
+   border: 1px solid #ffe1ad
+}
+
+.clickable-row {
+   transition: filter .14s ease, transform .1s ease
+}
+
+.clickable-row:hover {
+   filter: brightness(0.97)
+}
+
+.clickable-row:active {
+   transform: scale(0.995)
+}
+
+.clickable-row:focus-visible {
+   outline: 2px solid var(--blue);
+   outline-offset: 2px
+}
+
+.procurement-alert.clickable-row svg:last-child {
+   width: 14px;
+   height: 14px;
+   flex: 0 0 auto;
+   opacity: .6
+}
+
 .popover {
    position: fixed;
    z-index: 95;
@@ -10865,4 +10895,402 @@ body.dark-mode .dp-day.is-selected {
 
 body.dark-mode .dp-footer {
    border-top-color: #2a2f3a;
+}
+
+/* --- Passo 4 do assistente (Revisar e enviar): modo "review" sem barra lateral,
+   com cabecalho proprio e cartoes de resumo -- visual definido a partir de
+   referencia fornecida pelo usuario, mantendo os passos 1-3 inalterados. --- */
+.modal.demand-wizard.dw-review-mode {
+   grid-template-columns: 1fr;
+}
+
+.modal.demand-wizard.dw-review-mode .dw-sidebar {
+   display: none;
+}
+
+.modal.demand-wizard.dw-review-mode .modal-header {
+   grid-column: 1;
+   position: relative;
+   overflow: hidden;
+}
+
+.modal.demand-wizard.dw-review-mode .modal-header > div:first-child {
+   display: block;
+}
+
+.modal.demand-wizard.dw-review-mode .modal-body {
+   grid-column: 1;
+   max-width: 1040px;
+   position: relative;
+}
+
+.modal.demand-wizard.dw-review-mode .modal-footer {
+   grid-column: 1;
+}
+
+.modal.demand-wizard.dw-review-mode .modal-body::before,
+.modal.demand-wizard.dw-review-mode .modal-body::after {
+   content: "";
+   position: absolute;
+   width: 190px;
+   height: 150px;
+   pointer-events: none;
+   z-index: 0;
+   background-image: radial-gradient(var(--line-strong) 1.4px, transparent 1.4px);
+   background-size: 15px 15px;
+   opacity: .55;
+}
+
+.modal.demand-wizard.dw-review-mode .modal-body::before {
+   top: 0;
+   right: 0;
+   mask-image: radial-gradient(circle at top right, #000 0%, transparent 72%);
+   -webkit-mask-image: radial-gradient(circle at top right, #000 0%, transparent 72%);
+}
+
+.modal.demand-wizard.dw-review-mode .modal-body::after {
+   bottom: 0;
+   left: 0;
+   mask-image: radial-gradient(circle at bottom left, #000 0%, transparent 72%);
+   -webkit-mask-image: radial-gradient(circle at bottom left, #000 0%, transparent 72%);
+}
+
+.modal.demand-wizard.dw-review-mode .modal-body > * {
+   position: relative;
+   z-index: 1;
+}
+
+.dw-stepper .step-badge-row {
+   display: flex;
+   align-items: center;
+   gap: 6px;
+}
+
+.dw-stepper .step-check {
+   display: none;
+   width: 20px;
+   height: 20px;
+   border-radius: 50%;
+   background: var(--green);
+   color: #fff;
+   align-items: center;
+   justify-content: center;
+   flex: 0 0 auto;
+}
+
+.dw-stepper .step-check svg {
+   width: 11px;
+   height: 11px;
+}
+
+.dw-stepper .step.done .step-check {
+   display: inline-flex;
+}
+
+.modal.dw-review-mode .dw-stepper .step.active {
+   border: 1.5px solid #b9d3ff;
+}
+
+.modal.dw-review-mode .dw-stepper .step.active .step-num {
+   background: var(--blue);
+   border-color: var(--blue);
+}
+
+.modal.dw-review-mode .dw-stepper .step.active .step-text small {
+   color: var(--blue);
+}
+
+.modal.dw-review-mode .dw-stepper .step.active::before {
+   display: none;
+}
+
+.dw-footer-security {
+   align-items: center;
+}
+
+.dw-footer-security svg {
+   width: 22px;
+   height: 22px;
+   padding: 4px;
+   border-radius: 50%;
+   background: var(--green-soft);
+   box-sizing: content-box;
+}
+
+.dw-footer-security strong {
+   display: block;
+   font-size: 12px;
+   font-weight: 800;
+   color: var(--ink);
+}
+
+.dw-footer-security small {
+   display: block;
+   font-size: 10.5px;
+   color: var(--muted);
+   margin-top: 1px;
+}
+
+#prevStep svg {
+   width: 13px;
+   height: 13px;
+   transform: rotate(180deg);
+}
+
+.dw-next-btn .dw-next-icon svg {
+   width: 15px;
+   height: 15px;
+}
+
+.dw-next-btn .dw-next-text {
+   display: flex;
+   flex-direction: column;
+   line-height: 1.25;
+}
+
+.review-summary {
+   background: var(--surface);
+   border: 1px solid var(--line);
+   border-radius: 16px;
+   padding: 22px 24px;
+   margin-bottom: 14px;
+}
+
+.review-summary-head {
+   display: flex;
+   gap: 14px;
+   align-items: flex-start;
+   margin-bottom: 22px;
+}
+
+.review-summary-badge {
+   width: 40px;
+   height: 40px;
+   border-radius: 50%;
+   background: var(--blue);
+   color: #fff;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   flex: 0 0 auto;
+}
+
+.review-summary-badge svg {
+   width: 18px;
+   height: 18px;
+}
+
+.review-summary-head h3 {
+   margin: 0 0 3px;
+   font-size: 15.5px;
+}
+
+.review-summary-head p {
+   margin: 0;
+   font-size: 12.5px;
+   color: var(--muted);
+   line-height: 1.5;
+}
+
+.review-grid {
+   display: grid;
+   grid-template-columns: repeat(3, 1fr);
+   gap: 20px 24px;
+}
+
+.review-grid.review-grid-2 {
+   grid-template-columns: repeat(2, 1fr);
+}
+
+.review-grid.review-grid-divider {
+   margin-top: 20px;
+   padding-top: 20px;
+   border-top: 1px solid var(--line);
+}
+
+.review-item {
+   display: flex;
+   gap: 12px;
+   align-items: flex-start;
+}
+
+.review-item-icon {
+   width: 38px;
+   height: 38px;
+   border-radius: 10px;
+   background: var(--blue-soft);
+   color: var(--blue);
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   flex: 0 0 auto;
+}
+
+.review-item-icon svg {
+   width: 17px;
+   height: 17px;
+}
+
+.review-item-body {
+   display: flex;
+   flex-direction: column;
+   gap: 3px;
+   min-width: 0;
+}
+
+.review-label {
+   display: block;
+   font-size: 10px;
+   font-weight: 800;
+   letter-spacing: .06em;
+   text-transform: uppercase;
+   color: var(--muted);
+}
+
+.review-item-body strong {
+   font-size: 13px;
+   font-weight: 700;
+   color: var(--ink);
+   line-height: 1.4;
+}
+
+.review-pill {
+   display: inline-flex;
+   align-items: center;
+   gap: 5px;
+   padding: 4px 10px;
+   border-radius: 999px;
+   font-size: 11.5px;
+   font-weight: 700;
+   width: fit-content;
+}
+
+.review-pill svg {
+   width: 12px;
+   height: 12px;
+}
+
+.review-pill.blue {
+   background: var(--blue-soft);
+   color: var(--blue);
+}
+
+.review-pill.green {
+   background: var(--green-soft);
+   color: var(--green);
+}
+
+.review-pill.red {
+   background: var(--red-soft);
+   color: var(--red);
+}
+
+.review-alert {
+   display: flex;
+   align-items: center;
+   gap: 9px;
+   margin-bottom: 12px;
+}
+
+.review-alert svg {
+   width: 16px;
+   height: 16px;
+   flex: 0 0 auto;
+}
+
+.review-category-card {
+   background: var(--surface);
+   border: 1px solid var(--line);
+   border-radius: 16px;
+   padding: 20px 24px;
+   margin-bottom: 12px;
+}
+
+.review-category-head {
+   display: flex;
+   align-items: center;
+   gap: 10px;
+   margin-bottom: 18px;
+}
+
+.review-category-icon {
+   width: 34px;
+   height: 34px;
+   border-radius: 10px;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   flex: 0 0 auto;
+}
+
+.review-category-icon svg {
+   width: 16px;
+   height: 16px;
+}
+
+.review-category-head h4 {
+   margin: 0;
+   font-size: 15px;
+}
+
+.review-fields {
+   display: grid;
+   grid-template-columns: 1fr 1fr;
+   gap: 18px 24px;
+   padding-bottom: 18px;
+   border-bottom: 1px solid var(--line);
+   margin-bottom: 16px;
+}
+
+.review-photo-block .review-label {
+   margin-bottom: 8px;
+}
+
+.review-photo-thumb {
+   display: block;
+   width: 132px;
+   height: 100px;
+   object-fit: cover;
+   border-radius: 10px;
+   border: 1px solid var(--line);
+}
+
+.review-photo-empty {
+   margin: 0;
+   font-size: 12px;
+   color: var(--muted);
+}
+
+@media (max-width: 720px) {
+   .review-grid,
+   .review-grid.review-grid-2,
+   .review-fields {
+      grid-template-columns: 1fr;
+   }
+}
+
+/* --- Providência / Encaminhamento: aviso "SMEDU nao tem material" -> Planejamento 2027 (reaproveitado do fluxo antigo) --- */
+.procurement-panel {
+   margin-top: 12px;
+}
+
+.procurement-panel.hidden {
+   display: none;
+}
+
+.procurement-panel .alert {
+   display: flex;
+   align-items: center;
+   gap: 9px;
+}
+
+.procurement-panel .alert svg {
+   width: 16px;
+   height: 16px;
+   flex: 0 0 auto;
+}
+
+.review-alert.procurement-flag {
+   background: var(--blue-soft);
+   color: #2452a0;
 }

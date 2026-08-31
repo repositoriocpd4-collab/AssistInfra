@@ -27,6 +27,115 @@
     { value: 30, title: 'Muitas pessoas', hint: 'Vários alunos e funcionários', icon: 'users' },
     { value: 150, title: 'Quase todo mundo', hint: 'A escola inteira é afetada', icon: 'globe' }
   ];
+  // --- Unidades de medida por categoria (referência fornecida pelo usuário) ---
+  const UNIDADES_MEDIDA_LIST = [
+    {codigo:"UN",nome:"Unidade",simbolo:"un"},
+    {codigo:"PC",nome:"Peça",simbolo:"pç"},
+    {codigo:"PAR",nome:"Par",simbolo:"par"},
+    {codigo:"JG",nome:"Jogo",simbolo:"jg"},
+    {codigo:"KIT",nome:"Kit",simbolo:"kit"},
+    {codigo:"CJ",nome:"Conjunto",simbolo:"cj"},
+    {codigo:"CX",nome:"Caixa",simbolo:"cx"},
+    {codigo:"PCT",nome:"Pacote",simbolo:"pct"},
+    {codigo:"RL",nome:"Rolo",simbolo:"rl"},
+    {codigo:"BR",nome:"Barra",simbolo:"barra"},
+    {codigo:"SC",nome:"Saco",simbolo:"sc"},
+    {codigo:"BD",nome:"Balde",simbolo:"bd"},
+    {codigo:"GL",nome:"Galão",simbolo:"gal"},
+    {codigo:"LT",nome:"Lata",simbolo:"lata"},
+    {codigo:"M",nome:"Metro",simbolo:"m"},
+    {codigo:"M2",nome:"Metro quadrado",simbolo:"m²"},
+    {codigo:"M3",nome:"Metro cúbico",simbolo:"m³"},
+    {codigo:"MM",nome:"Milímetro",simbolo:"mm"},
+    {codigo:"CM",nome:"Centímetro",simbolo:"cm"},
+    {codigo:"L",nome:"Litro",simbolo:"L"},
+    {codigo:"ML",nome:"Mililitro",simbolo:"mL"},
+    {codigo:"KG",nome:"Quilograma",simbolo:"kg"},
+    {codigo:"G",nome:"Grama",simbolo:"g"},
+    {codigo:"T",nome:"Tonelada",simbolo:"t"},
+    {codigo:"KWH",nome:"Quilowatt-hora",simbolo:"kWh"},
+    {codigo:"H",nome:"Hora",simbolo:"h"},
+    {codigo:"DIA",nome:"Diária",simbolo:"diária"},
+    {codigo:"SERV",nome:"Serviço",simbolo:"serv."},
+    {codigo:"VIS",nome:"Visita",simbolo:"visita"},
+    {codigo:"APL",nome:"Aplicação",simbolo:"aplic."},
+    {codigo:"DOC",nome:"Documento",simbolo:"doc."},
+    {codigo:"LAU",nome:"Laudo",simbolo:"laudo"},
+    {codigo:"FAT",nome:"Fatura",simbolo:"fatura"},
+    {codigo:"VIAG",nome:"Viagem",simbolo:"viagem"},
+    {codigo:"CARGA",nome:"Carga",simbolo:"carga"},
+  ];
+  const UNIDADES_MEDIDA_BY_CODE = Object.fromEntries(UNIDADES_MEDIDA_LIST.map(u => [u.codigo, u]));
+  const CATEGORIA_UNIDADES = {
+    "Elétrica":{usar:true,permitidas:["UN","M","RL","CX","PCT","KIT","JG","PC"],porItem:{"fio/cabo":["M","RL"],"lâmpada":["UN","CX","PCT"],"disjuntor":["UN","CX"],"conector":["UN","PCT","CX"],"interruptor":["UN","CX","PCT"],"tomada":["UN","CX","PCT"],"eletroduto":["M","BR"],"fita isolante":["RL","UN"],"quadro elétrico":["UN","KIT"]}},
+    "Hidráulica":{usar:true,permitidas:["UN","M","BR","RL","CX","PCT","KIT","L","KG"],porItem:{"cano/tubo":["M","BR"],"conexão":["UN","PCT","CX"],"torneira":["UN"],"registro":["UN"],"mangueira":["M","RL"],"fita veda rosca":["RL","UN"],"adesivo pvc":["ML","L","UN"]}},
+    "Cobertura/Telhado":{usar:true,permitidas:["UN","M","M2","RL","CX","PCT","SC","KG"],porItem:{}},
+    "Pintura":{usar:true,permitidas:["L","ML","GL","BD","LT","KG","UN","RL","M2","SERV"],porItem:{"tinta":["L","GL","BD","LT"],"massa corrida":["KG","BD","SC"],"rolo":["UN"],"pincel":["UN"],"lixa":["UN","PCT"],"área a pintar":["M2"]}},
+    "Climatização":{usar:true,permitidas:["UN","PC","KIT","M","RL","CX","KG","SERV","H"],porItem:{}},
+    "Serralheria":{usar:true,permitidas:["UN","PC","M","M2","BR","KG","KIT","SERV"],porItem:{}},
+    "Alvenaria":{usar:true,permitidas:["UN","M","M2","M3","SC","KG","CX","SERV"],porItem:{}},
+    "Acessibilidade":{usar:true,permitidas:["UN","M","M2","BR","RL","KIT","SERV"],porItem:{}},
+    "Mobiliário":{usar:true,permitidas:["UN","PC","PAR","JG","CJ","KIT"],porItem:{}},
+    "Equipamentos":{usar:true,permitidas:["UN","PC","KIT","CJ","PAR","JG"],porItem:{}},
+    "Segurança":{usar:true,permitidas:["UN","PC","KIT","CJ","M","RL","CX","PCT","SERV"],porItem:{}},
+    "Saneamento":{usar:true,permitidas:["UN","M","M3","L","KG","SC","SERV","H"],porItem:{}},
+    "Estrutura":{usar:true,permitidas:["UN","M","M2","M3","BR","KG","SC","SERV"],porItem:{}},
+    "Área externa":{usar:true,permitidas:["M","M2","M3","UN","KG","SC","L","SERV"],porItem:{}},
+    "Iluminação":{usar:true,permitidas:["UN","PC","CX","PCT","KIT","M","RL"],porItem:{"lâmpada":["UN","CX","PCT"],"luminária":["UN","CX"],"refletor":["UN"],"soquete":["UN","PCT"],"fio/cabo":["M","RL"]}},
+    "Portas e janelas":{usar:true,permitidas:["UN","PC","M","M2","KIT","JG","SERV"],porItem:{}},
+    "Reforma":{usar:true,permitidas:["UN","M","M2","M3","KG","L","SC","CX","SERV","H"],porItem:{}},
+    "Obra":{usar:true,permitidas:["UN","M","M2","M3","KG","T","L","SC","SERV","H"],porItem:{}},
+    "Aquisição":{usar:true,permitidas:["UN","PC","PAR","JG","KIT","CJ","CX","PCT","RL","M","M2","M3","L","KG"],porItem:{}},
+    "Outros":{usar:true,permitidas:["UN","PC","PAR","JG","KIT","CJ","CX","PCT","RL","M","M2","M3","L","KG","SERV","H"],porItem:{}},
+    "Agendamento":{usar:false,permitidas:[],porItem:{}},
+    "Assistência":{usar:true,permitidas:["SERV","H","DIA","VIS"],porItem:{}},
+    "Automação":{usar:true,permitidas:["UN","PC","KIT","CJ","M","RL","CX","PCT","SERV"],porItem:{}},
+    "Avaliação":{usar:true,permitidas:["LAU","VIS","SERV","H"],porItem:{}},
+    "Boletim de Ocorrência":{usar:false,permitidas:[],porItem:{}},
+    "Bombeiro Hidráulico":{usar:true,permitidas:["SERV","H","DIA","VIS"],porItem:{}},
+    "Capina":{usar:true,permitidas:["M2","SERV","H","DIA"],porItem:{}},
+    "Comunicado":{usar:false,permitidas:[],porItem:{}},
+    "Conserto":{usar:true,permitidas:["SERV","H","PC","UN"],porItem:{}},
+    "Consultoria":{usar:true,permitidas:["SERV","H","DIA","VIS"],porItem:{}},
+    "Conta Luz":{usar:false,permitidas:[],porItem:{}},
+    "Corte":{usar:false,permitidas:[],porItem:{}},
+    "Declaração":{usar:false,permitidas:[],porItem:{}},
+    "Dedetização":{usar:true,permitidas:["M2","L","ML","APL","SERV"],porItem:{}},
+    "Desratização":{usar:true,permitidas:["M2","KG","G","APL","SERV"],porItem:{}},
+    "Desalojamento de pombos":{usar:true,permitidas:["M2","APL","SERV","H"],porItem:{}},
+    "Desinfecção":{usar:true,permitidas:["M2","L","ML","APL","SERV"],porItem:{}},
+    "Iluminação Interna":{usar:true,permitidas:["UN","PC","CX","PCT","KIT","M","RL"],porItem:{"lâmpada":["UN","CX","PCT"],"luminária":["UN","CX"],"soquete":["UN","PCT"],"fio/cabo":["M","RL"]}},
+    "Iluminação Externa":{usar:true,permitidas:["UN","PC","CX","PCT","KIT","M","RL"],porItem:{"lâmpada":["UN","CX","PCT"],"refletor":["UN"],"luminária/poste":["UN"],"fio/cabo":["M","RL"]}},
+    "Informação":{usar:false,permitidas:[],porItem:{}},
+    "Inspeção":{usar:true,permitidas:["VIS","LAU","SERV","H"],porItem:{}},
+    "Inspeção Gás":{usar:true,permitidas:["VIS","LAU","SERV","H"],porItem:{}},
+    "Instalação":{usar:true,permitidas:["UN","PC","KIT","M","M2","SERV","H"],porItem:{}},
+    "Isolamento":{usar:true,permitidas:["M","M2","RL","UN","PCT","SERV"],porItem:{}},
+    "Jardinagem":{usar:true,permitidas:["M2","M3","UN","KG","SC","L","SERV","H"],porItem:{}},
+    "Levantamento":{usar:true,permitidas:["VIS","LAU","SERV","H"],porItem:{}},
+    "Limpeza":{usar:true,permitidas:["M2","M3","L","KG","UN","PCT","SERV","H"],porItem:{}},
+    "Manutenção":{usar:true,permitidas:["SERV","H","DIA","VIS","PC","UN"],porItem:{}},
+    "Montagem":{usar:true,permitidas:["SERV","H","UN","PC","KIT","CJ"],porItem:{}},
+    "Obra/Reparo":{usar:true,permitidas:["UN","M","M2","M3","KG","L","SC","SERV","H"],porItem:{}},
+    "Poda de árvore":{usar:true,permitidas:["UN","SERV","H","DIA"],porItem:{}},
+    "Poda e Roçada":{usar:true,permitidas:["M2","SERV","H","DIA"],porItem:{}},
+    "Reciclagem":{usar:true,permitidas:["KG","T","M3","CX","PCT","UN","SERV"],porItem:{}},
+    "Refrigeração":{usar:true,permitidas:["UN","PC","KIT","M","KG","SERV","H"],porItem:{}},
+    "Relatório":{usar:false,permitidas:[],porItem:{}},
+    "Reparo":{usar:true,permitidas:["SERV","H","PC","UN"],porItem:{}},
+    "Resposta":{usar:false,permitidas:[],porItem:{}},
+    "Retirada":{usar:true,permitidas:["UN","PC","KG","T","M3","CARGA","SERV"],porItem:{}},
+    "Retorno":{usar:false,permitidas:[],porItem:{}},
+    "Serviço de solda":{usar:true,permitidas:["SERV","H","M","KG","PC","UN"],porItem:{}},
+    "Solicitação":{usar:false,permitidas:[],porItem:{}},
+    "Substituição":{usar:true,permitidas:["UN","PC","KIT","SERV","H"],porItem:{}},
+    "Transporte":{usar:true,permitidas:["VIAG","CARGA","UN","KG","T","M3","SERV"],porItem:{}},
+    "Troca":{usar:true,permitidas:["UN","PC","KIT","SERV","H"],porItem:{}},
+    "Vacall":{usar:true,permitidas:["M3","SERV","H","VIAG"],porItem:{}},
+    "Visita técnica":{usar:true,permitidas:["VIS","SERV","H"],porItem:{}},
+    "Vistoria":{usar:true,permitidas:["VIS","LAU","SERV","H"],porItem:{}},
+  };
+  const CATEGORIA_UNIDADES_DEFAULT = {usar:true,permitidas:['UN','PC','KIT','CJ','M','M2','L','KG','SERV','H'],porItem:{}};
   // Agrupamento temático das categorias no assistente de registro (passo 1) — só para
   // organizar a busca em abas (Infraestrutura/Manutenção/Serviços/Administrativo/Outros);
   // não existe coluna "grupo" no banco, então isso é só uma classificação de exibição no
@@ -366,7 +475,7 @@
         <li>${icon('check-circle')}<span>Acompanhamento em tempo real</span></li>
         <li>${icon('check-circle')}<span>Soluções mais rápidas</span></li>
       </ul>
-      <img class="dw-sidebar-illustration" src="https://vvdbbwgcubddfvsxsehb.supabase.co/storage/v1/object/public/Lateral/lateral_azul.png" alt="" loading="lazy">
+      <img class="dw-sidebar-illustration" src="/static/images/categoria/lateral_azul.png" alt="" loading="lazy">
       <div class="dw-sidebar-help">
         <span class="dw-help-icon">?</span>
         <div><strong>Dúvidas?</strong><small>Nossa equipe está pronta para ajudar.</small></div>
@@ -379,10 +488,10 @@
       mode: 'fullscreen demand-wizard',
       sidebar: dwSidebar,
       body: `<div class="stepper dw-stepper">
-        <div class="step active" data-step-ind="1"><span class="step-num">1</span><span class="step-text"><strong>O que houve</strong><small>Tipo de problema</small></span></div>
-        <div class="step" data-step-ind="2"><span class="step-num">2</span><span class="step-text"><strong>Detalhes</strong><small>Local e descrição</small></span></div>
-        <div class="step" data-step-ind="3"><span class="step-num">3</span><span class="step-text"><strong>Impacto</strong><small>Urgência e alcance</small></span></div>
-        <div class="step" data-step-ind="4"><span class="step-num">4</span><span class="step-text"><strong>Enviar</strong><small>Revisar e enviar</small></span></div>
+        <div class="step active" data-step-ind="1"><span class="step-badge-row"><span class="step-num">1</span><span class="step-check">${icon('check-circle')}</span></span><span class="step-text"><strong>O que houve</strong><small>Tipo de problema</small></span></div>
+        <div class="step" data-step-ind="2"><span class="step-badge-row"><span class="step-num">2</span><span class="step-check">${icon('check-circle')}</span></span><span class="step-text"><strong>Detalhes</strong><small>Local e descrição</small></span></div>
+        <div class="step" data-step-ind="3"><span class="step-badge-row"><span class="step-num">3</span><span class="step-check">${icon('check-circle')}</span></span><span class="step-text"><strong>Impacto</strong><small>Urgência e alcance</small></span></div>
+        <div class="step" data-step-ind="4"><span class="step-badge-row"><span class="step-num">4</span><span class="step-check">${icon('check-circle')}</span></span><span class="step-text"><strong>Enviar</strong><small>Revisar e enviar</small></span></div>
       </div>
       <form id="demandForm">
         <section data-step="1" class="form-step">
@@ -441,11 +550,12 @@
 
         <section data-step="4" class="form-step hidden"><div id="demandReview"></div></section>
       </form>`,
-      footer: `<div class="dw-footer-security">${icon('shield')}<span>Seus dados estão seguros</span></div><div class="dw-footer-actions"><button class="btn btn-secondary hidden" id="prevStep">Voltar</button><button class="btn btn-primary dw-next-btn" id="nextStep" disabled><span class="dw-next-main">Continuar</span><span class="dw-next-sub">Próximo passo</span></button></div>`,
+      footer: `<div class="dw-footer-security">${icon('shield')}<div><strong>Seus dados estão seguros</strong><small>Utilizamos criptografia e seguimos as melhores práticas de segurança.</small></div></div><div class="dw-footer-actions"><button class="btn btn-secondary hidden" id="prevStep">${icon('arrow')}<span>Voltar</span></button><button class="btn btn-primary dw-next-btn" id="nextStep" disabled><span class="dw-next-main">Continuar</span><span class="dw-next-sub">Próximo passo</span></button></div>`,
       onOpen(root) {
         let step = 1;
         const form = $('#demandForm', root), next = $('#nextStep'), prev = $('#prevStep');
         const totalSteps = 4;
+        const reviewPhotoUrls = [];
 
         const syncNextEnabled = () => {
           if (step === 1) next.disabled = !state.categories.length || (!ctx.user.perm.school_scoped && !form.elements.school_id.value);
@@ -631,12 +741,16 @@
 
         const priorityLabelFriendly = p => URGENCY_CHOICES.find(u => u.value === p)?.title || priorityLabel(p);
 
-        const setNextLabel = (main, sub = '') => { next.innerHTML = `<span class="dw-next-main">${esc(main)}</span>${sub ? `<span class="dw-next-sub">${esc(sub)}</span>` : ''}`; };
+        const setNextLabel = (main, sub = '') => { next.innerHTML = `${step === totalSteps ? `<span class="dw-next-icon">${icon('send')}</span>` : ''}<span class="dw-next-text"><span class="dw-next-main">${esc(main)}</span>${sub ? `<span class="dw-next-sub">${esc(sub)}</span>` : ''}</span>`; };
 
         const updateStep = () => {
           $$('[data-step]', root).forEach(s => s.classList.toggle('hidden', Number(s.dataset.step) !== step));
           $$('[data-step-ind]', root).forEach(s => { const n = Number(s.dataset.stepInd); s.classList.toggle('active', n === step); s.classList.toggle('done', n < step); });
           prev.classList.toggle('hidden', step === 1);
+          root.classList.toggle('dw-review-mode', step === totalSteps);
+          const headerTitleEl = $('.modal-header h2', root), headerSubEl = $('.modal-header p', root);
+          if (headerTitleEl) headerTitleEl.textContent = step === totalSteps ? 'Nova demanda' : 'Registrar Demanda/CI';
+          if (headerSubEl) headerSubEl.textContent = step === totalSteps ? 'Revise as informações e envie sua demanda' : 'Conte pra gente o que está acontecendo. Sua demanda gera soluções.';
           setNextLabel(step === totalSteps ? (state.items.length > 1 ? 'Enviar demandas' : 'Enviar demanda') : 'Continuar', step === totalSteps ? 'Finalizar registro' : 'Próximo passo');
           if (step === 2) renderDetailsFields();
           syncNextEnabled();
@@ -644,15 +758,40 @@
             const selectedSchoolId = ctx.user.perm.school_scoped ? ctx.user.school_id : form.elements.school_id?.value;
             const s = schools.find(x => String(x.id) === String(selectedSchoolId));
             const reach = state.customReach ? (Number($('[name=affected_people_custom]', form).value) || 0) : state.reach;
-            $('#demandReview').innerHTML = `<div class="info-card accent"><h3>${icon('check-circle')}Confira antes de enviar</h3><div class="key-value">
-              <div class="kv"><span>Unidade Escolar</span><strong>${esc(s?.name || ctx.user.school_name || '—')}</strong></div>
-              <div class="kv"><span>Urgência</span><strong>${esc(priorityLabelFriendly(state.priority))}</strong></div>
-              <div class="kv"><span>Pessoas afetadas (aprox.)</span><strong>${num(reach)}</strong></div>
-              <div class="kv"><span>Impede atividade escolar?</span><strong>${state.blocks_activity ? 'Sim' : 'Não'}</strong></div>
-              <div class="kv"><span>Risco de acidente?</span><strong>${state.risk ? 'Sim' : 'Não'}</strong></div>
-            </div></div>
-            <div class="alert info">${state.items.length > 1 ? `Serão registradas ${state.items.length} demandas, uma para cada tipo de problema — cada uma recebe um código único e sua própria foto.` : 'Depois de enviada, a demanda recebe um código único e você poderá acompanhar todo o andamento.'}</div>
-            ${state.items.map((it, i) => `<section class="info-card mt-12"><h3>${icon(CATEGORY_ICONS[it.category] || 'clipboard')}${state.items.length > 1 ? `${i + 1}. ` : ''}${esc(it.category)}</h3><div class="key-value"><div class="kv"><span>Local</span><strong>${esc(it.location || 'Não informado')}</strong></div><div class="kv"><span>Descrição</span><strong>${esc(it.description)}</strong></div><div class="kv"><span>Foto deste problema</span><strong>${it.photo ? esc(it.photo.name) : 'Nenhuma foto anexada'}</strong></div></div></section>`).join('')}`;
+            const urgencyChoice = URGENCY_CHOICES.find(u => u.value === state.priority) || URGENCY_CHOICES[0];
+            const boolPill = (isYes, yesText, noText) => `<span class="review-pill ${isYes ? 'red' : 'green'}">${icon(isYes ? 'warning' : 'check-circle')}<span>${isYes ? yesText : noText}</span></span>`;
+            reviewPhotoUrls.forEach(u => URL.revokeObjectURL(u));
+            reviewPhotoUrls.length = 0;
+            const photoThumb = (file) => {
+              if (!file) return `<div class="review-photo-block"><span class="review-label">Foto deste problema</span><p class="review-photo-empty">Nenhuma foto anexada</p></div>`;
+              const url = URL.createObjectURL(file);
+              reviewPhotoUrls.push(url);
+              return `<div class="review-photo-block"><span class="review-label">Foto deste problema</span><img class="review-photo-thumb" src="${url}" alt="Foto anexada"></div>`;
+            };
+            $('#demandReview').innerHTML = `<div class="review-summary">
+              <div class="review-summary-head">
+                <span class="review-summary-badge">${icon('check-circle')}</span>
+                <div><h3>Confira antes de enviar</h3><p>Revise os detalhes da sua demanda. Você poderá acompanhar todo o andamento após o envio.</p></div>
+              </div>
+              <div class="review-grid">
+                <div class="review-item"><span class="review-item-icon">${icon('school')}</span><div class="review-item-body"><span class="review-label">Unidade Escolar</span><strong>${esc(s?.name || ctx.user.school_name || '—')}</strong></div></div>
+                <div class="review-item"><span class="review-item-icon">${icon(urgencyChoice.icon)}</span><div class="review-item-body"><span class="review-label">Urgência</span><strong>${esc(urgencyChoice.title)}</strong><span class="review-pill blue">${icon('clock')}<span>${esc(urgencyChoice.hint)}</span></span></div></div>
+                <div class="review-item"><span class="review-item-icon">${icon('users')}</span><div class="review-item-body"><span class="review-label">Pessoas afetadas (aprox.)</span><span class="review-pill blue">${icon('users')}<span>${num(reach)} pessoas</span></span></div></div>
+              </div>
+              <div class="review-grid review-grid-2 review-grid-divider">
+                <div class="review-item"><span class="review-item-icon">${icon('calendar')}</span><div class="review-item-body"><span class="review-label">Impede atividade escolar?</span>${boolPill(state.blocks_activity, 'Impede', 'Não impede')}</div></div>
+                <div class="review-item"><span class="review-item-icon">${icon('shield')}</span><div class="review-item-body"><span class="review-label">Risco de acidente?</span>${boolPill(state.risk, 'Há risco', 'Não há risco')}</div></div>
+              </div>
+            </div>
+            <div class="alert info review-alert">${icon('info')}<span>${state.items.length > 1 ? `Serão registradas ${state.items.length} demandas, uma para cada tipo de problema — cada uma recebe um código único e sua própria foto.` : 'Depois de enviada, a demanda recebe um código único e você poderá acompanhar todo o andamento.'}</span></div>
+            ${state.items.map((it, i) => `<section class="review-category-card">
+              <div class="review-category-head"><span class="review-category-icon" style="background:var(--${CATEGORY_COLORS[it.category] || 'blue'}-soft);color:var(--${CATEGORY_COLORS[it.category] || 'blue'})">${icon(CATEGORY_ICONS[it.category] || 'clipboard')}</span><h4>${state.items.length > 1 ? `${i + 1}. ` : ''}${esc(it.category)}</h4></div>
+              <div class="review-fields">
+                <div class="review-item"><span class="review-item-icon">${icon('map')}</span><div class="review-item-body"><span class="review-label">Local</span><strong>${esc(it.location || 'Não informado')}</strong></div></div>
+                <div class="review-item"><span class="review-item-icon">${icon('clipboard')}</span><div class="review-item-body"><span class="review-label">Descrição</span><strong>${esc(it.description)}</strong></div></div>
+              </div>
+              ${photoThumb(it.photo || state.photo)}
+            </section>`).join('')}`;
           }
         };
         prev.addEventListener('click', () => { step--; updateStep(); });
@@ -1068,6 +1207,21 @@
         </div>
         <p class="wizard-question mt-16">Tipo de ação</p>
         <div class="prov-type-row" id="provTypeRow">${PROV_ACTION_TYPES.map(t => `<button type="button" class="prov-type-chip ${d.prov_action_type === t.key ? 'active' : ''}" data-prov-type="${t.key}" style="--chip-color:var(--${t.color});--chip-soft:var(--${t.color}-soft)"><span class="prov-type-icon">${icon(t.icon)}</span>${esc(t.label)}</button>`).join('')}</div>
+
+        <p class="wizard-question mt-16">A SMEDU tem o material necessário disponível agora?</p>
+        <p class="wizard-hint">Se precisar comprar, esta demanda é sinalizada automaticamente no <strong>Planejamento 2027</strong> — dali é só destinar a um exercício futuro.</p>
+        <div class="toggle-row" id="materialToggleRow">
+          <button type="button" class="toggle-btn toggle-btn-no ${!d.needs_material ? 'active' : ''}" data-toggle="needs_material" data-val="0">${icon('check-circle')}Sim, tem material</button>
+          <button type="button" class="toggle-btn toggle-btn-yes ${d.needs_material ? 'active' : ''}" data-toggle="needs_material" data-val="1">${icon('cart')}Precisa comprar</button>
+        </div>
+        <div class="procurement-panel ${d.needs_material ? '' : 'hidden'}" id="materialProcurementPanel">
+          <div class="alert info procurement-alert clickable-row" id="materialPlanningShortcut" role="button" tabindex="0" data-tooltip="Abrir Planejamento Futuro" style="cursor:pointer;justify-content:space-between"><span style="display:flex;align-items:center;gap:9px">${icon('calendar')}<span>Sem o material em estoque, essa necessidade é registrada no <strong>Planejamento 2027</strong>. Toque aqui para destinar a um exercício futuro.</span></span>${icon('chevron')}</div>
+          <div class="prov-form-grid mt-12">
+            <div class="field"><label>Quantidade necessária</label><input class="input" type="number" min="0" step="0.01" id="materialQty" value="${d.planned_quantity ? esc(String(d.planned_quantity)) : ''}" placeholder="1"></div>
+            <div class="field" id="materialUnitField"><label>Unidade de medida</label><select class="select" id="materialUnit"></select></div>
+          </div>
+        </div>
+
         <div class="prov-form-grid mt-16">
           <div class="field"><label>Responsável</label><select class="select" id="provResponsible"><option value="">Selecionar responsável...</option>${staffOptions}</select></div>
           <div class="field"><label>Prazo previsto</label><div class="datepicker" data-datepicker data-dp-target="provDueDate"><input type="hidden" id="provDueDate" value="${esc(d.prov_due_date || d.due_date || '')}"><div class="datepicker-input-wrap"><input class="input datepicker-display" type="text" placeholder="dd/mm/aaaa" readonly autocomplete="off"><button type="button" class="datepicker-icon-btn" aria-label="Abrir calendário" data-tooltip="Escolher data">${icon('calendar')}</button></div></div></div>
@@ -1108,7 +1262,8 @@
     </div><aside class="side-stack"><section class="info-card"><h3>${icon('info')}Boa devolutiva</h3><p>Informe o que foi analisado, qual é o próximo passo, quem está responsável e a previsão atualizada.</p></section></aside></div>`;
     if (name === 'attachments') return `<section class="info-card"><h3>${icon('paperclip')}Anexos</h3><label class="upload-zone" id="uploadZone">${icon('paperclip')}<strong>Arraste um arquivo ou clique para selecionar</strong><small>PDF, DOCX, XLSX e imagens · até 12 MB</small><input type="file" id="attachmentInput" hidden></label>${renderFiles(payload.attachments)}</section>`;
     if (name === 'history') return `<section class="info-card"><h3>${icon('clock')}Histórico completo</h3>${renderTimeline(payload.updates)}</section>`;
-    if (name === 'planning') return `<div class="detail-layout"><div><section class="info-card accent"><h3>${icon('calendar')}Planejamento</h3>${d.future_year ? `<p>Esta demanda está vinculada ao planejamento do exercício de <strong>${d.future_year}</strong>.</p><div class="metric-row mt-16"><div class="metric"><span>Tipo</span><strong>${esc(d.planning_kind || 'Planejamento futuro')}</strong></div><div class="metric"><span>Quantidade</span><strong>${num(d.planned_quantity || 0)} ${esc(d.planned_unit || '')}</strong></div><div class="metric"><span>Estimativa</span><strong>${money(d.cost_estimate)}</strong></div></div>` : `<p>Esta demanda ainda não foi destinada a um exercício futuro.</p>`}</section>
+    if (name === 'planning') return `<div class="detail-layout"><div><section class="info-card accent"><h3>${icon('calendar')}Planejamento</h3>${d.future_year ? `<p>Esta demanda está vinculada ao planejamento do exercício de <strong>${d.future_year}</strong>.</p><div class="metric-row mt-16"><div class="metric"><span>Tipo</span><strong>${esc(d.planning_kind || 'Planejamento futuro')}</strong></div><div class="metric"><span>Quantidade</span><strong>${num(d.planned_quantity || 0)} ${esc(d.planned_unit || '')}</strong></div><div class="metric"><span>Estimativa</span><strong>${money(d.cost_estimate)}</strong></div></div>` : (d.needs_material ? `<div class="alert warning" style="display:flex;align-items:center;gap:9px">${icon('cart')}<span>A Providência sinalizou que a SMEDU <strong>não possui o material</strong> necessário${d.planned_quantity ? ` (aprox. ${num(d.planned_quantity)} ${esc(d.planned_unit || '')})` : ''}. Clique em <strong>"Destinar a um exercício futuro"</strong> abaixo para confirmar o Planejamento 2027.</span></div>
+      <div class="table-wrap mt-16"><table class="data-table"><thead><tr><th>Categoria</th><th>Descrição</th><th>Quantidade</th><th>Unidade</th><th>Situação</th></tr></thead><tbody><tr id="materialPlanningRow" class="clickable-row" data-tooltip="Abrir Planejamento Futuro" style="cursor:pointer" tabindex="0" role="button"><td data-label="Categoria"><span class="review-category-icon" style="width:28px;height:28px;display:inline-flex;vertical-align:middle;margin-right:6px;background:var(--${CATEGORY_COLORS[d.category] || 'blue'}-soft);color:var(--${CATEGORY_COLORS[d.category] || 'blue'})">${icon(CATEGORY_ICONS[d.category] || 'clipboard')}</span><strong>${esc(d.category)}</strong></td><td data-label="Descrição">${esc(d.description || '—')}</td><td data-label="Quantidade"><strong>${num(d.planned_quantity || 0)}</strong></td><td data-label="Unidade">${esc(d.planned_unit || '—')}</td><td data-label="Situação"><span class="status-badge future">${icon('cart')}Precisa comprar</span></td></tr></tbody></table></div>` : `<p>Esta demanda ainda não foi destinada a um exercício futuro.</p>`)}</section>
       ${ctx.user.perm.can_edit_analysis ? `<button class="btn btn-primary" id="editPlanningLink">${icon('calendar')}${d.future_year ? 'Editar planejamento' : 'Destinar a um exercício futuro'}</button>` : ''}
       ${payload.planning.length ? payload.planning.map(p => `<section class="info-card mt-16"><div class="detail-code-line"><span class="badge P4">${esc(p.code)}</span><span class="status-badge future">${esc(p.status)}</span></div><h3 style="margin-top:12px">${esc(p.title)}</h3><div class="metric-row"><div class="metric"><span>Exercício</span><strong>${p.year}</strong></div><div class="metric"><span>Estimativa</span><strong>${money(p.estimated_cost)}</strong></div><div class="metric"><span>Escolas</span><strong>${p.schools_count}</strong></div></div></section>`).join('') : ''}</div><aside class="side-stack"><section class="info-card"><h3>${icon('info')}Fluxo futuro</h3><p>Demanda → Planejamento → Consolidação → Processo administrativo → Licitação/Contratação → Execução.</p></section></aside></div>`;
     return '';
@@ -1147,13 +1302,16 @@
   // PUT /api/demands/{id} (mesma rota usada em "Editar análise"), só que num formulário
   // dedicado e acessível direto na aba, em vez de misturado com a análise técnica.
   const PLANNING_KINDS = ['Aquisição futura', 'Contratação futura', 'Obra futura', 'Projeto futuro', 'Serviço continuado'];
-  async function openEditPlanning(d, reload) {
+  async function openEditPlanning(d, reload, overrides = {}) {
+    const pq = overrides.planned_quantity ?? d.planned_quantity;
+    const pu = overrides.planned_unit ?? d.planned_unit;
+    const pk = overrides.planning_kind ?? d.planning_kind;
     modal({
       title: 'Planejamento Futuro', subtitle: `${d.code} · ${d.title}`, mode: 'drawer', body: `<form id="planningLinkForm"><div class="form-grid">
       <div class="field"><label>Exercício futuro</label><input class="input" type="number" min="2026" max="2035" name="future_year" value="${esc(d.future_year || '')}" placeholder="Ex.: 2027"></div>
-      <div class="field"><label>Tipo de necessidade</label><select class="select" name="planning_kind"><option value="">Não definido</option>${PLANNING_KINDS.map(k => `<option ${k === d.planning_kind ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select></div>
-      <div class="field"><label>Quantidade</label><input class="input" type="number" min="0" step="0.01" name="planned_quantity" value="${esc(d.planned_quantity || '')}"></div>
-      <div class="field"><label>Unidade de medida</label><input class="input" name="planned_unit" value="${esc(d.planned_unit || '')}" placeholder="un, m², serviço..."></div>
+      <div class="field"><label>Tipo de necessidade</label><select class="select" name="planning_kind"><option value="">Não definido</option>${PLANNING_KINDS.map(k => `<option ${k === pk ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select></div>
+      <div class="field"><label>Quantidade</label><input class="input" type="number" min="0" step="0.01" name="planned_quantity" value="${esc(pq || '')}"></div>
+      <div class="field"><label>Unidade de medida</label><input class="input" name="planned_unit" value="${esc(pu || '')}" placeholder="un, m², serviço..."></div>
       <div class="field span-2"><label>Estimativa de custo (R$)</label><input class="input" type="number" min="0" step="0.01" name="cost_estimate" value="${esc(d.cost_estimate || 0)}"></div>
     </div><p class="wizard-hint mt-12">Deixe o exercício em branco para remover o vínculo desta demanda com o planejamento futuro.</p></form>`,
       footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="savePlanningLink">Salvar planejamento</button>`, onOpen() {
@@ -1290,6 +1448,8 @@
       $('#editDemand')?.addEventListener('click', () => openEditTechnical(d, reload));
       $('#editTechnical')?.addEventListener('click', () => openEditTechnical(d, reload));
       $('#editPlanningLink')?.addEventListener('click', () => openEditPlanning(d, reload));
+      $('#materialPlanningRow')?.addEventListener('click', () => openEditPlanning(d, reload));
+      $('#materialPlanningRow')?.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEditPlanning(d, reload); } });
 
       // Stepper click actions
       $$('[data-step-action]', content).forEach(el => {
@@ -1401,10 +1561,46 @@
       $('#provAttachBtn')?.addEventListener('click', () => provAttachInput?.click());
       provAttachInput?.addEventListener('change', () => provAttachInput.files[0] && upload(provAttachInput.files[0]));
 
+      // Providência: "A SMEDU tem o material?" -> reflete no Planejamento 2027
+      const refreshMaterialUnitOptions = () => {
+        const sel = $('#materialUnit', content), field = $('#materialUnitField', content);
+        if (!sel) return;
+        const meta = CATEGORIA_UNIDADES[d.category] || CATEGORIA_UNIDADES_DEFAULT;
+        if (!meta.usar) { field?.classList.add('hidden'); sel.innerHTML = ''; return }
+        field?.classList.remove('hidden');
+        const desc = (d.description || '').toLowerCase();
+        const matched = new Set();
+        Object.entries(meta.porItem || {}).forEach(([kw, units]) => { if (desc.includes(kw)) units.forEach(u => matched.add(u)); });
+        const allowed = matched.size ? [...matched] : meta.permitidas;
+        const prev = sel.value || d.planned_unit;
+        sel.innerHTML = allowed.map(c => UNIDADES_MEDIDA_BY_CODE[c]).filter(Boolean)
+          .map(u => `<option value="${esc(u.simbolo)}">${esc(u.simbolo)} — ${esc(u.nome)}</option>`).join('');
+        if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+      };
+      $$('.toggle-btn[data-toggle="needs_material"]', content).forEach(b => b.addEventListener('click', () => {
+        $$('.toggle-btn[data-toggle="needs_material"]', content).forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        const show = b.dataset.val === '1';
+        $('#materialProcurementPanel', content)?.classList.toggle('hidden', !show);
+        if (show) refreshMaterialUnitOptions();
+      }));
+      if (d.needs_material) refreshMaterialUnitOptions();
+      const openMaterialPlanningShortcut = () => {
+        const overrides = {
+          planned_quantity: Number($('#materialQty', content)?.value) || d.planned_quantity,
+          planned_unit: ($('#materialUnit', content)?.value || d.planned_unit || '').trim(),
+          planning_kind: d.planning_kind || 'Aquisição futura'
+        };
+        openEditPlanning(d, reload, overrides);
+      };
+      $('#materialPlanningShortcut', content)?.addEventListener('click', openMaterialPlanningShortcut);
+      $('#materialPlanningShortcut', content)?.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMaterialPlanningShortcut(); } });
+
       const saveProv = async (sendUpdate) => {
         const type = $('#provTypeRow .prov-type-chip.active')?.dataset.provType || '';
         const selectedStatus = $('#provStatus')?.value || d.status;
         const selectedResp = $('#provResponsible')?.value || '';
+        const needsMaterial = $('.toggle-btn[data-toggle="needs_material"].active', content)?.dataset.val === '1';
         const body = {
           prov_action_type: type,
           prov_responsible: selectedResp,
@@ -1413,8 +1609,14 @@
           prov_due_date: $('#provDueDate')?.value || null,
           prov_priority: $('#provPriority')?.value || null,
           prov_note: $('#provNote')?.value || '',
-          prov_notify_school: $('#provNotify')?.checked ? 1 : 0
+          prov_notify_school: $('#provNotify')?.checked ? 1 : 0,
+          needs_material: needsMaterial ? 1 : 0
         };
+        if (needsMaterial) {
+          body.planned_quantity = Number($('#materialQty', content)?.value) || d.planned_quantity || 1;
+          body.planned_unit = $('#materialUnit', content)?.value || d.planned_unit || 'un';
+          if (!d.planning_kind) body.planning_kind = 'Aquisição futura';
+        }
         try {
           await api(`/api/demands/${id}`, { method: 'PUT', body });
           if (sendUpdate) {
@@ -1423,6 +1625,10 @@
             await api(`/api/demands/${id}/updates`, { method: 'POST', body: { kind: 'Devolutiva', message: msg } });
           }
           toast(sendUpdate ? 'Providência salva e devolutiva enviada' : 'Providência salva com sucesso');
+          if (needsMaterial && !d.future_year) {
+            toast('Sinalizado para o Planejamento 2027', 'Acesse a aba Planejamento e clique em "Destinar a um exercício futuro" para dar prosseguimento à compra.');
+            active = 'planning';
+          }
           await reload();
         } catch (e) { toast('Não foi possível salvar', e.message, 'error'); }
       };
@@ -2054,7 +2260,7 @@
         el.className = 'custom-leaflet-marker-wrap';
         el.innerHTML = markerHtml;
 
-        const photoUrl = `/api/school_photo/${s.id}?lat=${s.lat}&lon=${s.lon}`;
+        const photoUrl = s.photo_url || `/api/school_photo/${s.id}?lat=${s.lat}&lon=${s.lon}`;
         const satFallback = `https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/export?bbox=${s.lon-0.0009},${s.lat-0.00055},${s.lon+0.0009},${s.lat+0.00055}&bboxSR=4326&imageSR=4326&size=450,200&format=png&f=image`;
         const dList = s.demands_summary || [];
         let demandsHtml = dList.length === 0 ? `<div class="popup-demand-empty">✨ <strong>Rede 100% Regularizada</strong></div>` : dList.map(d => {
