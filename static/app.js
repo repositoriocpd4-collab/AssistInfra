@@ -124,9 +124,10 @@
 
   function showBackdrop(show = true) { $('#backdrop').hidden = !show; }
   function closeModal() { $('#modalRoot').innerHTML = ''; showBackdrop(false); }
-  function modal({ title, subtitle = '', body = '', footer = '', mode = 'drawer', onOpen }) {
+  function modal({ title, subtitle = '', body = '', footer = '', mode = 'drawer', sidebar = '', onOpen }) {
     showBackdrop(true);
     $('#modalRoot').innerHTML = `<section class="modal ${mode}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+      ${sidebar}
       <header class="modal-header"><div><h2>${esc(title)}</h2>${subtitle ? `<p>${esc(subtitle)}</p>` : ''}</div><button class="close-btn" data-close aria-label="Fechar" data-tooltip="Fechar">${icon('x')}</button></header>
       <div class="modal-body">${body}</div>${footer ? `<footer class="modal-footer">${footer}</footer>` : ''}
     </section>`;
@@ -135,6 +136,29 @@
   }
   $('#backdrop')?.addEventListener('click', closeModal);
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#backdrop').hidden) closeModal(); });
+
+  // O Fullscreen API do navegador só desenha a subárvore do elemento em tela cheia --
+  // #backdrop e #modalRoot vivem no topo do <body>, então quando o mapa (ou qualquer
+  // outro elemento) entra em tela cheia eles somem visualmente mesmo continuando a
+  // funcionar. Aqui movemos os dois para dentro do elemento em tela cheia enquanto ele
+  // estiver ativo, e devolvemos cada um ao seu lugar original ao sair -- assim modais
+  // como "Visão 360°" continuam abrindo normalmente com o mapa em tela cheia.
+  (function bridgeModalsIntoFullscreen() {
+    const backdropEl = $('#backdrop'), modalRootEl = $('#modalRoot');
+    if (!backdropEl || !modalRootEl) return;
+    const backdropHome = { parent: backdropEl.parentNode, next: backdropEl.nextSibling };
+    const modalRootHome = { parent: modalRootEl.parentNode, next: modalRootEl.nextSibling };
+    document.addEventListener('fullscreenchange', () => {
+      const fsEl = document.fullscreenElement;
+      if (fsEl) {
+        if (!fsEl.contains(backdropEl)) fsEl.appendChild(backdropEl);
+        if (!fsEl.contains(modalRootEl)) fsEl.appendChild(modalRootEl);
+      } else {
+        backdropHome.parent.insertBefore(backdropEl, backdropHome.next);
+        modalRootHome.parent.insertBefore(modalRootEl, modalRootHome.next);
+      }
+    });
+  })();
 
   async function loadSchools() {
     if (schoolsCache) return schoolsCache;
@@ -183,22 +207,44 @@
     const frequentCats = [...ctx.categories]
       .sort((a, b) => (counts[b] || 0) - (counts[a] || 0))
       .slice(0, FREQUENT_N);
-    const categoryCard = c => `<button type="button" class="category-card" data-category="${esc(c)}" data-group="${esc(CATEGORY_GROUPS[c] || 'outros')}" data-name="${esc(c.toLowerCase())}" aria-pressed="false" data-tooltip="${esc(CATEGORY_HINTS[c] || c)}"><span class="category-icon">${icon(CATEGORY_ICONS[c] || 'clipboard')}</span><strong>${esc(c)}</strong></button>`;
+    const categoryCard = c => `<button type="button" class="category-card category-card-compact" data-category="${esc(c)}" data-group="${esc(CATEGORY_GROUPS[c] || 'outros')}" data-name="${esc(c.toLowerCase())}" aria-pressed="false" data-tooltip="${esc(CATEGORY_HINTS[c] || c)}"><span class="category-icon" style="background:var(--${CATEGORY_COLORS[c] || 'blue'}-soft);color:var(--${CATEGORY_COLORS[c] || 'blue'})">${icon(CATEGORY_ICONS[c] || 'clipboard')}</span><strong>${esc(c)}</strong></button>`;
+    const categoryCardFull = c => `<button type="button" class="category-card category-card-full" data-category="${esc(c)}" data-group="${esc(CATEGORY_GROUPS[c] || 'outros')}" data-name="${esc(c.toLowerCase())}" aria-pressed="false" data-tooltip="${esc(CATEGORY_HINTS[c] || c)}"><span class="category-icon" style="background:var(--${CATEGORY_COLORS[c] || 'blue'}-soft);color:var(--${CATEGORY_COLORS[c] || 'blue'})">${icon(CATEGORY_ICONS[c] || 'clipboard')}</span><span class="category-card-text"><strong>${esc(c)}</strong><small>${esc(CATEGORY_HINTS[c] || '')}</small></span></button>`;
+
+    const dwSidebar = `<aside class="dw-sidebar">
+      <div class="dw-sidebar-blob"></div>
+      <div class="dw-sidebar-badge">${icon('clipboard')}</div>
+      <h2 class="dw-sidebar-title">Registrar<br>Demanda/CI</h2>
+      <p class="dw-sidebar-subtitle">Conte pra gente o que está acontecendo. Sua demanda gera soluções.</p>
+      <ul class="dw-sidebar-benefits">
+        <li>${icon('check-circle')}<span>Atendimento mais eficiente</span></li>
+        <li>${icon('check-circle')}<span>Acompanhamento em tempo real</span></li>
+        <li>${icon('check-circle')}<span>Soluções mais rápidas</span></li>
+      </ul>
+      <img class="dw-sidebar-illustration" src="https://vvdbbwgcubddfvsxsehb.supabase.co/storage/v1/object/public/Lateral/lateral_azul.png" alt="" loading="lazy">
+      <div class="dw-sidebar-help">
+        <span class="dw-help-icon">?</span>
+        <div><strong>Dúvidas?</strong><small>Nossa equipe está pronta para ajudar.</small></div>
+      </div>
+    </aside>`;
 
     modal({
       title: 'Registrar Demanda/CI',
       subtitle: 'Conte pra gente o que está acontecendo. Sua demanda gera soluções.',
-      mode: 'center',
-      body: `<div class="stepper">
-        <div class="step active" data-step-ind="1"><span class="step-num">1</span><span>O que houve</span></div>
-        <div class="step" data-step-ind="2"><span class="step-num">2</span><span>Detalhes</span></div>
-        <div class="step" data-step-ind="3"><span class="step-num">3</span><span>Impacto</span></div>
-        <div class="step" data-step-ind="4"><span class="step-num">4</span><span>Enviar</span></div>
+      mode: 'fullscreen demand-wizard',
+      sidebar: dwSidebar,
+      body: `<div class="stepper dw-stepper">
+        <div class="step active" data-step-ind="1"><span class="step-num">1</span><span class="step-text"><strong>O que houve</strong><small>Tipo de problema</small></span></div>
+        <div class="step" data-step-ind="2"><span class="step-num">2</span><span class="step-text"><strong>Detalhes</strong><small>Local e descrição</small></span></div>
+        <div class="step" data-step-ind="3"><span class="step-num">3</span><span class="step-text"><strong>Impacto</strong><small>Urgência e alcance</small></span></div>
+        <div class="step" data-step-ind="4"><span class="step-num">4</span><span class="step-text"><strong>Enviar</strong><small>Revisar e enviar</small></span></div>
       </div>
       <form id="demandForm">
         <section data-step="1" class="form-step">
-          ${!ctx.user.perm.school_scoped ? `<div class="field span-2 mb-16"><label>Unidade Escolar *</label><select class="select" name="school_id" required>${schoolOptions}</select></div>` : ''}
-          <p class="wizard-question">Qual é o tipo de problema?</p>
+          ${!ctx.user.perm.school_scoped ? `<div class="field span-2 mb-16"><label>Unidade Escolar *</label><div class="select-wrap"><span class="select-wrap-icon">${icon('school')}</span><select class="select" name="school_id" required>${schoolOptions}</select></div></div>` : ''}
+          <div class="wizard-question-row">
+            <p class="wizard-question">Qual é o tipo de problema?</p>
+            <span class="dw-pill" id="categoryCountPill">0 de ${MAX_CATEGORIES} selecionados</span>
+          </div>
           <p class="wizard-hint">Toque em até 3 opções que mais se parecem com o que você está vendo.</p>
           <p class="wizard-hint" id="categoryPickHint">Nenhum problema selecionado ainda.</p>
           <div class="category-toolbar">
@@ -210,10 +256,13 @@
           <div id="categorySections">
             <div class="category-section" id="frequentSection">
               <p class="category-section-title">${icon('star')}Mais frequentes</p>
-              <div class="category-grid">${frequentCats.map(categoryCard).join('')}</div>
+              <div class="category-grid category-grid-full">${frequentCats.map(categoryCardFull).join('')}</div>
             </div>
             <div class="category-section">
-              <p class="category-section-title" id="allCategoriesTitle">Todos os tipos de demanda</p>
+              <div class="category-section-title-row">
+                <p class="category-section-title" id="allCategoriesTitle">Todos os tipos de demanda</p>
+                <button type="button" class="link-btn dw-view-toggle" id="categoryViewToggle" data-view="grid">${icon('menu')}<span>Ver em lista</span></button>
+              </div>
               <div class="category-grid" id="categoryGrid" role="group" aria-label="Tipo de problema — escolha até 3">
                 ${ctx.categories.map(categoryCard).join('')}
               </div>
@@ -246,7 +295,7 @@
 
         <section data-step="4" class="form-step hidden"><div id="demandReview"></div></section>
       </form>`,
-      footer: `<button class="btn btn-secondary hidden" id="prevStep">Voltar</button><button class="btn btn-primary" id="nextStep" disabled>Continuar</button>`,
+      footer: `<div class="dw-footer-security">${icon('shield')}<span>Seus dados estão protegidos</span></div><div class="dw-footer-actions"><button class="btn btn-secondary hidden" id="prevStep">Voltar</button><button class="btn btn-primary dw-next-btn" id="nextStep" disabled>Continuar</button></div>`,
       onOpen(root) {
         let step = 1;
         const form = $('#demandForm', root), next = $('#nextStep'), prev = $('#prevStep');
@@ -261,6 +310,8 @@
         // Passo 1 — até 3 categorias em cards visuais
         const updateCategoryHint = () => {
           const hint = $('#categoryPickHint', root);
+          const pill = $('#categoryCountPill', root);
+          if (pill) { pill.textContent = `${state.categories.length} de ${MAX_CATEGORIES} selecionados`; pill.classList.toggle('dw-pill-active', state.categories.length > 0); }
           if (!hint) return;
           if (!state.categories.length) hint.textContent = 'Nenhum problema selecionado ainda.';
           else if (state.categories.length < MAX_CATEGORIES) hint.textContent = `${state.categories.length} de ${MAX_CATEGORIES} selecionados: ${state.categories.join(', ')}.`;
@@ -339,6 +390,14 @@
           $$('[data-group-tab]', root).forEach(x => x.classList.toggle('active', x === t));
           applyCategoryFilter();
         }));
+        $('#categoryViewToggle', root)?.addEventListener('click', () => {
+          const btn = $('#categoryViewToggle', root);
+          const grid = $('#categoryGrid', root);
+          const toList = btn.dataset.view === 'grid';
+          btn.dataset.view = toList ? 'list' : 'grid';
+          grid.classList.toggle('category-grid-list', toList);
+          btn.innerHTML = toList ? `${icon('grid')}<span>Ver em grade</span>` : `${icon('menu')}<span>Ver em lista</span>`;
+        });
         form.elements.school_id?.addEventListener('change', syncNextEnabled);
 
         // Passo 2 — local, descrição e foto individual para cada tipo de problema escolhido
@@ -551,8 +610,12 @@
       <div class="stats-customize-wrap">
         <button type="button" class="stats-customize-btn" id="statsCustomizeBtn" aria-haspopup="true" aria-expanded="false" data-tooltip="Escolher quais grupos aparecem aqui">${icon('settings')}<span>Personalizar painel</span></button>
         <div class="popover stats-customize-panel" id="statsCustomizePanel" hidden>
-          <div class="stats-customize-head"><strong>Personalizar painel</strong><small>Escolha quais grupos de indicadores aparecem aqui. A escolha fica salva neste navegador.</small></div>
+          <div class="stats-customize-head"><strong>Personalizar painel</strong><small>Escolha quais grupos de indicadores aparecem aqui.</small></div>
           <div class="stats-customize-list">${statGroups.map(([label]) => `<label class="stats-customize-row"><span>${esc(groupLabelSentence(label))}</span><span class="switch"><input type="checkbox" data-group-toggle="${esc(label)}"${hiddenGroups.has(label) ? '' : ' checked'}><span class="switch-track"></span></span></label>`).join('')}</div>
+          <div class="stats-customize-footer">
+            <span class="stats-customize-saved" id="statsCustomizeSaved">${icon('check-circle')}<span>Preferência salva</span></span>
+            <button type="button" class="btn btn-primary stats-customize-save" id="statsCustomizeSave">Salvar preferência</button>
+          </div>
         </div>
       </div>
     </div>
@@ -595,7 +658,10 @@
     const statsGroupsEl = $('#statsGroups', content);
     const customizeBtn = $('#statsCustomizeBtn', content);
     const customizePanel = $('#statsCustomizePanel', content);
-    const openCustomize = () => { if (!customizePanel) return; customizePanel.hidden = false; customizeBtn?.setAttribute('aria-expanded', 'true'); };
+    const customizeSaveBtn = $('#statsCustomizeSave', content);
+    const customizeSavedNote = $('#statsCustomizeSaved', content);
+    let customizeSavedTimer = null;
+    const openCustomize = () => { if (!customizePanel) return; customizePanel.hidden = false; customizeBtn?.setAttribute('aria-expanded', 'true'); customizeSavedNote?.classList.remove('is-visible'); };
     const closeCustomize = () => { if (!customizePanel) return; customizePanel.hidden = true; customizeBtn?.setAttribute('aria-expanded', 'false'); };
     customizeBtn?.addEventListener('click', e => { e.stopPropagation(); customizePanel?.hidden ? openCustomize() : closeCustomize(); });
     document.addEventListener('click', e => { if (customizePanel && !customizePanel.hidden && !e.target.closest('.stats-customize-wrap')) closeCustomize(); });
@@ -604,7 +670,6 @@
       input.addEventListener('change', () => {
         const label = input.dataset.groupToggle;
         if (input.checked) hiddenGroups.delete(label); else hiddenGroups.add(label);
-        saveHiddenGroups(hiddenGroups);
         const el = statsGroupsEl?.querySelector(`.stat-group[data-group="${CSS.escape(label)}"]`);
         if (el) {
           if (input.checked) {
@@ -615,7 +680,14 @@
             setTimeout(() => { el.hidden = true; }, 180);
           }
         }
+        customizeSavedNote?.classList.remove('is-visible');
       });
+    });
+    customizeSaveBtn?.addEventListener('click', () => {
+      saveHiddenGroups(hiddenGroups);
+      customizeSavedNote?.classList.add('is-visible');
+      clearTimeout(customizeSavedTimer);
+      customizeSavedTimer = setTimeout(closeCustomize, 900);
     });
   }
 
@@ -1462,10 +1534,21 @@
     let circuitData = null;
     let circuitModeActive = false;
     let circuitMarkers = [];
+    let neighborhoodCounts = null;
 
     const fetchAndRender = async () => {
       const url = `/api/map/network?q=${encodeURIComponent(currentQ)}&neighborhood=${encodeURIComponent(currentNeighborhood)}&criticality=${encodeURIComponent(currentCrit)}&status=${encodeURIComponent(currentStatus)}`;
       networkData = await api(url);
+      // Cada bairro é uma propriedade fixa da escola (não muda com os filtros de
+      // criticidade/status), então basta contar uma vez, a partir da primeira carga,
+      // para exibir "Bairro (N)" no seletor mesmo depois de filtros serem aplicados.
+      if (!neighborhoodCounts) {
+        neighborhoodCounts = {};
+        (networkData.schools || []).forEach(s => {
+          const n = (s.neighborhood || '').trim();
+          if (n) neighborhoodCounts[n] = (neighborhoodCounts[n] || 0) + 1;
+        });
+      }
       renderUI(networkData);
     };
 
@@ -1493,9 +1576,11 @@
                 ${icon('building')}
                 <select id="mapNeighborhoodSelect" class="select map-select">
                   <option value="all" ${currentNeighborhood === 'all' ? 'selected' : ''}>Bairro (Todos)</option>
-                  ${neighborhoods.map(b => `
-                    <option value="${esc(b)}" ${currentNeighborhood === b ? 'selected' : ''}>📍 ${esc(b)}</option>
-                  `).join('')}
+                  ${neighborhoods.map(b => {
+                    const bName = typeof b === 'string' ? b : b.name;
+                    const bCount = typeof b === 'string' ? neighborhoodCounts?.[bName] : b.count;
+                    return `<option value="${esc(bName)}" ${currentNeighborhood === bName ? 'selected' : ''}>📍 ${esc(bName)}${bCount != null ? ` (${bCount})` : ''}</option>`;
+                  }).join('')}
                 </select>
               </div>
               <div class="map-filter-select-wrap">
@@ -1520,7 +1605,11 @@
                   <option value="waiting_contract" ${currentStatus === 'waiting_contract' ? 'selected' : ''}>Aguardando contratação</option>
                 </select>
               </div>
-              
+
+              ${(currentQ || currentNeighborhood !== 'all' || currentCrit !== 'all' || currentStatus !== 'all') ? `
+              <button type="button" class="btn btn-secondary" id="mapClearFilters" data-tooltip="Remover busca, bairro, criticidade e status">${icon('filter')}Limpar</button>
+              ` : ''}
+
               <div class="map-actions-group">
                 <button type="button" id="btnToggleCircuitMode" class="btn-circuit-toggle ${circuitModeActive || selectedCircuitSchoolIds.length > 0 ? 'active' : ''}" title="Clique para escolher livremente até 10 unidades escolares para o circuito">
                   ${icon('school')} Escolher Unidades <span class="circuit-badge">${selectedCircuitSchoolIds.length}/10</span>
@@ -1531,6 +1620,9 @@
                 <a href="/api/export/demands.csv" class="btn primary map-export-btn" download>
                   ${icon('download')} Exportar
                 </a>
+                <button type="button" id="btnTogglePageFullscreen" class="btn-page-fullscreen" data-tooltip="Ver esta página em tela cheia">
+                  ${icon('expand')}<span>Tela Cheia</span>
+                </button>
               </div>
             </div>
           </div>
@@ -1789,6 +1881,8 @@
         }).join('');
 
         const isInCircuit = selectedCircuitSchoolIds.includes(s.id);
+        const fullAddress = s.address || 'Itaguaí - RJ';
+        const shortAddress = fullAddress.split(' · ')[0] || fullAddress;
         const popupContent = `
           <div class="popup-photo-banner">
             <img src="${photoUrl}" alt="${esc(s.name)}" loading="lazy" onerror="this.onerror=null; this.src='${satFallback}';">
@@ -1803,8 +1897,8 @@
               <h4 class="popup-title">${esc(s.name)}</h4>
               <span class="popup-badge badge-crit-${crit}">${crit === 'critical' ? '🔴 Crítico' : (crit === 'warning' ? '🟠 Atenção' : (crit === 'in_progress' ? '🔵 Em atendimento' : '🟢 Regular'))}</span>
             </div>
-            <p class="popup-address">${esc(s.address || 'Itaguaí - RJ')}</p>
-            
+            <p class="popup-address" title="${esc(fullAddress)}">${esc(shortAddress)}</p>
+
             <div class="popup-stats-grid">
               <div class="pstat"><span class="pstat-val">${s.open_demands_count}</span><span class="pstat-lbl">Demandas</span></div>
               <div class="pstat"><span class="pstat-val text-red">${s.urgent_p1_count}</span><span class="pstat-lbl">Urgentes P1</span></div>
@@ -1813,13 +1907,17 @@
             </div>
 
             <!-- RESUMO OPERACIONAL DE DEMANDAS COM DATAS -->
+            ${dList.length === 0 ? `
+            <div class="popup-regularized-banner">✨ <strong>Rede 100% Regularizada</strong></div>
+            ` : `
             <div class="popup-demands-container">
               <div class="popup-demands-head">
                 <span class="popup-demands-head-title">${icon('clipboard')} Demandas em Aberto</span>
                 <span class="popup-demands-count-tag">${s.open_demands_count} ativa(s)</span>
               </div>
-              ${demandsHtml}
+              <div class="popup-demands-list">${demandsHtml}</div>
             </div>
+            `}
 
             <!-- INFORMAÇÕES INSTITUCIONAIS -->
             <div class="popup-info-grid">
@@ -1831,12 +1929,12 @@
 
             <div class="popup-actions mt-8">
               <button type="button" class="popup-btn ${isInCircuit ? 'popup-btn-primary' : 'popup-btn-secondary'}" onclick="window.appToggleCircuitSchool(${s.id})" title="${isInCircuit ? 'Remover do Circuito' : 'Adicionar ao Circuito de Vistorias'}">
-                ${isInCircuit ? '✓ No Circuito' : '+ Circuito'}
+                ${isInCircuit ? '✓ Circuito' : '+ Circuito'}
               </button>
               <a href="/demandas?school_id=${s.id}" class="popup-btn popup-btn-primary">${icon('clipboard')} Demandas</a>
-              <button type="button" class="popup-btn popup-btn-secondary" onclick="window.appOpenSchool360(${s.id})">${icon('school')} 360°</button>
-              <button type="button" class="popup-btn popup-btn-route" onclick="window.appRouteSchool(${s.lat}, ${s.lon})">${icon('trend')} Rota 1:1</button>
-              ${s.maps_link ? `<a href="${esc(s.maps_link)}" target="_blank" rel="noopener noreferrer" class="popup-btn" style="flex:0 0 auto;padding:5px 8px" title="Abrir no Google Maps">${icon('globe')}</a>` : ''}
+              <button type="button" class="popup-btn popup-btn-icon" onclick="window.appOpenSchool360(${s.id})" title="Visão 360° da unidade">${icon('school')}</button>
+              <button type="button" class="popup-btn popup-btn-icon popup-btn-route" onclick="window.appRouteSchool(${s.lat}, ${s.lon})" title="Traçar rota 1:1">${icon('trend')}</button>
+              ${s.maps_link ? `<a href="${esc(s.maps_link)}" target="_blank" rel="noopener noreferrer" class="popup-btn popup-btn-icon" title="Abrir no Google Maps">${icon('globe')}</a>` : ''}
             </div>
           </div>
         `;
@@ -2384,11 +2482,24 @@
       $('#mapNeighborhoodSelect')?.addEventListener('change', (e) => { currentNeighborhood = e.target.value; fetchAndRender(); });
       $('#mapCritSelect')?.addEventListener('change', (e) => { currentCrit = e.target.value; fetchAndRender(); });
       $('#mapStatusSelect')?.addEventListener('change', (e) => { currentStatus = e.target.value; fetchAndRender(); });
+      $('#mapClearFilters')?.addEventListener('click', () => {
+        currentQ = ''; currentNeighborhood = 'all'; currentCrit = 'all'; currentStatus = 'all';
+        fetchAndRender();
+      });
       $('#btnToggleCircuitMode')?.addEventListener('click', () => window.appOpenCircuitSelectorModal());
       $('#btnQuickTop5Circuit')?.addEventListener('click', () => window.appQuickTopCircuit(5));
       $$('[data-quick-filter]').forEach(b => b.addEventListener('click', () => { currentStatus = 'all'; currentCrit = 'all'; fetchAndRender(); }));
       $$('[data-quick-crit]').forEach(b => b.addEventListener('click', () => { currentCrit = b.dataset.quickCrit; fetchAndRender(); }));
       $$('[data-quick-status]').forEach(b => b.addEventListener('click', () => { currentStatus = b.dataset.quickStatus; fetchAndRender(); }));
+      $('#btnTogglePageFullscreen')?.addEventListener('click', () => {
+        const wrap = document.querySelector('.map-page-wrapper');
+        if (!wrap) return;
+        if (document.fullscreenElement === wrap) {
+          document.exitFullscreen?.();
+        } else {
+          (wrap.requestFullscreen || wrap.webkitRequestFullscreen)?.call(wrap);
+        }
+      });
       $$('[data-focus-school]').forEach(el => {
         el.addEventListener('click', () => {
           const sid = Number(el.dataset.focusSchool);
@@ -2406,6 +2517,18 @@
         });
       });
     };
+
+    // Registrado uma única vez (bindMapEvents roda a cada troca de filtro, então o
+    // botão em si é religado ali; aqui só sincronizamos ícone/rótulo quando o estado
+    // de tela cheia muda, buscando o botão atual no DOM em vez de guardar referência).
+    document.addEventListener('fullscreenchange', () => {
+      const btn = document.getElementById('btnTogglePageFullscreen');
+      if (!btn) return;
+      const isFs = document.fullscreenElement === document.querySelector('.map-page-wrapper');
+      btn.classList.toggle('active', isFs);
+      btn.setAttribute('data-tooltip', isFs ? 'Sair da tela cheia' : 'Ver esta página em tela cheia');
+      btn.innerHTML = isFs ? `${icon('compress')}<span>Sair da Tela Cheia</span>` : `${icon('expand')}<span>Tela Cheia</span>`;
+    });
 
     await fetchAndRender();
   }

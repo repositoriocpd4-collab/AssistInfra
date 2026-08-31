@@ -9925,3 +9925,223 @@ body.dark-mode .stats-customize-row:hover {
    height: 100% !important;
    min-height: 100% !important;
 }
+
+/* ===== POPUP CARD: COMPACT LAYOUT TO ELIMINATE VERTICAL SCROLL ===== */
+/* Address: single line, truncated with ellipsis, full text on hover via title attr */
+.popup-address {
+   display: block;
+   font-size: 11px;
+   color: var(--muted);
+   margin: 2px 0 8px;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+   cursor: default;
+}
+
+/* Compact "no open demands" banner replaces the bulky bordered empty-state block */
+.popup-regularized-banner {
+   display: flex;
+   align-items: center;
+   gap: 6px;
+   margin: 8px 0;
+   padding: 6px 10px;
+   background: rgba(46, 125, 50, 0.08);
+   border: 1px solid rgba(46, 125, 50, 0.22);
+   border-radius: var(--radius-sm);
+   font-size: 11.5px;
+   font-weight: 700;
+   color: #2e7d32;
+}
+
+body.dark-mode .popup-regularized-banner {
+   background: rgba(76, 175, 80, 0.14);
+   border-color: rgba(76, 175, 80, 0.3);
+   color: #81c784;
+}
+
+/* Demands list: only THIS sub-section scrolls when a school has several open demands,
+   so the outer popup card never needs its own scrollbar */
+.popup-demands-list {
+   max-height: 92px;
+   overflow-y: auto;
+   scrollbar-width: thin;
+   padding-right: 2px;
+   margin-right: -2px;
+}
+
+/* A little extra headroom (still within the outer popup's own cap) for the rare
+   school with several open demands and a long name, so the outer card itself
+   still never needs to scroll -- only the demands sub-list does. */
+.map-popup-card {
+   max-height: 404px;
+}
+
+.maplibregl-popup-content,
+.custom-leaflet-popup .leaflet-popup-content-wrapper {
+   max-height: 490px;
+}
+
+.popup-demands-list .popup-demand-card:last-child {
+   margin-bottom: 0;
+}
+
+/* Info grid: tighter vertical rhythm */
+.popup-info-grid {
+   margin: 8px 0;
+   padding: 5px 8px;
+   gap: 3px 8px;
+}
+
+/* Actions: keep every action visible on a single row instead of wrapping to two */
+.popup-actions {
+   flex-wrap: nowrap;
+   gap: 5px;
+}
+
+.popup-actions .popup-btn:not(.popup-btn-icon) {
+   flex: 1 1 auto;
+   min-width: 0;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+}
+
+.popup-btn-icon {
+   flex: 0 0 auto;
+   width: 30px;
+   padding-left: 0;
+   padding-right: 0;
+}
+
+/* ===== "TELA CHEIA" DA PÁGINA MAPA OPERACIONAL DA REDE ===== */
+/* Diferente do botão de tela cheia do MapLibre (que expande só o canvas do mapa),
+   este toggle expande a PÁGINA inteira -- cabeçalho, filtros, KPIs, mapa, painel
+   lateral de prioridades e o planejador de circuito -- ocupando toda a tela, sem
+   o menu lateral / cabeçalho do sistema. */
+.btn-page-fullscreen {
+   display: inline-flex;
+   align-items: center;
+   gap: 6px;
+   padding: 6px 14px;
+   font-size: 12px;
+   font-weight: 600;
+   border-radius: 20px;
+   background: var(--teal-soft);
+   color: var(--teal);
+   border: 1px solid transparent;
+   cursor: pointer;
+   transition: all 0.15s ease;
+}
+
+.btn-page-fullscreen:hover {
+   background: var(--teal);
+   color: #fff;
+}
+
+.btn-page-fullscreen.active {
+   background: var(--teal);
+   color: #fff;
+   box-shadow: 0 4px 12px rgba(15, 123, 121, 0.28);
+}
+
+.map-page-wrapper:fullscreen,
+.map-page-wrapper:-webkit-full-screen {
+   width: 100vw;
+   height: 100vh;
+   max-width: 1600px;
+   margin: 0 auto;
+   overflow-y: auto;
+   background: var(--bg);
+   padding: 20px clamp(16px, 3vw, 40px) 40px;
+   box-sizing: border-box;
+}
+
+body.dark-mode .map-page-wrapper:fullscreen,
+body.dark-mode .map-page-wrapper:-webkit-full-screen {
+   background: var(--bg);
+}
+
+/* ===== MODAL "TELA CHEIA" (assistente de Registrar Demanda/CI) ===== */
+/* Ocupa toda a viewport -- cabeçalho e rodapé permanecem barras de ponta a ponta,
+   e o conteúdo central (stepper + grade de categorias + formulário) fica centralizado
+   com largura confortável de leitura, em vez de esticar até as bordas em telas largas. */
+.modal.fullscreen {
+   top: 0;
+   left: 0;
+   right: 0;
+   bottom: 0;
+   width: 100vw;
+   height: 100vh;
+   max-width: 100vw;
+   max-height: 100vh;
+   border-radius: 0;
+   border: 0;
+   display: flex;
+   flex-direction: column;
+}
+
+.modal.fullscreen .modal-body {
+   max-width: 1160px;
+   width: 100%;
+   margin: 0 auto;
+   box-sizing: border-box;
+   scrollbar-width: none;
+   -ms-overflow-style: none;
+}
+
+.modal.fullscreen .modal-body::-webkit-scrollbar {
+   display: none;
+   width: 0;
+   height: 0;
+}
+
+/* ============================================================
+   PERSONALIZAR PAINEL — botão "Salvar preferência" explícito no
+   rodapé do popover, com uma confirmação visual breve ao salvar.
+   ============================================================ */
+.stats-customize-footer {
+   display: flex;
+   align-items: center;
+   justify-content: flex-end;
+   gap: 10px;
+   padding: 10px 12px 8px;
+   border-top: 1px solid var(--line);
+   margin-top: 4px;
+}
+
+.stats-customize-saved {
+   display: inline-flex;
+   align-items: center;
+   gap: 5px;
+   font-size: 11.5px;
+   font-weight: 700;
+   color: var(--green, #1a7c44);
+   opacity: 0;
+   transform: translateY(2px);
+   transition: opacity .18s ease, transform .18s ease;
+   pointer-events: none;
+   margin-right: auto;
+}
+
+.stats-customize-saved svg {
+   width: 14px;
+   height: 14px;
+   flex: 0 0 auto;
+}
+
+.stats-customize-saved.is-visible {
+   opacity: 1;
+   transform: translateY(0);
+}
+
+.stats-customize-save {
+   padding: 7px 14px;
+   font-size: 12.5px;
+   border-radius: 999px;
+}
+
+body.dark-mode .stats-customize-footer {
+   border-top-color: #2a2f3a;
+}
+
