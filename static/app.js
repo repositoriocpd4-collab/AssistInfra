@@ -1730,7 +1730,8 @@
         el.className = 'custom-leaflet-marker-wrap';
         el.innerHTML = markerHtml;
 
-        const photoUrl = s.photo_url || `https://static-maps.yandex.ru/1.x/?ll=${s.lon},${s.lat}&z=17&l=sat&size=450,220`;
+        const photoUrl = `/api/school_photo/${s.id}?lat=${s.lat}&lon=${s.lon}`;
+        const satFallback = `https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/export?bbox=${s.lon-0.0009},${s.lat-0.00055},${s.lon+0.0009},${s.lat+0.00055}&bboxSR=4326&imageSR=4326&size=450,200&format=png&f=image`;
         const dList = s.demands_summary || [];
         let demandsHtml = dList.length === 0 ? `<div class="popup-demand-empty">✨ <strong>Rede 100% Regularizada</strong></div>` : dList.map(d => {
             const prioClass = d.priority === 'P1' ? 'prio-p1' : (d.priority === 'P2' ? 'prio-p2' : 'prio-p3');
@@ -1741,7 +1742,7 @@
         const isInCircuit = selectedCircuitSchoolIds.includes(s.id);
         const popupContent = `
           <div class="popup-photo-banner">
-            <img src="${photoUrl}" alt="${esc(s.name)}" loading="lazy" onerror="this.onerror=null; this.src='https://static-maps.yandex.ru/1.x/?ll=${s.lon},${s.lat}&z=17&l=sat&size=450,220';">
+            <img src="${photoUrl}" alt="${esc(s.name)}" loading="lazy" onerror="this.onerror=null; this.src='${satFallback}';">
             ${s.maps_link ? `
               <a href="${esc(s.maps_link)}" target="_blank" rel="noopener noreferrer" class="popup-streetview-tag" title="Abrir no Google Street View">
                 ${icon('camera')} Google Street View ↗
@@ -1827,6 +1828,230 @@
         s._marker = marker;
         s._popup = popup;
       });
+    };
+
+    window.appOpenCircuitSelectorModal = () => {
+      const allSchools = (networkData?.schools || []).filter(s => s.lat && s.lon);
+      if (!allSchools.length) {
+        toast('Circuito', 'Nenhuma escola georreferenciada disponível.', 'warning');
+        return;
+      }
+
+      const existing = document.getElementById('circuitPickerModalOverlay');
+      if (existing) existing.remove();
+
+      let tempSelectedIds = [...selectedCircuitSchoolIds];
+      let filterText = '';
+      let activeTab = 'all';
+
+      const overlay = document.createElement('div');
+      overlay.id = 'circuitPickerModalOverlay';
+      overlay.className = 'circuit-modal-overlay';
+
+      const renderModalContent = () => {
+        let filtered = allSchools.filter(s => {
+          const q = filterText.toLowerCase().trim();
+          const matchQ = !q || s.name.toLowerCase().includes(q) || (s.neighborhood || '').toLowerCase().includes(q) || (s.director || '').toLowerCase().includes(q);
+          if (!matchQ) return false;
+
+          if (activeTab === 'p1') return s.urgent_p1_count > 0;
+          if (activeTab === 'overdue') return s.overdue_count > 0;
+          if (activeTab === 'open') return s.open_demands_count > 0;
+          return true;
+        });
+
+        overlay.innerHTML = `
+          <div class="circuit-modal-dialog" onclick="event.stopPropagation()">
+            <div class="circuit-modal-header">
+              <div>
+                <h3 class="circuit-modal-title">
+                  ${icon('school')} Escolher Unidades Escolares do Circuito
+                </h3>
+                <p class="circuit-modal-sub">Selecione livremente de 1 até 10 unidades escolares da rede para compor seu roteiro de vistorias.</p>
+              </div>
+              <button type="button" class="circuit-modal-close-btn" id="circuitModalCloseBtn" title="Fechar">✕</button>
+            </div>
+
+            <div class="circuit-modal-toolbar">
+              <div class="circuit-modal-search-wrap">
+                <span class="circuit-modal-search-icon">🔍</span>
+                <input type="text" id="circuitModalSearchInput" placeholder="Buscar por nome da escola, bairro ou diretor..." value="${esc(filterText)}" autocomplete="off">
+              </div>
+
+              <div class="circuit-picker-counter-badge" id="circuitModalCountBadge">
+                <strong>${tempSelectedIds.length}</strong> de 10 selecionadas
+              </div>
+
+              <div class="circuit-modal-chips-bar">
+                <button type="button" class="circuit-modal-chip ${activeTab === 'all' ? 'active' : ''}" data-modal-tab="all">
+                  Todas as Escolas (${allSchools.length})
+                </button>
+                <button type="button" class="circuit-modal-chip ${activeTab === 'p1' ? 'active' : ''}" data-modal-tab="p1">
+                  🔴 Urgentes P1 (${allSchools.filter(s => s.urgent_p1_count > 0).length})
+                </button>
+                <button type="button" class="circuit-modal-chip ${activeTab === 'overdue' ? 'active' : ''}" data-modal-tab="overdue">
+                  ⚠️ Prazos Vencidos (${allSchools.filter(s => s.overdue_count > 0).length})
+                </button>
+                <button type="button" class="circuit-modal-chip ${activeTab === 'open' ? 'active' : ''}" data-modal-tab="open">
+                  📋 Com Demandas (${allSchools.filter(s => s.open_demands_count > 0).length})
+                </button>
+              </div>
+            </div>
+
+            <div class="circuit-schools-picker-list" id="circuitSchoolsPickerList">
+              ${filtered.length ? filtered.map(s => {
+                const isSelected = tempSelectedIds.includes(s.id);
+                const isMax = tempSelectedIds.length >= 10 && !isSelected;
+                return `
+                  <div class="circuit-school-pick-row ${isSelected ? 'selected' : ''} ${isMax ? 'disabled-max' : ''}" data-pick-id="${s.id}">
+                    <div class="circuit-pick-checkbox">${isSelected ? '✓' : ''}</div>
+                    <div class="circuit-pick-details">
+                      <div class="circuit-pick-name" title="${esc(s.name)}">${esc(s.name)}</div>
+                      <div class="circuit-pick-sub">${esc(s.neighborhood || 'Itaguaí')} · ${esc(s.director || 'S/ Diretor')}</div>
+                    </div>
+                    <div class="circuit-pick-tags">
+                      ${s.urgent_p1_count > 0 ? `<span class="circuit-pick-badge" style="background:#fee2e2;color:#b91c1c">🔴 ${s.urgent_p1_count} P1</span>` : ''}
+                      ${s.open_demands_count > 0 ? `<span class="circuit-pick-badge" style="background:#e0f2fe;color:#0369a1">📋 ${s.open_demands_count}</span>` : `<span class="circuit-pick-badge" style="background:#dcfce7;color:#15803d">🟢 Ok</span>`}
+                    </div>
+                  </div>
+                `;
+              }).join('') : `<div style="grid-column: 1/-1; text-align:center; padding:30px; color:var(--muted)">Nenhuma unidade encontrada para os filtros aplicados.</div>`}
+            </div>
+
+            <div class="circuit-modal-footer">
+              <div class="circuit-modal-footer-left">
+                <button type="button" class="btn secondary" id="circuitModalClearBtn" style="padding:6px 12px;font-size:12px">
+                  ✕ Limpar Seleção
+                </button>
+                <button type="button" class="btn secondary" id="circuitModalQuickTop5" style="padding:6px 12px;font-size:12px">
+                  ⚡ Sugestão Top 5
+                </button>
+              </div>
+              <div class="circuit-modal-footer-right">
+                <button type="button" class="btn secondary" id="circuitModalCancelBtn">
+                  Cancelar
+                </button>
+                <button type="button" class="btn primary" id="circuitModalApplyBtn" style="background:var(--primary);color:#fff">
+                  🚀 Traçar Circuito (${tempSelectedIds.length} ${tempSelectedIds.length === 1 ? 'escola' : 'escolas'})
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        overlay.querySelector('#circuitModalCloseBtn')?.addEventListener('click', () => overlay.remove());
+        overlay.querySelector('#circuitModalCancelBtn')?.addEventListener('click', () => overlay.remove());
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+        const searchInp = overlay.querySelector('#circuitModalSearchInput');
+        searchInp?.addEventListener('input', (e) => {
+          filterText = e.target.value;
+          renderSchoolItemsOnly();
+        });
+
+        overlay.querySelectorAll('[data-modal-tab]').forEach(tabBtn => {
+          tabBtn.addEventListener('click', () => {
+            activeTab = tabBtn.dataset.modalTab;
+            overlay.querySelectorAll('[data-modal-tab]').forEach(b => b.classList.remove('active'));
+            tabBtn.classList.add('active');
+            renderSchoolItemsOnly();
+          });
+        });
+
+        overlay.querySelector('#circuitModalClearBtn')?.addEventListener('click', () => {
+          tempSelectedIds = [];
+          updateSelectionState();
+        });
+
+        overlay.querySelector('#circuitModalQuickTop5')?.addEventListener('click', () => {
+          const top = (networkData?.priority_queue || []).filter(s => s.lat && s.lon).slice(0, 5).map(s => s.id);
+          tempSelectedIds = top;
+          updateSelectionState();
+        });
+
+        overlay.querySelector('#circuitModalApplyBtn')?.addEventListener('click', () => {
+          if (!tempSelectedIds.length) {
+            toast('Circuito', 'Selecione pelo menos 1 unidade escolar.', 'warning');
+            return;
+          }
+          selectedCircuitSchoolIds = [...tempSelectedIds];
+          circuitModeActive = true;
+          overlay.remove();
+          updateCircuitUI();
+          calculateAndRenderCircuit(true);
+          toast('Circuito de Vistorias', `Traçando roteiro otimizado para ${selectedCircuitSchoolIds.length} unidades!`, 'success');
+        });
+
+        bindRowClicks();
+      };
+
+      const bindRowClicks = () => {
+        overlay.querySelectorAll('[data-pick-id]').forEach(row => {
+          row.addEventListener('click', () => {
+            const id = Number(row.dataset.pickId);
+            const idx = tempSelectedIds.indexOf(id);
+            if (idx >= 0) {
+              tempSelectedIds.splice(idx, 1);
+            } else {
+              if (tempSelectedIds.length >= 10) {
+                toast('Limite Atingido', 'Você já selecionou o limite máximo de 10 unidades.', 'warning');
+                return;
+              }
+              tempSelectedIds.push(id);
+            }
+            updateSelectionState();
+          });
+        });
+      };
+
+      const updateSelectionState = () => {
+        const badge = overlay.querySelector('#circuitModalCountBadge');
+        if (badge) badge.innerHTML = `<strong>${tempSelectedIds.length}</strong> de 10 selecionadas`;
+
+        const applyBtn = overlay.querySelector('#circuitModalApplyBtn');
+        if (applyBtn) applyBtn.innerHTML = `🚀 Traçar Circuito (${tempSelectedIds.length} ${tempSelectedIds.length === 1 ? 'escola' : 'escolas'})`;
+
+        renderSchoolItemsOnly();
+      };
+
+      const renderSchoolItemsOnly = () => {
+        const list = overlay.querySelector('#circuitSchoolsPickerList');
+        if (!list) return;
+
+        let filtered = allSchools.filter(s => {
+          const q = filterText.toLowerCase().trim();
+          const matchQ = !q || s.name.toLowerCase().includes(q) || (s.neighborhood || '').toLowerCase().includes(q) || (s.director || '').toLowerCase().includes(q);
+          if (!matchQ) return false;
+
+          if (activeTab === 'p1') return s.urgent_p1_count > 0;
+          if (activeTab === 'overdue') return s.overdue_count > 0;
+          if (activeTab === 'open') return s.open_demands_count > 0;
+          return true;
+        });
+
+        list.innerHTML = filtered.length ? filtered.map(s => {
+          const isSelected = tempSelectedIds.includes(s.id);
+          const isMax = tempSelectedIds.length >= 10 && !isSelected;
+          return `
+            <div class="circuit-school-pick-row ${isSelected ? 'selected' : ''} ${isMax ? 'disabled-max' : ''}" data-pick-id="${s.id}">
+              <div class="circuit-pick-checkbox">${isSelected ? '✓' : ''}</div>
+              <div class="circuit-pick-details">
+                <div class="circuit-pick-name" title="${esc(s.name)}">${esc(s.name)}</div>
+                <div class="circuit-pick-sub">${esc(s.neighborhood || 'Itaguaí')} · ${esc(s.director || 'S/ Diretor')}</div>
+              </div>
+              <div class="circuit-pick-tags">
+                ${s.urgent_p1_count > 0 ? `<span class="circuit-pick-badge" style="background:#fee2e2;color:#b91c1c">🔴 ${s.urgent_p1_count} P1</span>` : ''}
+                ${s.open_demands_count > 0 ? `<span class="circuit-pick-badge" style="background:#e0f2fe;color:#0369a1">📋 ${s.open_demands_count}</span>` : `<span class="circuit-pick-badge" style="background:#dcfce7;color:#15803d">🟢 Ok</span>`}
+              </div>
+            </div>
+          `;
+        }).join('') : `<div style="grid-column: 1/-1; text-align:center; padding:30px; color:var(--muted)">Nenhuma unidade encontrada para os filtros aplicados.</div>`;
+
+        bindRowClicks();
+      };
+
+      document.body.appendChild(overlay);
+      renderModalContent();
     };
 
     window.appToggleCircuitSchool = (schoolId) => {
@@ -2016,6 +2241,9 @@
             <div class="circuit-dock-title">
               ${icon('trend')} Circuito de Vistorias em Campo
               <span class="circuit-badge" style="background:var(--primary);color:#fff;padding:2px 8px;border-radius:10px">${selectedCircuitSchoolIds.length}/10 unidades</span>
+              <button type="button" class="btn secondary" onclick="window.appOpenCircuitSelectorModal()" style="margin-left:8px;padding:3px 8px;font-size:11.5px" title="Adicionar ou trocar escolas do circuito">
+                ${icon('school')} Escolher / Alterar
+              </button>
             </div>
 
             <div class="circuit-kpis-bar">
@@ -2104,7 +2332,7 @@
     const bindMapEvents = () => {
       let searchTimeout;
       $('#mapSearchInput')?.addEventListener('input', (e) => { clearTimeout(searchTimeout); currentQ = e.target.value; searchTimeout = setTimeout(fetchAndRender, 250); });
-      $('#btnToggleCircuitMode')?.addEventListener('click', () => { if (!selectedCircuitSchoolIds.length) window.appQuickTopCircuit(5); else document.querySelector('.circuit-planner-dock')?.scrollIntoView({ behavior: 'smooth' }); });
+      $('#btnToggleCircuitMode')?.addEventListener('click', () => window.appOpenCircuitSelectorModal());
       $('#btnQuickTop5Circuit')?.addEventListener('click', () => window.appQuickTopCircuit(5));
       $$('[data-quick-filter]').forEach(b => b.addEventListener('click', () => { currentStatus = 'all'; currentCrit = 'all'; fetchAndRender(); }));
       $$('[data-focus-school]').forEach(el => {

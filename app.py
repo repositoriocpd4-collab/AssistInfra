@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, Request, Form, UploadFile, File, HTTPException, Query
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -1272,6 +1272,37 @@ def api_map_network(request: Request, q: str = "", neighborhood: str = "", criti
             "address": "Sede Administrativa · Itaguaí - RJ"
         }
     }
+
+
+@app.get("/api/school_photo/{school_id}")
+async def api_school_photo(school_id: int, lat: float = None, lon: float = None):
+    cache_path = f"static/school_cache/school_{school_id}.png"
+    if os.path.exists(cache_path) and os.path.getsize(cache_path) > 1000:
+        return FileResponse(cache_path, media_type="image/png")
+    
+    conn = db()
+    c = conn.cursor()
+    row = c.execute("SELECT lat, lon FROM schools WHERE id = ?", (school_id,)).fetchone()
+    if row and row["lat"] and row["lon"]:
+        s_lat, s_lon = float(row["lat"]), float(row["lon"])
+    elif lat is not None and lon is not None:
+        s_lat, s_lon = float(lat), float(lon)
+    else:
+        s_lat, s_lon = SMEDU_LAT, SMEDU_LON
+        
+    esri_url = f"https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/export?bbox={s_lon-0.0009},{s_lat-0.00055},{s_lon+0.0009},{s_lat+0.00055}&bboxSR=4326&imageSR=4326&size=450,200&format=png&f=image"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            r = await client.get(esri_url)
+            if r.status_code == 200 and len(r.content) > 1000:
+                os.makedirs("static/school_cache", exist_ok=True)
+                with open(cache_path, "wb") as f:
+                    f.write(r.content)
+                return Response(content=r.content, media_type="image/png")
+    except Exception:
+        pass
+    
+    return RedirectResponse(url=esri_url)
 
 
 def _haversine_distance_m(lat1, lon1, lat2, lon2):
