@@ -9607,3 +9607,321 @@ body.dark-mode .category-section-title svg {
    align-items: center;
    gap: 8px;
 }
+/* ============================================================
+   MENU LATERAL RECOLHÍVEL (DESKTOP) — alterna entre o modo
+   expandido (com rótulos) e o modo compacto (somente ícones),
+   com a preferência do usuário salva entre sessões.
+   Adicionado a pedido da SMEDU/PMI.
+   ============================================================ */
+:root {
+   --sidebar-collapsed: 80px;
+}
+
+.sidebar-collapse-toggle {
+   display: none;
+   position: fixed;
+   top: calc(var(--header-h, 124px) + 22px);
+   left: var(--sidebar-fixed);
+   transform: translate(-50%, 0);
+   width: 26px;
+   height: 26px;
+   padding: 0;
+   border-radius: 50%;
+   background: var(--surface);
+   border: 1px solid var(--line-strong);
+   color: var(--primary);
+   box-shadow: var(--shadow);
+   align-items: center;
+   justify-content: center;
+   cursor: pointer;
+   transition: left .22s ease, background .16s ease, box-shadow .16s ease;
+   z-index: 46;
+}
+
+.sidebar-collapse-toggle:hover {
+   background: var(--surface-blue);
+   box-shadow: var(--shadow-lg);
+}
+
+.sidebar-collapse-toggle:focus-visible {
+   outline: 2px solid var(--teal);
+   outline-offset: 2px;
+}
+
+.sidebar-collapse-toggle svg {
+   width: 13px;
+   height: 13px;
+   transform: rotate(180deg);
+   transition: transform .22s ease;
+}
+
+body.sidebar-collapsed .sidebar-collapse-toggle svg {
+   transform: rotate(0deg);
+}
+
+body.dark-mode .sidebar-collapse-toggle {
+   background: #132a44;
+   border-color: #24405f;
+   color: #dce8f7;
+}
+
+body.dark-mode .sidebar-collapse-toggle:hover {
+   background: #1a3654;
+}
+
+@media(min-width:981px) {
+   .sidebar-collapse-toggle {
+      display: flex;
+   }
+
+   #sidebar.side-menu,
+   .main-content,
+   .govbr-footer {
+      transition: transform .22s ease, width .22s ease, max-width .22s ease, left .22s ease, margin-left .22s ease, margin-right .22s ease;
+   }
+
+   body.sidebar-collapsed {
+      --sidebar-fixed: var(--sidebar-collapsed);
+   }
+
+   body.sidebar-collapsed .side-menu-header {
+      justify-content: center !important;
+      padding-left: .5rem !important;
+      padding-right: .5rem !important;
+   }
+
+   body.sidebar-collapsed .side-menu-title {
+      gap: 0 !important;
+   }
+
+   body.sidebar-collapsed .side-menu-title-text,
+   body.sidebar-collapsed .side-menu-content .nav-item span,
+   body.sidebar-collapsed .side-menu-content .nav-item .key-hint,
+   body.sidebar-collapsed .side-menu-content .btn-new span,
+   body.sidebar-collapsed .side-menu-content .btn-new .key-hint,
+   body.sidebar-collapsed .side-menu-footer {
+      display: none !important;
+   }
+
+   body.sidebar-collapsed .side-menu-content .btn-new {
+      width: 44px !important;
+      height: 44px !important;
+      min-height: 44px !important;
+      margin: .5rem auto 1rem !important;
+      padding: 0 !important;
+      border-radius: 50% !important;
+      justify-content: center !important;
+   }
+
+   body.sidebar-collapsed .side-menu-content .nav-item {
+      justify-content: center !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      gap: 0 !important;
+   }
+
+   body.sidebar-collapsed .side-divider {
+      margin-left: .6rem !important;
+      margin-right: .6rem !important;
+   }
+}
+
+/* ============================================================
+   BOTÃO "VOLTAR AO PAINEL" — presente no cabeçalho de cada tela
+   interna (Demandas, Unidades Escolares, Mapa, Planejamento,
+   Relatórios, Administração, Sobre, detalhe de demanda), levando
+   direto para o Painel (Dashboard). Adicionado a pedido da SMEDU/PMI.
+   ============================================================ */
+.page-back-link {
+   display: flex;
+   width: max-content;
+   align-items: center;
+   gap: 5px;
+   margin-bottom: 8px;
+   font-size: 12.5px;
+   font-weight: 700;
+   color: var(--muted);
+   text-decoration: none;
+}
+
+.page-back-link:hover {
+   color: var(--teal);
+}
+
+.page-back-link svg {
+   width: 15px;
+   height: 15px;
+   transform: rotate(180deg);
+   flex: 0 0 auto;
+}
+
+body.dark-mode .page-back-link {
+   color: #9fb2c8;
+}
+
+body.dark-mode .page-back-link:hover {
+   color: #6fd6d3;
+}
+
+/* ============================================================
+   CORREÇÃO: a dica de nome ao passar o mouse nos pinos do mapa
+   (Mapa da Rede / Circuito de Vistorias) precisa ficar num
+   elemento INTERNO do marcador, nunca no elemento raiz que o
+   MapLibre usa para posicionar o pino geograficamente — colocar
+   `data-tooltip` ali força `position:relative` (via a regra
+   genérica [data-tooltip]) e atropela o posicionamento por
+   transform do MapLibre, fazendo os pinos "pularem" de lugar.
+   ============================================================ */
+.circuit-pin-inner {
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   width: 100%;
+   height: 100%;
+}
+
+/* ============================================================
+   PERSONALIZAR PAINEL — permite ao usuário exibir ou ocultar
+   cada grupo de indicadores do Painel, com preferência salva
+   neste navegador. Adicionado a pedido da SMEDU/PMI.
+   ============================================================ */
+.stats-groups-toolbar {
+   display: flex;
+   justify-content: flex-end;
+   margin-bottom: 8px;
+}
+
+.stats-customize-wrap {
+   position: relative;
+}
+
+.stats-customize-btn {
+   display: inline-flex;
+   align-items: center;
+   gap: 7px;
+   padding: 7px 13px;
+   border-radius: 999px;
+   border: 1px solid var(--line-strong);
+   background: var(--surface);
+   color: var(--primary);
+   font-size: 12.5px;
+   font-weight: 700;
+   cursor: pointer;
+   transition: background .16s ease, border-color .16s ease;
+}
+
+.stats-customize-btn svg {
+   width: 15px;
+   height: 15px;
+}
+
+.stats-customize-btn:hover,
+.stats-customize-btn[aria-expanded="true"] {
+   background: var(--surface-blue);
+   border-color: var(--primary);
+}
+
+.stats-customize-panel {
+   position: absolute;
+   top: calc(100% + 8px);
+   right: 0;
+   width: 280px;
+   padding: 4px;
+   z-index: 20;
+}
+
+.stats-customize-head {
+   padding: 12px 12px 10px;
+   border-bottom: 1px solid var(--line);
+   margin-bottom: 4px;
+}
+
+.stats-customize-head strong {
+   display: block;
+   font-size: 13px;
+   color: var(--ink);
+}
+
+.stats-customize-head small {
+   display: block;
+   font-size: 11px;
+   color: var(--muted);
+   margin-top: 3px;
+   line-height: 1.4;
+}
+
+.stats-customize-list {
+   max-height: 320px;
+   overflow-y: auto;
+}
+
+.stats-customize-row {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 12px;
+   padding: 9px 12px;
+   border-radius: 9px;
+   font-size: 12.5px;
+   color: var(--ink);
+   cursor: pointer;
+}
+
+.stats-customize-row:hover {
+   background: var(--surface-soft);
+}
+
+.stat-group {
+   transition: opacity .18s ease, transform .18s ease;
+}
+
+.stat-group.is-hiding {
+   opacity: 0;
+   transform: scale(.97);
+}
+
+body.dark-mode .stats-customize-btn {
+   background: #1a1f27;
+   border-color: #2a2f3a;
+   color: #dce8f7;
+}
+
+body.dark-mode .stats-customize-btn:hover,
+body.dark-mode .stats-customize-btn[aria-expanded="true"] {
+   background: #22344a;
+}
+
+body.dark-mode .stats-customize-row:hover {
+   background: rgba(255, 255, 255, .05);
+}
+
+@media(max-width:600px) {
+   .stats-customize-panel {
+      right: -6px;
+      width: min(300px, calc(100vw - 32px));
+   }
+}
+
+/* ============================================================
+   TELA CHEIA DO MAPA — o controle nativo do MapLibre (ícone de
+   cantos no topo direito do mapa) expande apenas o mapa + a
+   legenda flutuante, sem os filtros/painéis ao redor. Aqui só
+   garantimos que o contêiner ocupe a tela toda nesse modo, já
+   que ele normalmente tem uma altura fixa em pixels.
+   ============================================================ */
+.map-viewport-wrapper:fullscreen,
+.map-viewport-wrapper:-webkit-full-screen {
+   width: 100vw !important;
+   height: 100vh !important;
+   min-height: 100vh !important;
+   border-radius: 0 !important;
+   border: 0 !important;
+}
+
+.map-viewport-wrapper:fullscreen #networkMapContainer,
+.map-viewport-wrapper:fullscreen .map-container-box,
+.map-viewport-wrapper:-webkit-full-screen #networkMapContainer,
+.map-viewport-wrapper:-webkit-full-screen .map-container-box {
+   height: 100% !important;
+   min-height: 100% !important;
+}

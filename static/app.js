@@ -159,7 +159,8 @@
   const PROV_PRIORITIES = ['Baixa', 'Média', 'Alta'];
 
   function pageHeader(title, subtitle, actions = '') {
-    return `<div class="page-header"><div><span class="eyebrow">AGENDA INTEGRADA</span><h1>${esc(title)}</h1><p>${esc(subtitle)}</p></div><div class="page-actions">${actions}</div></div>`;
+    const back = page !== 'dashboard' ? `<a class="page-back-link" href="/" data-tooltip="Voltar para a visão geral · tecla P"><svg><use href="#i-chevron"></use></svg><span>Voltar ao Painel</span></a>` : '';
+    return `<div class="page-header"><div>${back}<span class="eyebrow">AGENDA INTEGRADA</span><h1>${esc(title)}</h1><p>${esc(subtitle)}</p></div><div class="page-actions">${actions}</div></div>`;
   }
 
   async function openDemandForm() {
@@ -539,11 +540,29 @@
       const alertCls = (c[0] === 'unassigned' && c[2] > 0) ? ' stat-tile-alert' : '';
       return `<article class="stat-tile ${c[4]}${alertCls}" data-dashboard-filter="${esc(c[7])}" data-tooltip="${esc(c[6])}"><div class="stat-tile-icon">${icon(c[5])}</div><div class="stat-tile-body"><div class="stat-tile-value mono">${c[8] === 'money' ? money(c[2]) : num(c[2])}</div><div class="stat-tile-label">${esc(c[1])}</div><div class="stat-tile-note">${esc(c[3])}</div></div></article>`;
     };
-    const statsGroupsHtml = `<div class="stats-groups">${statGroups.map(([label, keys]) => {
+    // Personalizar painel: cada usuário escolhe quais grupos de indicadores aparecem
+    // no seu Painel. Preferência salva neste navegador (não é um dado do servidor).
+    const HIDDEN_GROUPS_KEY = 'agenda-hidden-stat-groups';
+    const getHiddenGroups = () => { try { return new Set(JSON.parse(localStorage.getItem(HIDDEN_GROUPS_KEY) || '[]')); } catch { return new Set(); } };
+    const saveHiddenGroups = set => localStorage.setItem(HIDDEN_GROUPS_KEY, JSON.stringify([...set]));
+    const groupLabelSentence = label => label.charAt(0) + label.slice(1).toLowerCase();
+    const hiddenGroups = getHiddenGroups();
+    const statsGroupsHtml = `<div class="stats-groups-toolbar">
+      <div class="stats-customize-wrap">
+        <button type="button" class="stats-customize-btn" id="statsCustomizeBtn" aria-haspopup="true" aria-expanded="false" data-tooltip="Escolher quais grupos aparecem aqui">${icon('settings')}<span>Personalizar painel</span></button>
+        <div class="popover stats-customize-panel" id="statsCustomizePanel" hidden>
+          <div class="stats-customize-head"><strong>Personalizar painel</strong><small>Escolha quais grupos de indicadores aparecem aqui. A escolha fica salva neste navegador.</small></div>
+          <div class="stats-customize-list">${statGroups.map(([label]) => `<label class="stats-customize-row"><span>${esc(groupLabelSentence(label))}</span><span class="switch"><input type="checkbox" data-group-toggle="${esc(label)}"${hiddenGroups.has(label) ? '' : ' checked'}><span class="switch-track"></span></span></label>`).join('')}</div>
+        </div>
+      </div>
+    </div>
+    <div class="stats-groups" id="statsGroups">${statGroups.map(([label, keys]) => {
       const isCost = label === 'CUSTO EM ABERTO';
-      const cards = `<div class="stat-group-label">${esc(label)}</div><div class="stat-group-cards">${keys.map(k => statTile(byKey[k])).join('')}</div>`;
-      if (!isCost) return `<div class="stat-group">${cards}</div>`;
-      return `<div class="stat-group stat-group-cost"><div>${cards}</div><button class="btn-cost-detail" type="button" data-tooltip="Ver o detalhamento do custo em aberto por categoria">${icon('eye')}<span>Ver detalhes</span></button></div>`;
+      const isHidden = hiddenGroups.has(label);
+      const cardsHtml = `<div class="stat-group-label">${esc(label)}</div><div class="stat-group-cards">${keys.map(k => statTile(byKey[k])).join('')}</div>`;
+      const attrs = `class="stat-group${isCost ? ' stat-group-cost' : ''}${isHidden ? ' is-hiding' : ''}" data-group="${esc(label)}"${isHidden ? ' hidden' : ''}`;
+      if (!isCost) return `<div ${attrs}>${cardsHtml}</div>`;
+      return `<div ${attrs}><div>${cardsHtml}</div><button class="btn-cost-detail" type="button" data-tooltip="Ver o detalhamento do custo em aberto por categoria">${icon('eye')}<span>Ver detalhes</span></button></div>`;
     }).join('')}</div>`;
     const maxCat = Math.max(1, ...data.categories.map(x => x.qty));
     const CAT_PALETTE = ['#005A9C', '#0f7b79', '#1a7c44', '#c67c00', '#6f42c1', '#b71c1c', '#0d3c75', '#4ade95'];
@@ -570,6 +589,34 @@
       location.href = f ? `/demandas?${f}` : '/demandas';
     }));
     $('.btn-cost-detail', content)?.addEventListener('click', () => openCostDetail(data));
+
+    // Personalizar painel: abrir/fechar o popover e mostrar/ocultar cada grupo, com
+    // uma pequena animação de saída/entrada em vez de um corte seco no layout.
+    const statsGroupsEl = $('#statsGroups', content);
+    const customizeBtn = $('#statsCustomizeBtn', content);
+    const customizePanel = $('#statsCustomizePanel', content);
+    const openCustomize = () => { if (!customizePanel) return; customizePanel.hidden = false; customizeBtn?.setAttribute('aria-expanded', 'true'); };
+    const closeCustomize = () => { if (!customizePanel) return; customizePanel.hidden = true; customizeBtn?.setAttribute('aria-expanded', 'false'); };
+    customizeBtn?.addEventListener('click', e => { e.stopPropagation(); customizePanel?.hidden ? openCustomize() : closeCustomize(); });
+    document.addEventListener('click', e => { if (customizePanel && !customizePanel.hidden && !e.target.closest('.stats-customize-wrap')) closeCustomize(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape' && customizePanel && !customizePanel.hidden) { closeCustomize(); customizeBtn?.focus(); } });
+    $$('[data-group-toggle]', content).forEach(input => {
+      input.addEventListener('change', () => {
+        const label = input.dataset.groupToggle;
+        if (input.checked) hiddenGroups.delete(label); else hiddenGroups.add(label);
+        saveHiddenGroups(hiddenGroups);
+        const el = statsGroupsEl?.querySelector(`.stat-group[data-group="${CSS.escape(label)}"]`);
+        if (el) {
+          if (input.checked) {
+            el.hidden = false;
+            requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('is-hiding')));
+          } else {
+            el.classList.add('is-hiding');
+            setTimeout(() => { el.hidden = true; }, 180);
+          }
+        }
+      });
+    });
   }
 
   function openCostDetail(data) {
@@ -969,7 +1016,7 @@
     payload.staff = staff; let active = 'summary';
     const render = () => {
       const d = payload.demand, due = dueInfo(d);
-      content.innerHTML = `<div class="breadcrumb"><a href="/demandas">Demandas</a><span>›</span><span>${esc(d.code)}</span></div>
+      content.innerHTML = `<div class="breadcrumb"><a href="/">Painel</a><span>›</span><a href="/demandas">Demandas</a><span>›</span><span>${esc(d.code)}</span></div>
         <div class="detail-head"><div><div class="detail-code-line"><span class="code-label">${esc(d.code)}</span><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span><span class="deadline ${due.cls}">${esc(due.text)}</span></div><h1>${esc(d.title)}</h1></div><div class="page-actions">${ctx.user.perm.can_edit_analysis ? `<button class="btn btn-secondary" id="editDemand">${icon('edit')}Editar análise</button>` : ''}<button class="btn btn-primary" id="quickUpdate">${icon('message')}Devolutiva</button></div></div>
         <nav class="tabs" aria-label="Detalhes da demanda">
           <button class="tab ${active === 'summary' ? 'active' : ''}" data-tab="summary">${icon('file')}Resumo</button>
@@ -1433,6 +1480,7 @@
         <div class="map-page-wrapper">
           <div class="map-page-header">
             <div>
+              <a class="page-back-link" href="/" data-tooltip="Voltar para a visão geral · tecla P"><svg><use href="#i-chevron"></use></svg><span>Voltar ao Painel</span></a>
               <h1 class="map-page-title">Mapa Operacional da Rede</h1>
               <p class="map-page-subtitle">Visão territorial e roteirizador logístico de vistorias</p>
             </div>
@@ -1672,6 +1720,7 @@
 
       mapInstance.addControl(new maplibregl.NavigationControl({ showCompass: true, showZoom: true }), 'top-right');
       mapInstance.addControl(new maplibregl.ScaleControl({ maxWidth: 100, unit: 'metric' }), 'bottom-left');
+      mapInstance.addControl(new maplibregl.FullscreenControl({ container: mapDiv.closest('.map-viewport-wrapper') || mapDiv }), 'top-right');
 
       mapInstance.on('load', () => {
         const smeduPinEl = document.createElement('div');
@@ -1717,13 +1766,13 @@
         
         let markerHtml = '';
         if (crit === 'critical') {
-          markerHtml = `<div class="custom-map-pin pin-critical"><span class="pin-inner">${count > 0 ? count : '⚠️'}</span><div class="pin-pulse"></div></div>`;
+          markerHtml = `<div class="custom-map-pin pin-critical" data-tooltip="${esc(s.name)}"><span class="pin-inner">${count > 0 ? count : '⚠️'}</span><div class="pin-pulse"></div></div>`;
         } else if (crit === 'warning') {
-          markerHtml = `<div class="custom-map-pin pin-warning"><span class="pin-inner">${count > 0 ? count : '!'}</span></div>`;
+          markerHtml = `<div class="custom-map-pin pin-warning" data-tooltip="${esc(s.name)}"><span class="pin-inner">${count > 0 ? count : '!'}</span></div>`;
         } else if (crit === 'in_progress') {
-          markerHtml = `<div class="custom-map-pin pin-progress"><span class="pin-inner">${count > 0 ? count : '▶'}</span></div>`;
+          markerHtml = `<div class="custom-map-pin pin-progress" data-tooltip="${esc(s.name)}"><span class="pin-inner">${count > 0 ? count : '▶'}</span></div>`;
         } else {
-          markerHtml = `<div class="custom-map-pin pin-regular"><span class="pin-inner">${count > 0 ? count : '✓'}</span></div>`;
+          markerHtml = `<div class="custom-map-pin pin-regular" data-tooltip="${esc(s.name)}"><span class="pin-inner">${count > 0 ? count : '✓'}</span></div>`;
         }
 
         const el = document.createElement('div');
@@ -2175,9 +2224,9 @@
         pin.className = 'circuit-pin-marker';
         if (stop.is_origin) {
           pin.style.background = '#005A9C';
-          pin.innerHTML = `🏛️`;
+          pin.innerHTML = `<span class="circuit-pin-inner" data-tooltip="${esc(stop.name)}">🏛️</span>`;
         } else {
-          pin.innerHTML = `${stop.order}`;
+          pin.innerHTML = `<span class="circuit-pin-inner" data-tooltip="${esc(stop.name)}">${stop.order}</span>`;
           if (stop.p1_count > 0) pin.style.background = '#e53935';
           else if (stop.p2_count > 0) pin.style.background = '#fb8c00';
           else pin.style.background = '#005A9C';
@@ -2332,9 +2381,14 @@
     const bindMapEvents = () => {
       let searchTimeout;
       $('#mapSearchInput')?.addEventListener('input', (e) => { clearTimeout(searchTimeout); currentQ = e.target.value; searchTimeout = setTimeout(fetchAndRender, 250); });
+      $('#mapNeighborhoodSelect')?.addEventListener('change', (e) => { currentNeighborhood = e.target.value; fetchAndRender(); });
+      $('#mapCritSelect')?.addEventListener('change', (e) => { currentCrit = e.target.value; fetchAndRender(); });
+      $('#mapStatusSelect')?.addEventListener('change', (e) => { currentStatus = e.target.value; fetchAndRender(); });
       $('#btnToggleCircuitMode')?.addEventListener('click', () => window.appOpenCircuitSelectorModal());
       $('#btnQuickTop5Circuit')?.addEventListener('click', () => window.appQuickTopCircuit(5));
       $$('[data-quick-filter]').forEach(b => b.addEventListener('click', () => { currentStatus = 'all'; currentCrit = 'all'; fetchAndRender(); }));
+      $$('[data-quick-crit]').forEach(b => b.addEventListener('click', () => { currentCrit = b.dataset.quickCrit; fetchAndRender(); }));
+      $$('[data-quick-status]').forEach(b => b.addEventListener('click', () => { currentStatus = b.dataset.quickStatus; fetchAndRender(); }));
       $$('[data-focus-school]').forEach(el => {
         el.addEventListener('click', () => {
           const sid = Number(el.dataset.focusSchool);
@@ -3069,6 +3123,21 @@
   $('#menuButton')?.addEventListener('click', () => { $('#sidebar').classList.add('open'); showBackdrop(true) });
   $('#sideClose')?.addEventListener('click', () => { $('#sidebar').classList.remove('open'); showBackdrop(false) });
   $('#backdrop')?.addEventListener('click', () => $('#sidebar').classList.remove('open'));
+
+  // Menu lateral recolhível no desktop (modo compacto, somente ícones), com preferência salva por navegador.
+  const sidebarCollapseToggle = $('#sidebarCollapseToggle');
+  const setSidebarCollapsed = collapsed => {
+    document.body.classList.toggle('sidebar-collapsed', collapsed);
+    localStorage.setItem('agenda-sidebar-collapsed', collapsed ? '1' : '0');
+    if (sidebarCollapseToggle) {
+      sidebarCollapseToggle.setAttribute('aria-expanded', String(!collapsed));
+      sidebarCollapseToggle.setAttribute('aria-label', collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral');
+      sidebarCollapseToggle.setAttribute('data-tooltip', (collapsed ? 'Expandir menu' : 'Recolher menu') + ' \u00b7 tecla [');
+    }
+  };
+  const toggleSidebarCollapse = () => setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed'));
+  setSidebarCollapsed(localStorage.getItem('agenda-sidebar-collapsed') === '1');
+  sidebarCollapseToggle?.addEventListener('click', toggleSidebarCollapse);
   $$('.side-menu .nav-item').forEach(a => a.addEventListener('click', () => {
     $('#sidebar')?.classList.remove('open');
   }));
@@ -3114,6 +3183,7 @@
     ...(ctx.user.perm.can_manage_admin ? [{ key: 'A', label: 'Ir para Administração', href: '/administracao' }] : []),
     { key: 'S', label: 'Ir para Sobre o Sistema', href: '/sobre' },
     { key: 'B', label: 'Voltar para a página anterior', action: () => history.back() },
+    { key: '[', label: 'Recolher/expandir o menu lateral', action: () => toggleSidebarCollapse() },
     { key: 'Esc', label: 'Fechar uma janela aberta', action: () => closeModal() },
     { key: '?', label: 'Abrir esta lista de atalhos', action: () => openShortcutsHelp() },
   ];
