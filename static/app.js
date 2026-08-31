@@ -243,7 +243,7 @@
           ${!ctx.user.perm.school_scoped ? `<div class="field span-2 mb-16"><label>Unidade Escolar *</label><div class="select-wrap"><span class="select-wrap-icon">${icon('school')}</span><select class="select" name="school_id" required>${schoolOptions}</select></div></div>` : ''}
           <div class="wizard-question-row">
             <p class="wizard-question">Qual é o tipo de problema?</p>
-            <span class="dw-pill" id="categoryCountPill">0 de ${MAX_CATEGORIES} selecionados</span>
+            <span class="dw-pill" id="categoryCountPill">${icon('check-circle')}<span>0 de ${MAX_CATEGORIES} selecionados</span></span>
           </div>
           <p class="wizard-hint">Toque em até 3 opções que mais se parecem com o que você está vendo.</p>
           <p class="wizard-hint" id="categoryPickHint">Nenhum problema selecionado ainda.</p>
@@ -295,7 +295,7 @@
 
         <section data-step="4" class="form-step hidden"><div id="demandReview"></div></section>
       </form>`,
-      footer: `<div class="dw-footer-security">${icon('shield')}<span>Seus dados estão protegidos</span></div><div class="dw-footer-actions"><button class="btn btn-secondary hidden" id="prevStep">Voltar</button><button class="btn btn-primary dw-next-btn" id="nextStep" disabled>Continuar</button></div>`,
+      footer: `<div class="dw-footer-security">${icon('shield')}<span>Seus dados estão seguros</span></div><div class="dw-footer-actions"><button class="btn btn-secondary hidden" id="prevStep">Voltar</button><button class="btn btn-primary dw-next-btn" id="nextStep" disabled><span class="dw-next-main">Continuar</span><span class="dw-next-sub">Próximo passo</span></button></div>`,
       onOpen(root) {
         let step = 1;
         const form = $('#demandForm', root), next = $('#nextStep'), prev = $('#prevStep');
@@ -311,7 +311,7 @@
         const updateCategoryHint = () => {
           const hint = $('#categoryPickHint', root);
           const pill = $('#categoryCountPill', root);
-          if (pill) { pill.textContent = `${state.categories.length} de ${MAX_CATEGORIES} selecionados`; pill.classList.toggle('dw-pill-active', state.categories.length > 0); }
+          if (pill) { $('span', pill).textContent = `${state.categories.length} de ${MAX_CATEGORIES} selecionados`; pill.classList.toggle('dw-pill-active', state.categories.length > 0); }
           if (!hint) return;
           if (!state.categories.length) hint.textContent = 'Nenhum problema selecionado ainda.';
           else if (state.categories.length < MAX_CATEGORIES) hint.textContent = `${state.categories.length} de ${MAX_CATEGORIES} selecionados: ${state.categories.join(', ')}.`;
@@ -485,11 +485,13 @@
 
         const priorityLabelFriendly = p => URGENCY_CHOICES.find(u => u.value === p)?.title || priorityLabel(p);
 
+        const setNextLabel = (main, sub = '') => { next.innerHTML = `<span class="dw-next-main">${esc(main)}</span>${sub ? `<span class="dw-next-sub">${esc(sub)}</span>` : ''}`; };
+
         const updateStep = () => {
           $$('[data-step]', root).forEach(s => s.classList.toggle('hidden', Number(s.dataset.step) !== step));
           $$('[data-step-ind]', root).forEach(s => { const n = Number(s.dataset.stepInd); s.classList.toggle('active', n === step); s.classList.toggle('done', n < step); });
           prev.classList.toggle('hidden', step === 1);
-          next.textContent = step === totalSteps ? (state.items.length > 1 ? 'Enviar demandas' : 'Enviar demanda') : 'Continuar';
+          setNextLabel(step === totalSteps ? (state.items.length > 1 ? 'Enviar demandas' : 'Enviar demanda') : 'Continuar', step === totalSteps ? 'Finalizar registro' : 'Próximo passo');
           if (step === 2) renderDetailsFields();
           syncNextEnabled();
           if (step === totalSteps) {
@@ -515,7 +517,7 @@
           const reach = state.customReach ? (Number($('[name=affected_people_custom]', form).value) || 0) : state.reach;
           const schoolId = ctx.user.perm.school_scoped ? ctx.user.school_id : form.elements.school_id.value;
           const created = [], failed = [];
-          next.disabled = true; next.textContent = 'Enviando...';
+          next.disabled = true; setNextLabel('Enviando...');
           for (const it of state.items) {
             const title = (it.title || '').trim() || [it.category, it.location].filter(Boolean).join(' — ') || it.category;
             const payload = {
@@ -550,7 +552,7 @@
             location.href = created.length > 1 ? '/demandas' : `/demandas/${created[0].id}`;
           } else {
             toast('Não foi possível enviar', failed.map(f => f.message).join(' · ') || 'Tente novamente.', 'error');
-            next.disabled = false; next.textContent = state.items.length > 1 ? 'Enviar demandas' : 'Enviar demanda';
+            next.disabled = false; setNextLabel(state.items.length > 1 ? 'Enviar demandas' : 'Enviar demanda', 'Finalizar registro');
           }
         });
         updateStep();
