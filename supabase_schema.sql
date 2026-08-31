@@ -3,6 +3,17 @@
 -- DESTINO: SUPABASE / POSTGRESQL
 -- PROJETO: vvdbbwgcubddfvsxsehb (https://vvdbbwgcubddfvsxsehb.supabase.co)
 -- ===========================================================================
+--
+-- FOTOS DAS DEMANDAS: este script deixa o Supabase PRONTO para receber e
+-- armazenar as fotos/anexos das demandas — cria o bucket de Storage
+-- "demandas-anexos" (seção 1.5) e as colunas storage_bucket/storage_path/
+-- storage_url na tabela attachments (abaixo). O que ele NÃO faz sozinho é
+-- enviar os bytes dos arquivos que hoje estão em uploads/ no disco local:
+-- SQL não move arquivos binários para dentro do Storage. Isso exige uma
+-- chamada à Storage API (pelo app.py ou por um script de migração à parte)
+-- para cada arquivo já existente — o resto do sistema (tabelas, índices,
+-- políticas) já sai pronto para os próximos uploads caírem direto lá.
+-- ===========================================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
@@ -160,6 +171,10 @@ CREATE TABLE public.attachments (
     stored_name TEXT NOT NULL,
     mime TEXT,
     size BIGINT DEFAULT 0,
+    -- Onde o arquivo (foto/anexo) fica guardado no Supabase Storage.
+    storage_bucket TEXT NOT NULL DEFAULT 'demandas-anexos',
+    storage_path TEXT,              -- caminho dentro do bucket, ex.: "10/10_a07cc4b8f2a3018799e0.png"
+    storage_url TEXT,                -- URL pública/assinada, preenchida após o upload
     created_at TEXT NOT NULL
 );
 
@@ -191,6 +206,28 @@ CREATE TABLE public.planning_links (
     demand_id BIGINT NOT NULL REFERENCES public.demands(id) ON DELETE CASCADE,
     PRIMARY KEY (planning_id, demand_id)
 );
+
+-- 1.5. STORAGE — BUCKET PARA FOTOS E ANEXOS DAS DEMANDAS
+---------------------------------------------------------------------------
+-- Bucket privado (não público): os anexos hoje só são servidos autenticados,
+-- via GET /uploads/{attachment_id} no app.py (require_user). Mantemos o
+-- mesmo modelo aqui — leitura/escrita liberadas pela policy da seção 2,
+-- não por URL pública direta.
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+    'demandas-anexos',
+    'demandas-anexos',
+    false,
+    12582912, -- 12 MB, mesmo limite validado em app.py (upload_attachment)
+    ARRAY['image/png','image/jpeg','image/webp','application/pdf','application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'text/plain','text/csv']
+)
+ON CONFLICT (id) DO UPDATE SET
+    file_size_limit = EXCLUDED.file_size_limit,
+    allowed_mime_types = EXCLUDED.allowed_mime_types;
 
 -- 2. POLÍTICAS DE SEGURANÇA (ROW LEVEL SECURITY - RLS)
 ---------------------------------------------------------------------------
@@ -230,6 +267,13 @@ ALTER TABLE public.attachments ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Permitir acesso completo em attachments" ON public.attachments;
 CREATE POLICY "Permitir acesso completo em attachments" ON public.attachments FOR ALL USING (true) WITH CHECK (true);
 
+-- Storage: mesma política permissiva das demais tabelas, só que restrita ao
+-- bucket "demandas-anexos" (storage.objects guarda os arquivos de TODOS os
+-- buckets do projeto, então o filtro por bucket_id é obrigatório).
+DROP POLICY IF EXISTS "Permitir acesso completo em demandas-anexos" ON storage.objects;
+CREATE POLICY "Permitir acesso completo em demandas-anexos" ON storage.objects FOR ALL
+    USING (bucket_id = 'demandas-anexos') WITH CHECK (bucket_id = 'demandas-anexos');
+
 ALTER TABLE public.planning_items ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Permitir acesso completo em planning_items" ON public.planning_items;
 CREATE POLICY "Permitir acesso completo em planning_items" ON public.planning_items FOR ALL USING (true) WITH CHECK (true);
@@ -245,6 +289,7 @@ CREATE INDEX IF NOT EXISTS idx_demands_status ON public.demands(status);
 CREATE INDEX IF NOT EXISTS idx_demands_priority ON public.demands(priority);
 CREATE INDEX IF NOT EXISTS idx_demand_updates_demand_id ON public.demand_updates(demand_id);
 CREATE INDEX IF NOT EXISTS idx_attachments_demand_id ON public.attachments(demand_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_attachments_storage_path ON public.attachments(storage_bucket, storage_path) WHERE storage_path IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
 
 -- 4. POPULAÇÃO DOS DADOS EXISTENTES (DML)
@@ -461,6 +506,13 @@ INSERT INTO public.demand_updates ("id", "demand_id", "kind", "message", "author
 
 -- Inserindo 1 registro(s) em attachments
 INSERT INTO public.attachments ("id", "demand_id", "filename", "stored_name", "mime", "size", "created_at") VALUES (1, 10, 'energia explicação.png', '10_a07cc4b8f2a3018799e0.png', 'image/png', 1452645, '2026-08-29 01:06:01') ON CONFLICT DO NOTHING;
+
+-- Backfill: aponta cada anexo já exportado para o caminho que ele vai ocupar
+-- no bucket "demandas-anexos" quando o upload for feito (demand_id/stored_name)
+-- — não sobrescreve quem já tiver storage_path preenchido por um upload real.
+UPDATE public.attachments
+SET storage_path = demand_id || '/' || stored_name
+WHERE storage_path IS NULL;
 
 -- Inserindo 4 registro(s) em planning_items
 INSERT INTO public.planning_items ("id", "code", "year", "title", "category", "kind", "status", "estimated_cost", "quantity", "unit", "justification", "schools_count", "process_number", "procurement_number", "contract_number", "supplier", "created_at", "updated_at") VALUES (1, 'PLAN-2027-0001', 2027, 'Aquisição de aparelhos de ar-condicionado Split 12k BTU', 'Climatização', 'Aquisição futura', 'Aprovada para planejamento', 145000.0, 41.0, 'un', 'Consolidar necessidades de climatização de 12 unidades.', 12, NULL, NULL, NULL, NULL, '2026-08-29 00:48:11', '2026-08-29 00:48:11') ON CONFLICT DO NOTHING;

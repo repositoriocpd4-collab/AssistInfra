@@ -78,6 +78,152 @@
     if (Number.isNaN(d.getTime())) return v;
     return d.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
   };
+
+  // ===== Calendário customizado (substitui <input type="date"> nativo) =====
+  // Mantém o input original (agora hidden) com o valor ISO "YYYY-MM-DD" que o
+  // resto do código já lê via #id, e adiciona um input de exibição dd/mm/aaaa
+  // + um popover de calendário. A data "de hoje" nunca fica gravada em estado —
+  // é sempre recalculada com `new Date()` no momento em que é usada (abertura
+  // do calendário e clique em "Hoje"), então o calendário nunca mostra um mês
+  // desatualizado.
+  const DP_DOW = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+  const DP_MONTHS = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const dpPad2 = n => String(n).padStart(2, '0');
+  const dpTodayISO = () => { const t = new Date(); return `${t.getFullYear()}-${dpPad2(t.getMonth() + 1)}-${dpPad2(t.getDate())}`; };
+  const dpISOtoBR = iso => { if (!iso) return ''; const [y, m, d] = iso.split('-'); return y && m && d ? `${d}/${m}/${y}` : ''; };
+  const dpISOParts = iso => { if (!iso) return null; const [y, m, d] = iso.split('-').map(Number); return (y && m && d) ? { y, m, d } : null; };
+
+  let dpActiveClose = null; // fecha o popover aberto no momento, se houver
+
+  function dpCloseActive() {
+    if (dpActiveClose) { dpActiveClose(); dpActiveClose = null; }
+  }
+
+  function dpBuildGrid(viewYear, viewMonth, selectedISO) {
+    // viewMonth: 0-11. Primeiro dia da semana exibido = domingo anterior (ou o próprio dia 1).
+    const first = new Date(viewYear, viewMonth, 1);
+    const startOffset = first.getDay(); // 0=domingo
+    const gridStart = new Date(viewYear, viewMonth, 1 - startOffset);
+    const todayISO = dpTodayISO();
+    let cells = '';
+    for (let i = 0; i < 42; i++) {
+      const cellDate = new Date(gridStart);
+      cellDate.setDate(gridStart.getDate() + i);
+      const iso = `${cellDate.getFullYear()}-${dpPad2(cellDate.getMonth() + 1)}-${dpPad2(cellDate.getDate())}`;
+      const outside = cellDate.getMonth() !== viewMonth;
+      const isSelected = iso === selectedISO;
+      const isToday = iso === todayISO;
+      const cls = ['dp-day'];
+      if (outside) cls.push('is-outside');
+      if (isSelected) cls.push('is-selected');
+      if (isToday) cls.push('is-today');
+      cells += `<button type="button" class="${cls.join(' ')}" data-dp-date="${iso}">${cellDate.getDate()}</button>`;
+    }
+    return cells;
+  }
+
+  function dpPanelHTML(viewYear, viewMonth, selectedISO) {
+    return `
+      <div class="dp-header">
+        <span class="dp-month-label">${DP_MONTHS[viewMonth]} de ${viewYear}</span>
+        <div class="dp-nav">
+          <button type="button" class="dp-nav-btn dp-nav-prev" data-dp-nav="-1" aria-label="Mês anterior" data-tooltip="Mês anterior">${icon('chevron')}</button>
+          <button type="button" class="dp-nav-btn dp-nav-next" data-dp-nav="1" aria-label="Próximo mês" data-tooltip="Próximo mês">${icon('chevron')}</button>
+        </div>
+      </div>
+      <div class="dp-dow-row">${DP_DOW.map(d => `<span>${d}</span>`).join('')}</div>
+      <div class="dp-grid">${dpBuildGrid(viewYear, viewMonth, selectedISO)}</div>
+      <div class="dp-footer">
+        <button type="button" class="dp-link" data-dp-clear>Limpar</button>
+        <button type="button" class="dp-link" data-dp-today>Hoje</button>
+      </div>`;
+  }
+
+  function dpOpen(wrap) {
+    dpCloseActive();
+    const hidden = $('#' + wrap.dataset.dpTarget);
+    const display = $('.datepicker-display', wrap);
+    if (!hidden || !display) return;
+
+    const selectedParts = dpISOParts(hidden.value) || dpISOParts(dpTodayISO());
+    let viewYear = selectedParts.y, viewMonth = selectedParts.m - 1;
+
+    const panel = document.createElement('div');
+    panel.className = 'popover dp-panel';
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-label', 'Selecionar data');
+    panel.innerHTML = dpPanelHTML(viewYear, viewMonth, hidden.value || '');
+    document.body.appendChild(panel);
+
+    const positionPanel = () => {
+      const r = display.getBoundingClientRect();
+      const panelW = panel.offsetWidth || 280;
+      let left = r.left;
+      if (left + panelW > window.innerWidth - 8) left = Math.max(8, window.innerWidth - panelW - 8);
+      panel.style.left = `${left}px`;
+      panel.style.top = `${r.bottom + 6}px`;
+    };
+    positionPanel();
+
+    const rerender = () => { panel.innerHTML = dpPanelHTML(viewYear, viewMonth, hidden.value || ''); };
+
+    const pick = iso => {
+      hidden.value = iso;
+      display.value = dpISOtoBR(iso);
+      hidden.dispatchEvent(new Event('change', { bubbles: true }));
+      close();
+    };
+
+    panel.addEventListener('click', e => {
+      const navBtn = e.target.closest('[data-dp-nav]');
+      const dayBtn = e.target.closest('[data-dp-date]');
+      if (navBtn) {
+        viewMonth += Number(navBtn.dataset.dpNav);
+        if (viewMonth < 0) { viewMonth = 11; viewYear--; }
+        else if (viewMonth > 11) { viewMonth = 0; viewYear++; }
+        rerender();
+      } else if (dayBtn) {
+        pick(dayBtn.dataset.dpDate);
+      } else if (e.target.closest('[data-dp-clear]')) {
+        hidden.value = '';
+        display.value = '';
+        hidden.dispatchEvent(new Event('change', { bubbles: true }));
+        close();
+      } else if (e.target.closest('[data-dp-today]')) {
+        pick(dpTodayISO());
+      }
+    });
+
+    const onDocClick = e => { if (!panel.contains(e.target) && !wrap.contains(e.target)) close(); };
+    const onKeydown = e => { if (e.key === 'Escape') close(); };
+    const onScroll = () => positionPanel();
+    document.addEventListener('mousedown', onDocClick, true);
+    document.addEventListener('keydown', onKeydown);
+    window.addEventListener('resize', positionPanel);
+    window.addEventListener('scroll', onScroll, true);
+
+    function close() {
+      panel.remove();
+      document.removeEventListener('mousedown', onDocClick, true);
+      document.removeEventListener('keydown', onKeydown);
+      window.removeEventListener('resize', positionPanel);
+      window.removeEventListener('scroll', onScroll, true);
+      if (dpActiveClose === close) dpActiveClose = null;
+    }
+    dpActiveClose = close;
+  }
+
+  function initDatePickers(root = document) {
+    $$('[data-datepicker]', root).forEach(wrap => {
+      if (wrap.dataset.dpWired) return;
+      wrap.dataset.dpWired = '1';
+      const hidden = $('#' + wrap.dataset.dpTarget);
+      const display = $('.datepicker-display', wrap);
+      if (hidden && display) display.value = dpISOtoBR(hidden.value);
+      $$('.datepicker-display, .datepicker-icon-btn', wrap).forEach(el => el.addEventListener('click', () => dpOpen(wrap)));
+    });
+  }
+
   const PRIORITY_FALLBACK = { P1: 'Urgente', P2: 'Alta', P3: 'Programada', P4: 'Planejamento/Projeto' };
   const priorityLabel = p => (ctx.priorities && ctx.priorities[p] && ctx.priorities[p].label) || PRIORITY_FALLBACK[p] || p || '—';
   const statusClass = s => {
@@ -721,7 +867,7 @@
       return `<th class="th-filter${active ? ' active' : ''}" data-th-filter="${field}">${label}${icon('chevron')}</th>`;
     };
     return `<div class="table-wrap"><table class="data-table"><thead><tr><th>ID</th><th>Demanda</th>${compact ? '' : th('Categoria', 'category')}<th>Unidade Escolar</th>${th('Prioridade', 'priority')}${th('Status', 'status')}<th>Prazo</th><th>Ações</th></tr></thead><tbody>${rows.map(d => {
-      const due = dueInfo(d); return `<tr data-href="/demandas/${d.id}" class="${d.status === 'Concluída' ? 'row-done' : ''}"><td class="mono" data-label="ID"><strong>${esc(d.code)}</strong></td><td class="cell-title" data-label="Demanda"><strong>${esc(d.title)}</strong><small>Atualizado ${fmtDateTime(d.updated_at)}</small></td>${compact ? '' : `<td data-label="Categoria">${esc(d.category)}</td>`}<td data-label="Unidade Escolar">${esc(d.school_name || '—')}</td><td data-label="Prioridade"><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span></td><td data-label="Status"><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span></td><td data-label="Prazo"><span class="deadline ${due.cls}">${esc(due.text)}</span></td><td data-label="Ações"><a class="icon-btn" href="/demandas/${d.id}" aria-label="Ver detalhes" data-tooltip="Ver detalhes">${icon('eye')}</a></td></tr>`
+      const due = dueInfo(d); return `<tr data-href="/demandas/${d.id}" class="${d.status === 'Concluída' ? 'row-done' : ''}"><td class="mono" data-label="ID"><strong>${esc(d.code)}</strong></td><td class="cell-title" data-label="Demanda"><strong>${esc(d.title)}</strong><small>Atualizado ${fmtDateTime(d.updated_at)}</small></td>${compact ? '' : `<td data-label="Categoria">${esc(d.category)}</td>`}<td data-label="Unidade Escolar">${esc(d.school_name || '—')}</td><td data-label="Prioridade"><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span></td><td data-label="Status"><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span></td><td data-label="Prazo"><span class="deadline ${due.cls}">${esc(due.text)}</span></td><td data-label="Ações"><a class="icon-btn" href="/demandas/${d.id}" aria-label="Ver detalhes" data-tooltip="Ver detalhes">${icon('eye')}</a><button type="button" class="icon-btn" data-edit-demand="${d.id}" aria-label="Editar demanda" data-tooltip="Editar demanda">${icon('edit')}</button></td></tr>`
     }).join('')}</tbody></table></div>`;
   }
 
@@ -732,7 +878,7 @@
     const ds = dash.stats;
     const counts = catCounts.counts || {};
     const filters = { q: query.get('q') || '', status: query.get('status') || '', priority: query.get('priority') || '', category: query.get('category') || '', year: query.get('year') || '2026', overdue: query.get('overdue') === '1', due_soon: query.get('due_soon') === '1', unassigned: query.get('unassigned') === '1' };
-    content.innerHTML = pageHeader('Demandas Escolares', 'Gerencie, filtre e acompanhe todas as solicitações de infraestrutura.', `<a class="btn btn-secondary" href="/api/export/demands.csv" data-tooltip="Baixar a lista filtrada em CSV">${icon('download')}Exportar CSV</a><button class="btn btn-primary" data-open-demand data-tooltip="Abrir o assistente de registro">${icon('plus')}Registrar Demanda/CI</button>`) +
+    content.innerHTML = pageHeader('Demandas Escolares', 'Gerencie, filtre e acompanhe todas as solicitações de infraestrutura.', `<a class="btn btn-secondary" href="/api/export/demands.csv" data-tooltip="Baixar a lista filtrada em CSV">${icon('download')}Exportar CSV</a><a class="btn btn-secondary" href="/api/export/demands.pdf" data-tooltip="Baixar a lista em PDF">${icon('file')}Gerar um PDF</a><button class="btn btn-primary" data-open-demand data-tooltip="Abrir o assistente de registro">${icon('plus')}Registrar Demanda/CI</button>`) +
       `<section class="filters-card">
         <div class="field"><label>Buscar</label><div class="search-field">${icon('search')}<input class="input" id="fQ" value="${esc(filters.q)}" placeholder="Código, demanda ou escola..."></div></div>
         <div class="field"><label>Ano</label><select class="select" id="fYear"><option value="">Todos</option>${[2026, 2025, 2024].map(y => `<option ${String(y) === filters.year ? 'selected' : ''}>${y}</option>`).join('')}</select></div>
@@ -924,7 +1070,7 @@
         <div class="prov-type-row" id="provTypeRow">${PROV_ACTION_TYPES.map(t => `<button type="button" class="prov-type-chip ${d.prov_action_type === t.key ? 'active' : ''}" data-prov-type="${t.key}" style="--chip-color:var(--${t.color});--chip-soft:var(--${t.color}-soft)"><span class="prov-type-icon">${icon(t.icon)}</span>${esc(t.label)}</button>`).join('')}</div>
         <div class="prov-form-grid mt-16">
           <div class="field"><label>Responsável</label><select class="select" id="provResponsible"><option value="">Selecionar responsável...</option>${staffOptions}</select></div>
-          <div class="field"><label>Prazo previsto</label><input class="input" type="date" id="provDueDate" value="${esc(d.prov_due_date || d.due_date || '')}"></div>
+          <div class="field"><label>Prazo previsto</label><div class="datepicker" data-datepicker data-dp-target="provDueDate"><input type="hidden" id="provDueDate" value="${esc(d.prov_due_date || d.due_date || '')}"><div class="datepicker-input-wrap"><input class="input datepicker-display" type="text" placeholder="dd/mm/aaaa" readonly autocomplete="off"><button type="button" class="datepicker-icon-btn" aria-label="Abrir calendário" data-tooltip="Escolher data">${icon('calendar')}</button></div></div></div>
           <div class="field"><label>Prioridade da providência</label><select class="select" id="provPriority"><option value="">Selecionar...</option>${PROV_PRIORITIES.map(p => `<option ${p === d.prov_priority ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
           <div class="field"><label>Status da Demanda</label><select class="select" id="provStatus">${ctx.statuses.map(s => `<option ${s === d.status ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></div>
           <div class="field span-4"><label>Observação / Encaminhamento</label><textarea class="textarea" id="provNote" placeholder="Detalhe a providência tomada ou o encaminhamento dado...">${esc(d.prov_note || '')}</textarea></div>
@@ -1018,6 +1164,39 @@
             await api(`/api/demands/${d.id}`, { method: 'PUT', body: payload });
             closeModal();
             toast('Planejamento atualizado', payload.future_year ? `Demanda destinada ao exercício ${payload.future_year}.` : 'Vínculo com exercício futuro removido.');
+            await reload();
+          } catch (e) { toast('Não foi possível salvar', e.message, 'error'); }
+        });
+      }
+    });
+  }
+
+  // Editar demanda — os campos que a própria escola preencheu ao registrar (o que houve,
+  // local, descrição e impacto). Mesma rota PUT /api/demands/{id} usada em "Editar análise",
+  // só que só toca nos campos que qualquer usuário (não só quem tem can_edit_analysis) já
+  // pode alterar no backend: title, description, category, subcategory, location, impact,
+  // affected_people, risk, blocks_activity.
+  async function openEditDemand(d, reload) {
+    modal({
+      title: 'Editar demanda', subtitle: `${d.code} · ${d.school_name || ''}`, mode: 'drawer', body: `<form id="editDemandForm"><div class="form-grid">
+      <div class="field span-2"><label>Nome curto</label><input class="input" name="title" maxlength="140" value="${esc(d.title || '')}" required></div>
+      <div class="field"><label>Tipo de problema</label><select class="select" name="category">${ctx.categories.map(c => `<option ${c === d.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
+      <div class="field"><label>Local</label><input class="input" name="location" placeholder="Ex.: Sala 3, banheiro do pátio, cozinha..." value="${esc(d.location || '')}"></div>
+      <div class="field span-2"><label>Descrição</label><textarea class="textarea" name="description" required>${esc(d.description || '')}</textarea></div>
+      <div class="field"><label>Pessoas afetadas (aprox.)</label><input class="input" type="number" min="0" name="affected_people" value="${esc(d.affected_people || 0)}"></div>
+      <div class="field span-2"><label>Sinais de impacto</label><div class="check-grid"><label class="check"><input type="checkbox" name="blocks_activity" ${d.blocks_activity ? 'checked' : ''}> Impede atividade escolar</label><label class="check"><input type="checkbox" name="risk" ${d.risk ? 'checked' : ''}> Risco de acidente</label></div></div>
+    </div></form>`,
+      footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="saveEditDemand">Salvar alterações</button>`, onOpen() {
+        $('#saveEditDemand').addEventListener('click', async () => {
+          const f = $('#editDemandForm');
+          if (!f.reportValidity()) return;
+          const fd = new FormData(f);
+          const payload = Object.fromEntries(fd.entries());
+          ['blocks_activity', 'risk'].forEach(k => payload[k] = f.elements[k].checked);
+          try {
+            await api(`/api/demands/${d.id}`, { method: 'PUT', body: payload });
+            closeModal();
+            toast('Demanda atualizada', `${d.code} foi salva com as novas informações.`);
             await reload();
           } catch (e) { toast('Não foi possível salvar', e.message, 'error'); }
         });
@@ -1209,6 +1388,8 @@
         }
       });
 
+      initDatePickers(content);
+
       // Chips de tipo de providência
       $$('#provTypeRow .prov-type-chip', content).forEach(chip => chip.addEventListener('click', () => {
         const already = chip.classList.contains('active');
@@ -1344,7 +1525,7 @@
         <article class="stat-card orange" data-planning-insight data-tooltip="Ver quais unidades escolares são impactadas"><div class="stat-label">Escolas impactadas</div><div class="stat-value">${num(stats.schools)}</div><div class="stat-note">${icon('school')}Soma das unidades vinculadas</div></article>
         <article class="stat-card violet" data-planning-insight data-tooltip="Ver detalhamento do planejamento do exercício"><div class="stat-label">Ciclo administrativo</div><div class="stat-value" style="font-size:21px;margin-top:13px">Planejar → Licitar</div><div class="stat-note">${icon('trend')}Rastreabilidade do início à execução</div></article>
       </div>
-      ${pageHeader(`Planejamento ${selected}`, 'Itens previstos, consolidados e em preparação para contratação.', `<button class="btn btn-secondary" id="planningHelp">${icon('info')}Como funciona</button><button class="btn btn-secondary" id="newFutureDemand">${icon('plus')}Nova Demanda Futura</button>${ctx.user.perm.can_edit_analysis ? `<button class="btn btn-primary" id="newPlanning">${icon('plus')}Consolidar Item</button>` : ''}`)}
+      ${pageHeader(`Planejamento ${selected}`, 'Itens previstos, consolidados e em preparação para contratação.', `<a class="btn btn-secondary" href="/api/export/planning.pdf?year=${selected}" data-tooltip="Baixar os itens deste exercício em PDF">${icon('file')}Gerar um PDF</a><button class="btn btn-secondary" id="planningHelp">${icon('info')}Como funciona</button><button class="btn btn-secondary" id="newFutureDemand">${icon('plus')}Nova Demanda Futura</button>${ctx.user.perm.can_edit_analysis ? `<button class="btn btn-primary" id="newPlanning">${icon('plus')}Consolidar Item</button>` : ''}`)}
       <section class="panel"><div class="panel-header"><div><h2>Demandas de aquisição e contratação</h2><p>Itens consolidados para o exercício selecionado.</p></div><div class="search-field" style="width:260px">${icon('search')}<input class="input" id="planningQ" placeholder="Pesquisar planejamento..."></div></div><div id="planningTable"></div></section>`;
     const load = async () => { const q = $('#planningQ')?.value || ''; const res = await api(`/api/planning?year=${selected}&q=${encodeURIComponent(q)}`); $('#planningTable').innerHTML = renderPlanningTable(res.items) };
     $('#planningYear').addEventListener('change', e => location.href = `/planejamento?year=${e.target.value}`); $('#newFutureDemand')?.addEventListener('click', openFutureDemandForm); $('#newPlanning')?.addEventListener('click', openPlanningForm); let t; $('#planningQ').addEventListener('input', () => { clearTimeout(t); t = setTimeout(load, 200) }); $('#planningHelp').addEventListener('click', () => modal({ title: 'Fluxo do Planejamento', mode: 'center', body: `<div class="info-card accent"><h3>${icon('trend')}Do registro à execução</h3><p><strong>Demanda da escola</strong> → Análise técnica → Planejamento futuro → Consolidação → Processo administrativo → Licitação/Contratação → Contrato → Execução.</p></div><div class="alert info">A consolidação permite agrupar necessidades semelhantes de várias unidades sem perder o vínculo com cada escola de origem.</div>` }));
@@ -3335,6 +3516,18 @@
   const gs = $('#globalSearch'), gr = $('#globalSearchResults'); let gst;
   gs?.addEventListener('input', () => { clearTimeout(gst); const q = gs.value.trim(); if (q.length < 2) { gr.hidden = true; return } gst = setTimeout(async () => { try { const rows = await api(`/api/demands?q=${encodeURIComponent(q)}`); gr.innerHTML = rows.slice(0, 6).map(d => `<a class="search-result" href="/demandas/${d.id}"><span class="priority-dot ${d.priority}"></span><div><strong>${esc(d.title)}</strong><small>${esc(d.code)} · ${esc(d.school_name)}</small></div></a>`).join('') || `<div class="search-result"><div><strong>Nenhum resultado</strong><small>Tente outro termo.</small></div></div>`; gr.hidden = false; } catch { } }, 250) });
   document.addEventListener('click', e => { if (!e.target.closest('.global-search-wrap')) gr.hidden = true; if (!e.target.closest('#userMenuButton') && !e.target.closest('#userMenu')) $('#userMenu').hidden = true; if (!e.target.closest('#notificationButton') && !e.target.closest('#notificationPanel')) $('#notificationPanel').hidden = true; });
+
+  content.addEventListener('click', async e => {
+    const editBtn = e.target.closest('[data-edit-demand]');
+    if (!editBtn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const id = Number(editBtn.dataset.editDemand);
+    try {
+      const detail = await api(`/api/demands/${id}`);
+      await openEditDemand(detail.demand, () => location.reload());
+    } catch (err) { toast('Não foi possível carregar a demanda', err.message, 'error'); }
+  });
 
   content.addEventListener('click', e => {
     if (e.target.closest('a,button')) return;

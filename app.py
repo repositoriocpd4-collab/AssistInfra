@@ -1644,6 +1644,58 @@ def admin_summary(request: Request):
     conn.close(); return data
 
 
+def _pdf_response(filename: str, title: str, subtitle: str, headers: list, rows: list, col_widths=None):
+    """Monta um PDF tabular simples (relatório) e devolve como download.
+    Import feito aqui dentro (não no topo do arquivo) para que, se alguém rodar
+    `python app.py` direto sem passar pelos .bat (que reinstalam requirements.txt
+    quando faltar alguma dependência), o resto do sistema continue funcionando
+    normalmente e só a geração de PDF avise o que falta instalar."""
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    except ImportError:
+        raise HTTPException(500, "Geração de PDF indisponível: instale as dependências com 'pip install -r requirements.txt' (pacote reportlab) e reinicie o sistema.")
+    from xml.sax.saxutils import escape as _xesc
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=1.2 * cm, rightMargin=1.2 * cm,
+                             topMargin=1.4 * cm, bottomMargin=1.2 * cm, title=title)
+    styles = getSampleStyleSheet()
+    cell_style = ParagraphStyle("cell", parent=styles["Normal"], fontSize=8, leading=10)
+    head_style = ParagraphStyle("head", parent=styles["Normal"], fontSize=8.5, leading=10, textColor=colors.white, fontName="Helvetica-Bold")
+
+    story = [
+        Paragraph(_xesc(title), styles["Title"]),
+        Paragraph(_xesc(subtitle), styles["Normal"]),
+        Paragraph(f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles["Normal"]),
+        Spacer(1, 0.5 * cm),
+    ]
+    data = [[Paragraph(_xesc(str(h)), head_style) for h in headers]]
+    for r in rows:
+        data.append([Paragraph(_xesc(str(v)) if v not in (None, "") else "—", cell_style) for v in r])
+    table = Table(data, repeatRows=1, colWidths=col_widths)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#005A9C")),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#c9d4de")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f4f7fb")]),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(table)
+    doc.build(story)
+    pdf_bytes = buf.getvalue()
+    buf.close()
+    resp_headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return Response(content=pdf_bytes, media_type="application/pdf", headers=resp_headers)
+
+
 @app.get("/api/export/demands.csv")
 def export_demands(request: Request, status: str = "", priority: str = ""):
     user = require_user(request)
@@ -1661,6 +1713,67 @@ def export_demands(request: Request, status: str = "", priority: str = ""):
     content='\ufeff'+output.getvalue()
     headers={"Content-Disposition": f'attachment; filename="demandas_{date.today().isoformat()}.csv"'}
     return StreamingResponse(iter([content.encode('utf-8')]), media_type='text/csv; charset=utf-8', headers=headers)
+
+
+def _money_br(v) -> str:
+    try:
+        v = float(v or 0)
+    except (TypeError, ValueError):
+        return "—"
+    s = f"{v:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+    return f"R$ {s}"
+
+
+def _date_br(v) -> str:
+    if not v:
+        return "—"
+    try:
+        return datetime.fromisoformat(str(v)[:19]).strftime("%d/%m/%Y")
+    except ValueError:
+        return str(v)[:10]
+
+
+@app.get("/api/export/demands.pdf")
+def export_demands_pdf(request: Request, status: str = "", priority: str = ""):
+    user = require_user(request)
+    where=["1=1"]; params=[]
+    if user["perm"]["school_scoped"]: where.append("d.school_id=?"); params.append(user["school_id"])
+    if status: where.append("d.status=?"); params.append(status)
+    if priority: where.append("d.priority=?"); params.append(priority)
+    conn=db()
+    rows=conn.execute(f"""SELECT d.code,d.title,s.name school,d.category,d.priority,d.status,d.due_date,d.responsible,d.cost_estimate
+                         FROM demands d JOIN schools s ON s.id=d.school_id WHERE {' AND '.join(where)} ORDER BY d.id DESC""", params).fetchall()
+    conn.close()
+    from reportlab.lib.units import cm
+    table_rows = [[r["code"], r["title"], r["school"], r["category"], r["priority"], r["status"],
+                   _date_br(r["due_date"]), r["responsible"] or "—", _money_br(r["cost_estimate"])] for r in rows]
+    subtitle = "Carteira de demandas"
+    if status: subtitle += f" · Status: {status}"
+    if priority: subtitle += f" · Prioridade: {priority}"
+    col_widths = [2.7*cm, 5.3*cm, 4.0*cm, 2.6*cm, 2.1*cm, 2.9*cm, 2.0*cm, 2.9*cm, 2.6*cm]
+    filename = f"demandas_{date.today().isoformat()}.pdf"
+    return _pdf_response(filename, "Agenda Integrada — Carteira de Demandas", subtitle,
+                          ["Código", "Demanda", "Unidade Escolar", "Categoria", "Prioridade", "Status", "Prazo", "Responsável", "Custo estimado"],
+                          table_rows, col_widths)
+
+
+@app.get("/api/export/planning.pdf")
+def export_planning_pdf(request: Request, year: Optional[int] = None):
+    require_user(request)
+    where=["1=1"]; params=[]
+    if year: where.append("year=?"); params.append(year)
+    conn=db()
+    rows = conn.execute(f"SELECT * FROM planning_items WHERE {' AND '.join(where)} ORDER BY year, id DESC", params).fetchall()
+    conn.close()
+    from reportlab.lib.units import cm
+    table_rows = [[r["code"] or "—", r["title"], r["kind"], r["schools_count"] or 0, _money_br(r["estimated_cost"]), r["status"]] for r in rows]
+    subtitle = f"Planejamento {year}" if year else "Planejamento — todos os exercícios"
+    col_widths = [2.6*cm, 9.5*cm, 3.2*cm, 2.2*cm, 3.4*cm, 3.4*cm]
+    filename = f"planejamento_{year or 'todos'}_{date.today().isoformat()}.pdf"
+    return _pdf_response(filename, "Agenda Integrada — Planejamento Futuro", subtitle,
+                          ["Código", "Objeto consolidado", "Tipo", "Escolas", "Estimativa", "Status"],
+                          table_rows, col_widths)
+
 
 
 # ================================================================

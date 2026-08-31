@@ -10347,10 +10347,30 @@ body.dark-mode .stats-customize-footer {
 }
 
 .dw-stepper {
+   position: relative;
    gap: 8px;
    padding: 16px 0 22px;
    border-bottom: 1px solid var(--line);
    margin-bottom: 16px;
+}
+
+/* Trilho conectando os 4 passos — uma linha contínua atrás dos círculos
+   numerados (que têm fundo opaco e ficam por cima, "cortando" a linha),
+   em vez de tentar medir o vão entre cada par de passos. */
+.dw-stepper::before {
+   content: "";
+   position: absolute;
+   left: 24.5px;
+   right: 24.5px;
+   top: 37.5px;
+   height: 2px;
+   background: var(--line);
+   z-index: 0;
+}
+
+.dw-stepper .step {
+   position: relative;
+   z-index: 1;
 }
 
 .dw-stepper .step-text {
@@ -10661,4 +10681,188 @@ body.dark-mode .dw-pill {
 
 body.dark-mode .select-wrap-icon {
    color: #9db3cc;
+}
+
+/* ============================================================
+   DATEPICKER — calendário customizado para campos de data
+   (substitui o <input type="date"> nativo por um popover consistente
+   com o resto da interface; ver #provDueDate em "Providência/Encaminhamento").
+   ============================================================ */
+.datepicker-input-wrap {
+   position: relative;
+}
+
+.datepicker-display {
+   padding-right: 38px;
+   cursor: pointer;
+   background: white;
+}
+
+.datepicker-icon-btn {
+   position: absolute;
+   right: 5px;
+   top: 5px;
+   width: 30px;
+   height: 30px;
+   border: 0;
+   background: transparent;
+   border-radius: 7px;
+   display: grid;
+   place-items: center;
+   color: #7a8795;
+   cursor: pointer;
+}
+
+.datepicker-icon-btn:hover {
+   background: var(--surface-blue, #eef3fc);
+   color: var(--primary, #245fca);
+}
+
+.datepicker-icon-btn svg {
+   width: 17px;
+   height: 17px;
+}
+
+.dp-panel {
+   width: 280px;
+   padding: 14px;
+   font-size: 13px;
+}
+
+.dp-header {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   margin-bottom: 10px;
+}
+
+.dp-month-label {
+   font-weight: 700;
+   font-size: 13px;
+   color: var(--ink);
+}
+
+.dp-nav {
+   display: flex;
+   gap: 2px;
+}
+
+.dp-nav-btn {
+   width: 26px;
+   height: 26px;
+   border: 0;
+   background: transparent;
+   border-radius: 7px;
+   display: grid;
+   place-items: center;
+   color: #7a8795;
+   cursor: pointer;
+}
+
+.dp-nav-btn:hover {
+   background: var(--surface-blue, #eef3fc);
+   color: var(--primary, #245fca);
+}
+
+.dp-nav-btn svg {
+   width: 14px;
+   height: 14px;
+}
+
+.dp-nav-prev svg {
+   transform: rotate(-90deg);
+}
+
+.dp-nav-next svg {
+   transform: rotate(90deg);
+}
+
+.dp-dow-row {
+   display: grid;
+   grid-template-columns: repeat(7, 1fr);
+   margin-bottom: 4px;
+}
+
+.dp-dow-row span {
+   text-align: center;
+   font-size: 10.5px;
+   font-weight: 700;
+   color: var(--muted);
+   padding: 4px 0;
+}
+
+.dp-grid {
+   display: grid;
+   grid-template-columns: repeat(7, 1fr);
+   gap: 2px;
+}
+
+.dp-day {
+   border: 1px solid transparent;
+   background: transparent;
+   border-radius: 8px;
+   height: 30px;
+   font-size: 12.5px;
+   color: var(--ink);
+   cursor: pointer;
+}
+
+.dp-day:hover {
+   background: var(--surface-blue, #eef3fc);
+}
+
+.dp-day.is-outside {
+   color: #c3cbd4;
+}
+
+.dp-day.is-today {
+   color: var(--primary, #245fca);
+   font-weight: 700;
+}
+
+.dp-day.is-selected {
+   border-color: var(--ink);
+   font-weight: 700;
+   background: var(--surface-blue, #eef3fc);
+}
+
+.dp-footer {
+   display: flex;
+   align-items: center;
+   gap: 16px;
+   margin-top: 10px;
+   padding-top: 10px;
+   border-top: 1px solid var(--line);
+}
+
+.dp-link {
+   border: 0;
+   background: transparent;
+   padding: 0;
+   font-size: 12px;
+   font-weight: 700;
+   color: var(--primary, #245fca);
+   cursor: pointer;
+}
+
+.dp-link:hover {
+   text-decoration: underline;
+}
+
+body.dark-mode .datepicker-display {
+   background: #171b22;
+}
+
+body.dark-mode .dp-panel {
+   background: #1a1f27;
+   border-color: #2a2f3a;
+}
+
+body.dark-mode .dp-day.is-selected {
+   border-color: #d6dee8;
+   background: #22344a;
+}
+
+body.dark-mode .dp-footer {
+   border-top-color: #2a2f3a;
 }
