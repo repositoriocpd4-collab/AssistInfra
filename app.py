@@ -1099,7 +1099,12 @@ def api_map_network(request: Request, q: str = "", neighborhood: str = "", criti
                                    FROM demands d WHERE 1=1 {scope}""", params).fetchall()
     conn.close()
     
-    all_neighborhoods = sorted(list(set(s["neighborhood"].strip() for s in schools_raw if s["neighborhood"] and s["neighborhood"].strip())))
+    neighborhood_counts: dict[str, int] = {}
+    for s in schools_raw:
+        n = (s["neighborhood"] or "").strip()
+        if n:
+            neighborhood_counts[n] = neighborhood_counts.get(n, 0) + 1
+    all_neighborhoods = [{"name": n, "count": c} for n, c in sorted(neighborhood_counts.items())]
 
     demands_by_school = {}
     for d in demands_raw:
