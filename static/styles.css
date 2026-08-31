@@ -9725,3 +9725,203 @@ body.dark-mode .sidebar-collapse-toggle:hover {
       margin-right: .6rem !important;
    }
 }
+
+/* ============================================================
+   BOTÃO "VOLTAR AO PAINEL" — presente no cabeçalho de cada tela
+   interna (Demandas, Unidades Escolares, Mapa, Planejamento,
+   Relatórios, Administração, Sobre, detalhe de demanda), levando
+   direto para o Painel (Dashboard). Adicionado a pedido da SMEDU/PMI.
+   ============================================================ */
+.page-back-link {
+   display: flex;
+   width: max-content;
+   align-items: center;
+   gap: 5px;
+   margin-bottom: 8px;
+   font-size: 12.5px;
+   font-weight: 700;
+   color: var(--muted);
+   text-decoration: none;
+}
+
+.page-back-link:hover {
+   color: var(--teal);
+}
+
+.page-back-link svg {
+   width: 15px;
+   height: 15px;
+   transform: rotate(180deg);
+   flex: 0 0 auto;
+}
+
+body.dark-mode .page-back-link {
+   color: #9fb2c8;
+}
+
+body.dark-mode .page-back-link:hover {
+   color: #6fd6d3;
+}
+
+/* ============================================================
+   CORREÇÃO: a dica de nome ao passar o mouse nos pinos do mapa
+   (Mapa da Rede / Circuito de Vistorias) precisa ficar num
+   elemento INTERNO do marcador, nunca no elemento raiz que o
+   MapLibre usa para posicionar o pino geograficamente — colocar
+   `data-tooltip` ali força `position:relative` (via a regra
+   genérica [data-tooltip]) e atropela o posicionamento por
+   transform do MapLibre, fazendo os pinos "pularem" de lugar.
+   ============================================================ */
+.circuit-pin-inner {
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   width: 100%;
+   height: 100%;
+}
+
+/* ============================================================
+   PERSONALIZAR PAINEL — permite ao usuário exibir ou ocultar
+   cada grupo de indicadores do Painel, com preferência salva
+   neste navegador. Adicionado a pedido da SMEDU/PMI.
+   ============================================================ */
+.stats-groups-toolbar {
+   display: flex;
+   justify-content: flex-end;
+   margin-bottom: 8px;
+}
+
+.stats-customize-wrap {
+   position: relative;
+}
+
+.stats-customize-btn {
+   display: inline-flex;
+   align-items: center;
+   gap: 7px;
+   padding: 7px 13px;
+   border-radius: 999px;
+   border: 1px solid var(--line-strong);
+   background: var(--surface);
+   color: var(--primary);
+   font-size: 12.5px;
+   font-weight: 700;
+   cursor: pointer;
+   transition: background .16s ease, border-color .16s ease;
+}
+
+.stats-customize-btn svg {
+   width: 15px;
+   height: 15px;
+}
+
+.stats-customize-btn:hover,
+.stats-customize-btn[aria-expanded="true"] {
+   background: var(--surface-blue);
+   border-color: var(--primary);
+}
+
+.stats-customize-panel {
+   position: absolute;
+   top: calc(100% + 8px);
+   right: 0;
+   width: 280px;
+   padding: 4px;
+   z-index: 20;
+}
+
+.stats-customize-head {
+   padding: 12px 12px 10px;
+   border-bottom: 1px solid var(--line);
+   margin-bottom: 4px;
+}
+
+.stats-customize-head strong {
+   display: block;
+   font-size: 13px;
+   color: var(--ink);
+}
+
+.stats-customize-head small {
+   display: block;
+   font-size: 11px;
+   color: var(--muted);
+   margin-top: 3px;
+   line-height: 1.4;
+}
+
+.stats-customize-list {
+   max-height: 320px;
+   overflow-y: auto;
+}
+
+.stats-customize-row {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 12px;
+   padding: 9px 12px;
+   border-radius: 9px;
+   font-size: 12.5px;
+   color: var(--ink);
+   cursor: pointer;
+}
+
+.stats-customize-row:hover {
+   background: var(--surface-soft);
+}
+
+.stat-group {
+   transition: opacity .18s ease, transform .18s ease;
+}
+
+.stat-group.is-hiding {
+   opacity: 0;
+   transform: scale(.97);
+}
+
+body.dark-mode .stats-customize-btn {
+   background: #1a1f27;
+   border-color: #2a2f3a;
+   color: #dce8f7;
+}
+
+body.dark-mode .stats-customize-btn:hover,
+body.dark-mode .stats-customize-btn[aria-expanded="true"] {
+   background: #22344a;
+}
+
+body.dark-mode .stats-customize-row:hover {
+   background: rgba(255, 255, 255, .05);
+}
+
+@media(max-width:600px) {
+   .stats-customize-panel {
+      right: -6px;
+      width: min(300px, calc(100vw - 32px));
+   }
+}
+
+/* ============================================================
+   TELA CHEIA DO MAPA — o controle nativo do MapLibre (ícone de
+   cantos no topo direito do mapa) expande apenas o mapa + a
+   legenda flutuante, sem os filtros/painéis ao redor. Aqui só
+   garantimos que o contêiner ocupe a tela toda nesse modo, já
+   que ele normalmente tem uma altura fixa em pixels.
+   ============================================================ */
+.map-viewport-wrapper:fullscreen,
+.map-viewport-wrapper:-webkit-full-screen {
+   width: 100vw !important;
+   height: 100vh !important;
+   min-height: 100vh !important;
+   border-radius: 0 !important;
+   border: 0 !important;
+}
+
+.map-viewport-wrapper:fullscreen #networkMapContainer,
+.map-viewport-wrapper:fullscreen .map-container-box,
+.map-viewport-wrapper:-webkit-full-screen #networkMapContainer,
+.map-viewport-wrapper:-webkit-full-screen .map-container-box {
+   height: 100% !important;
+   min-height: 100% !important;
+}

@@ -2,9 +2,13 @@
 setlocal
 cd /d "%~dp0"
 
+set "REPO_URL=https://github.com/repositoriocpd4-collab/AssistInfra.git"
+set "BRANCH=DevAssist"
+
 echo ======================================================
 echo   PUBLICAR NO GITHUB - Agenda Integrada (AssistInfra)
 echo   Repositorio: https://github.com/repositoriocpd4-collab/AssistInfra
+echo   Branch: %BRANCH%
 echo ======================================================
 echo.
 
@@ -19,9 +23,16 @@ if errorlevel 1 (
 if not exist ".git" (
   echo Inicializando repositorio local...
   git init
-  git branch -M main
+  git checkout -b %BRANCH%
 ) else (
   echo Repositorio local ja existe, pulando "git init".
+  echo Alternando/criando a branch "%BRANCH%"...
+  git rev-parse --verify %BRANCH% >nul 2>nul
+  if errorlevel 1 (
+    git checkout -b %BRANCH%
+  ) else (
+    git checkout %BRANCH%
+  )
 )
 
 echo.
@@ -36,17 +47,18 @@ if errorlevel 1 (
 echo.
 echo Configurando o remoto "origin"...
 git remote remove origin >nul 2>nul
-git remote add origin https://github.com/repositoriocpd4-collab/AssistInfra.git
+git remote add origin %REPO_URL%
 
 echo.
-echo Enviando a branch principal (main)...
-git push -u origin main
+echo Enviando a branch "%BRANCH%"...
+git push -u origin %BRANCH%
 if errorlevel 1 (
   echo.
-  echo O envio da "main" falhou. Isso costuma acontecer quando o repositorio no
-  echo GitHub ja tem commits (ex.: foi criado com README pela interface web).
+  echo O envio da "%BRANCH%" falhou. Isso costuma acontecer quando o repositorio no
+  echo GitHub ja tem commits nessa branch (ex.: foi criado com README pela interface web)
+  echo ou quando as credenciais do Git ainda nao foram configuradas neste computador.
   echo Nesse caso, rode manualmente:
-  echo   git pull origin main --allow-unrelated-histories
+  echo   git pull origin %BRANCH% --allow-unrelated-histories
   echo e resolva conflitos se aparecerem, depois rode este arquivo de novo.
   pause
   exit /b 1
@@ -55,6 +67,6 @@ if errorlevel 1 (
 echo.
 echo ======================================================
 echo Concluido. Confira em:
-echo https://github.com/repositoriocpd4-collab/AssistInfra
+echo https://github.com/repositoriocpd4-collab/AssistInfra/tree/%BRANCH%
 echo ======================================================
 pause

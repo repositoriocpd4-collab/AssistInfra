@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#005A9C">
   <title>{{ title }} · Agenda Integrada</title>
   <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/styles.css?v=govbr-39">
+  <link rel="stylesheet" href="/static/styles.css?v=govbr-44">
 </head>
 <body data-page="{{ page }}"{% if entity_id %} data-entity-id="{{ entity_id }}"{% endif %}>
   <svg aria-hidden="true" class="svg-sprite">
@@ -126,7 +126,7 @@
       <div class="header-logo-area">
         <div class="prefeitura-brand" aria-label="Prefeitura Municipal de Itaguaí">
           <img class="header-logo" src="https://novoportal.itaguai.rj.gov.br/@@obter_logo_portal/logo25.png" alt="Prefeitura de Itaguaí" onerror="this.hidden=true;this.nextElementSibling.hidden=false">
-          <div class="prefeitura-wordmark" hidden><span>ITAGUAÍ</span><small>PREFEITURA</small></div>
+          <div class="prefeitura-wordmark" hidden><small>PREFEITURA</small></div>
         </div>
         <div class="logo-separator"></div>
         <span class="state-name hide-on-medium">Estado do Rio de Janeiro</span>
@@ -190,6 +190,6 @@
     window.APP_CONTEXT = {{ {'page': page, 'entityId': entity_id if entity_id else None, 'user': user, 'priorities': priorities, 'statuses': statuses, 'categories': categories, 'categoryMeta': category_meta, 'kanbanStages': kanban_stages}|tojson }};
   </script>
   <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
-  <script src="/static/app.js?v=govbr-29"></script>
+  <script src="/static/app.js?v=govbr-35"></script>
 </body>
 </html>
