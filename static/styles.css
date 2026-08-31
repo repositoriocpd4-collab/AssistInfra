@@ -9607,3 +9607,121 @@ body.dark-mode .category-section-title svg {
    align-items: center;
    gap: 8px;
 }
+/* ============================================================
+   MENU LATERAL RECOLHÍVEL (DESKTOP) — alterna entre o modo
+   expandido (com rótulos) e o modo compacto (somente ícones),
+   com a preferência do usuário salva entre sessões.
+   Adicionado a pedido da SMEDU/PMI.
+   ============================================================ */
+:root {
+   --sidebar-collapsed: 80px;
+}
+
+.sidebar-collapse-toggle {
+   display: none;
+   position: fixed;
+   top: calc(var(--header-h, 124px) + 22px);
+   left: var(--sidebar-fixed);
+   transform: translate(-50%, 0);
+   width: 26px;
+   height: 26px;
+   padding: 0;
+   border-radius: 50%;
+   background: var(--surface);
+   border: 1px solid var(--line-strong);
+   color: var(--primary);
+   box-shadow: var(--shadow);
+   align-items: center;
+   justify-content: center;
+   cursor: pointer;
+   transition: left .22s ease, background .16s ease, box-shadow .16s ease;
+   z-index: 46;
+}
+
+.sidebar-collapse-toggle:hover {
+   background: var(--surface-blue);
+   box-shadow: var(--shadow-lg);
+}
+
+.sidebar-collapse-toggle:focus-visible {
+   outline: 2px solid var(--teal);
+   outline-offset: 2px;
+}
+
+.sidebar-collapse-toggle svg {
+   width: 13px;
+   height: 13px;
+   transform: rotate(180deg);
+   transition: transform .22s ease;
+}
+
+body.sidebar-collapsed .sidebar-collapse-toggle svg {
+   transform: rotate(0deg);
+}
+
+body.dark-mode .sidebar-collapse-toggle {
+   background: #132a44;
+   border-color: #24405f;
+   color: #dce8f7;
+}
+
+body.dark-mode .sidebar-collapse-toggle:hover {
+   background: #1a3654;
+}
+
+@media(min-width:981px) {
+   .sidebar-collapse-toggle {
+      display: flex;
+   }
+
+   #sidebar.side-menu,
+   .main-content,
+   .govbr-footer {
+      transition: transform .22s ease, width .22s ease, max-width .22s ease, left .22s ease, margin-left .22s ease, margin-right .22s ease;
+   }
+
+   body.sidebar-collapsed {
+      --sidebar-fixed: var(--sidebar-collapsed);
+   }
+
+   body.sidebar-collapsed .side-menu-header {
+      justify-content: center !important;
+      padding-left: .5rem !important;
+      padding-right: .5rem !important;
+   }
+
+   body.sidebar-collapsed .side-menu-title {
+      gap: 0 !important;
+   }
+
+   body.sidebar-collapsed .side-menu-title-text,
+   body.sidebar-collapsed .side-menu-content .nav-item span,
+   body.sidebar-collapsed .side-menu-content .nav-item .key-hint,
+   body.sidebar-collapsed .side-menu-content .btn-new span,
+   body.sidebar-collapsed .side-menu-content .btn-new .key-hint,
+   body.sidebar-collapsed .side-menu-footer {
+      display: none !important;
+   }
+
+   body.sidebar-collapsed .side-menu-content .btn-new {
+      width: 44px !important;
+      height: 44px !important;
+      min-height: 44px !important;
+      margin: .5rem auto 1rem !important;
+      padding: 0 !important;
+      border-radius: 50% !important;
+      justify-content: center !important;
+   }
+
+   body.sidebar-collapsed .side-menu-content .nav-item {
+      justify-content: center !important;
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+      gap: 0 !important;
+   }
+
+   body.sidebar-collapsed .side-divider {
+      margin-left: .6rem !important;
+      margin-right: .6rem !important;
+   }
+}

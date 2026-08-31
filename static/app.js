@@ -3069,6 +3069,21 @@
   $('#menuButton')?.addEventListener('click', () => { $('#sidebar').classList.add('open'); showBackdrop(true) });
   $('#sideClose')?.addEventListener('click', () => { $('#sidebar').classList.remove('open'); showBackdrop(false) });
   $('#backdrop')?.addEventListener('click', () => $('#sidebar').classList.remove('open'));
+
+  // Menu lateral recolhível no desktop (modo compacto, somente ícones), com preferência salva por navegador.
+  const sidebarCollapseToggle = $('#sidebarCollapseToggle');
+  const setSidebarCollapsed = collapsed => {
+    document.body.classList.toggle('sidebar-collapsed', collapsed);
+    localStorage.setItem('agenda-sidebar-collapsed', collapsed ? '1' : '0');
+    if (sidebarCollapseToggle) {
+      sidebarCollapseToggle.setAttribute('aria-expanded', String(!collapsed));
+      sidebarCollapseToggle.setAttribute('aria-label', collapsed ? 'Expandir menu lateral' : 'Recolher menu lateral');
+      sidebarCollapseToggle.setAttribute('data-tooltip', (collapsed ? 'Expandir menu' : 'Recolher menu') + ' \u00b7 tecla [');
+    }
+  };
+  const toggleSidebarCollapse = () => setSidebarCollapsed(!document.body.classList.contains('sidebar-collapsed'));
+  setSidebarCollapsed(localStorage.getItem('agenda-sidebar-collapsed') === '1');
+  sidebarCollapseToggle?.addEventListener('click', toggleSidebarCollapse);
   $$('.side-menu .nav-item').forEach(a => a.addEventListener('click', () => {
     $('#sidebar')?.classList.remove('open');
   }));
@@ -3114,6 +3129,7 @@
     ...(ctx.user.perm.can_manage_admin ? [{ key: 'A', label: 'Ir para Administração', href: '/administracao' }] : []),
     { key: 'S', label: 'Ir para Sobre o Sistema', href: '/sobre' },
     { key: 'B', label: 'Voltar para a página anterior', action: () => history.back() },
+    { key: '[', label: 'Recolher/expandir o menu lateral', action: () => toggleSidebarCollapse() },
     { key: 'Esc', label: 'Fechar uma janela aberta', action: () => closeModal() },
     { key: '?', label: 'Abrir esta lista de atalhos', action: () => openShortcutsHelp() },
   ];

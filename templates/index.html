@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#005A9C">
   <title>{{ title }} · Agenda Integrada</title>
   <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/styles.css?v=govbr-38">
+  <link rel="stylesheet" href="/static/styles.css?v=govbr-39">
 </head>
 <body data-page="{{ page }}"{% if entity_id %} data-entity-id="{{ entity_id }}"{% endif %}>
   <svg aria-hidden="true" class="svg-sprite">
@@ -79,7 +79,7 @@
     <div class="side-menu-header">
       <div class="side-menu-title">
         <div class="municipal-mark" aria-hidden="true">AI</div>
-        <div><strong>Agenda Integrada</strong><span>Infraestrutura e Gestão Escolar</span></div>
+        <div class="side-menu-title-text"><strong>Agenda Integrada</strong><span>Infraestrutura e Gestão Escolar</span></div>
       </div>
       <button class="side-close" id="sideClose" aria-label="Fechar menu"><svg><use href="#i-x"></use></svg></button>
     </div>
@@ -115,6 +115,8 @@
     </div>
     <div class="side-menu-footer"><a href="/sobre" data-tooltip="Ver versão e detalhes do sistema">SMEDU · Prefeitura Municipal de Itaguaí</a></div>
   </aside>
+
+  <button type="button" id="sidebarCollapseToggle" class="sidebar-collapse-toggle" aria-controls="sidebar" aria-expanded="true" aria-label="Recolher menu lateral" data-tooltip="Recolher menu · tecla ["><svg><use href="#i-chevron"></use></svg></button>
 
   <div class="backdrop" id="backdrop" hidden></div>
 
@@ -188,6 +190,6 @@
     window.APP_CONTEXT = {{ {'page': page, 'entityId': entity_id if entity_id else None, 'user': user, 'priorities': priorities, 'statuses': statuses, 'categories': categories, 'categoryMeta': category_meta, 'kanbanStages': kanban_stages}|tojson }};
   </script>
   <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
-  <script src="/static/app.js?v=govbr-28"></script>
+  <script src="/static/app.js?v=govbr-29"></script>
 </body>
 </html>
