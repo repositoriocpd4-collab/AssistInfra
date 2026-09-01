@@ -35,13 +35,11 @@ if errorlevel 1 (
 )
 
 echo Verificando a porta %AGENDA_PORT%...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$p=Get-NetTCPConnection -LocalPort %AGENDA_PORT% -State Listen -ErrorAction SilentlyContinue; if($p){exit 2}else{exit 0}" >nul 2>nul
-if errorlevel 2 (
-  echo.
-  echo A porta %AGENDA_PORT% ja esta em uso.
-  echo Feche outra instancia desta versao do sistema e tente novamente.
-  pause
-  exit /b 2
+netstat -ano | find ":%AGENDA_PORT%" >nul 2>nul
+if not errorlevel 1 (
+  taskkill /F /IM python.exe >nul 2>nul
+  echo Encerrando instancias anteriores...
+  timeout /t 2 /nobreak >nul
 )
 
 echo.

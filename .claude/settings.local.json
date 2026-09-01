@@ -2,7 +2,23 @@
   "permissions": {
     "allow": [
       "Bash(\"/c/Users/Usuário/AppData/Local/Programs/Python/Python313/python.exe\" \"C:\\\\Users\\\\USURIO~2\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\G--AssistInfra-DevAssist\\\\b22340b1-b5f5-4d13-bbdd-e87a14fef85a\\\\scratchpad\\\\geocode_all_schools.py\")",
-      "Bash(xargs grep -l \"folium\\\\|leaflet\\\\|mapa.*html\")"
+      "Bash(xargs grep -l \"folium\\\\|leaflet\\\\|mapa.*html\")",
+      "Bash(\"/c/Users/Usuário/AppData/Local/Programs/Python/Python313/python.exe\" \"C:\\\\Users\\\\USURIO~2\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\G--AssistInfra-DevAssist\\\\b22340b1-b5f5-4d13-bbdd-e87a14fef85a\\\\scratchpad\\\\update_schools_dms.py\")",
+      "Bash(\"/c/Users/Usuário/AppData/Local/Programs/Python/Python313/python.exe\" \"C:\\\\Users\\\\USURIO~2\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\G--AssistInfra-DevAssist\\\\b22340b1-b5f5-4d13-bbdd-e87a14fef85a\\\\scratchpad\\\\update_remaining_10.py\")",
+      "Bash(python3)",
+      "Bash(\"/c/Users/Usuário/AppData/Local/Programs/Python/Python313/python.exe\" \"C:\\\\Users\\\\USURIO~2\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\G--AssistInfra-DevAssist\\\\b22340b1-b5f5-4d13-bbdd-e87a14fef85a\\\\scratchpad\\\\geocode_from_csv.py\")",
+      "Bash(tasklist)",
+      "Bash(taskkill /PID 28852 /F)",
+      "PowerShell(Stop-Process -Id 28852 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process python -ErrorAction SilentlyContinue)",
+      "Bash(\"/c/Users/Usuário/AppData/Local/Programs/Python/Python313/python.exe\" app.py)",
+      "Bash(pkill -f \"python.*app.py\")",
+      "Bash(cmd /c INICIAR_SISTEMA.bat)",
+      "Bash(curl -s http://localhost:8017/health)",
+      "Bash(pkill -9 python)",
+      "Bash(nohup python app.py)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }

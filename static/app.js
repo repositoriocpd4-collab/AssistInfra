@@ -834,7 +834,8 @@
             if (created.length > 1) toast('Demandas registradas com sucesso!', `${created.length} códigos gerados: ${created.map(c => c.code).join(', ')}.`);
             else toast('Demanda registrada com sucesso!', `Código ${created[0].code} — acompanhe o andamento a qualquer momento.`);
             if (failed.length) toast('Algumas demandas não puderam ser enviadas', failed.map(f => `${f.category}: ${f.message}`).join(' · '), 'error');
-            location.href = created.length > 1 ? '/demandas' : `/demandas/${created[0].id}`;
+            const isInfraManager = ctx.user && ctx.user.role === 'gestor';
+            location.href = (created.length > 1 || isInfraManager) ? '/demandas' : `/demandas/${created[0].id}`;
           } else {
             toast('Não foi possível enviar', failed.map(f => f.message).join(' · ') || 'Tente novamente.', 'error');
             next.disabled = false; setNextLabel(state.items.length > 1 ? 'Enviar demandas' : 'Enviar demanda', 'Finalizar registro');
@@ -1006,7 +1007,7 @@
       return `<th class="th-filter${active ? ' active' : ''}" data-th-filter="${field}">${label}${icon('chevron')}</th>`;
     };
     return `<div class="table-wrap"><table class="data-table"><thead><tr><th>ID</th><th>Demanda</th>${compact ? '' : th('Categoria', 'category')}<th>Unidade Escolar</th>${th('Prioridade', 'priority')}${th('Status', 'status')}<th>Prazo</th><th>Ações</th></tr></thead><tbody>${rows.map(d => {
-      const due = dueInfo(d); return `<tr data-href="/demandas/${d.id}" class="${d.status === 'Concluída' ? 'row-done' : ''}"><td class="mono" data-label="ID"><strong>${esc(d.code)}</strong></td><td class="cell-title" data-label="Demanda"><strong>${esc(d.title)}</strong><small>Atualizado ${fmtDateTime(d.updated_at)}</small></td>${compact ? '' : `<td data-label="Categoria">${esc(d.category)}</td>`}<td data-label="Unidade Escolar">${esc(d.school_name || '—')}</td><td data-label="Prioridade"><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span></td><td data-label="Status"><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span></td><td data-label="Prazo"><span class="deadline ${due.cls}">${esc(due.text)}</span></td><td data-label="Ações"><a class="icon-btn" href="/demandas/${d.id}" aria-label="Ver detalhes" data-tooltip="Ver detalhes">${icon('eye')}</a><button type="button" class="icon-btn" data-edit-demand="${d.id}" aria-label="Editar demanda" data-tooltip="Editar demanda">${icon('edit')}</button></td></tr>`
+      const due = dueInfo(d); const canDelete = ctx.user.perm.can_manage_admin; return `<tr data-href="/demandas/${d.id}" class="${d.status === 'Concluída' ? 'row-done' : ''}"><td class="mono" data-label="ID"><strong>${esc(d.code)}</strong></td><td class="cell-title" data-label="Demanda"><strong>${esc(d.title)}</strong><small>Atualizado ${fmtDateTime(d.updated_at)}</small></td>${compact ? '' : `<td data-label="Categoria">${esc(d.category)}</td>`}<td data-label="Unidade Escolar">${esc(d.school_name || '—')}</td><td data-label="Prioridade"><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span></td><td data-label="Status"><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span></td><td data-label="Prazo"><span class="deadline ${due.cls}">${esc(due.text)}</span></td><td data-label="Ações"><a class="icon-btn" href="/demandas/${d.id}" aria-label="Ver detalhes" data-tooltip="Ver detalhes">${icon('eye')}</a><button type="button" class="icon-btn" data-edit-demand="${d.id}" aria-label="Editar demanda" data-tooltip="Editar demanda">${icon('edit')}</button>${canDelete ? `<button type="button" class="icon-btn" data-delete-demand="${d.id}" aria-label="Deletar demanda" data-tooltip="Deletar demanda" style="color:var(--red)">${icon('trash')}</button>` : ''}</td></tr>`
     }).join('')}</tbody></table></div>`;
   }
 
@@ -1338,13 +1339,19 @@
     modal({
       title: 'Editar demanda', subtitle: `${d.code} · ${d.school_name || ''}`, mode: 'drawer', body: `<form id="editDemandForm"><div class="form-grid">
       <div class="field span-2"><label>Nome curto</label><input class="input" name="title" maxlength="140" value="${esc(d.title || '')}" required></div>
+      <div class="field"><label>Prioridade</label><select class="select" name="priority"><option value="P1 - Urgente" ${d.priority === 'P1 - Urgente' ? 'selected' : ''}>P1 - Urgente</option><option value="P2 - Alta" ${d.priority === 'P2 - Alta' ? 'selected' : ''}>P2 - Alta</option><option value="P3 - Programada" ${d.priority === 'P3 - Programada' ? 'selected' : ''}>P3 - Programada</option></select></div>
+      <div class="field"><label>Status</label><select class="select" name="status"><option value="P1 Urgentes" ${d.status === 'P1 Urgentes' ? 'selected' : ''}>P1 Urgentes</option><option value="Aguardando contratação" ${d.status === 'Aguardando contratação' ? 'selected' : ''}>Aguardando contratação</option><option value="Em execução" ${d.status === 'Em execução' ? 'selected' : ''}>Em execução</option><option value="Planejamento futuro" ${d.status === 'Planejamento futuro' ? 'selected' : ''}>Planejamento futuro</option><option value="Concluída" ${d.status === 'Concluída' ? 'selected' : ''}>Concluída</option></select></div>
       <div class="field"><label>Tipo de problema</label><select class="select" name="category">${ctx.categories.map(c => `<option ${c === d.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
+      <div class="field"><label>Data de vencimento</label><input class="input" type="date" name="due_date" value="${d.due_date || ''}"></div>
       <div class="field"><label>Local</label><input class="input" name="location" placeholder="Ex.: Sala 3, banheiro do pátio, cozinha..." value="${esc(d.location || '')}"></div>
+      <div class="field"><label>Responsável</label><input class="input" name="responsible" placeholder="Nome do responsável" value="${esc(d.responsible || '')}"></div>
       <div class="field span-2"><label>Descrição</label><textarea class="textarea" name="description" required>${esc(d.description || '')}</textarea></div>
+      <div class="field span-2"><label>Parecer técnico</label><textarea class="textarea" name="technical_opinion" placeholder="Parecer ou análise técnica da demanda">${esc(d.technical_opinion || '')}</textarea></div>
       <div class="field"><label>Pessoas afetadas (aprox.)</label><input class="input" type="number" min="0" name="affected_people" value="${esc(d.affected_people || 0)}"></div>
+      <div class="field"><label>Setor</label><input class="input" name="sector" placeholder="Setor responsável" value="${esc(d.sector || '')}"></div>
       <div class="field span-2"><label>Sinais de impacto</label><div class="check-grid"><label class="check"><input type="checkbox" name="blocks_activity" ${d.blocks_activity ? 'checked' : ''}> Impede atividade escolar</label><label class="check"><input type="checkbox" name="risk" ${d.risk ? 'checked' : ''}> Risco de acidente</label></div></div>
     </div></form>`,
-      footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="saveEditDemand">Salvar alterações</button>`, onOpen() {
+      footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-danger" id="deleteEditDemand" style="margin-left:auto;margin-right:auto">${icon('trash')}Deletar</button><button class="btn btn-primary" id="saveEditDemand">Salvar alterações</button>`, onOpen() {
         $('#saveEditDemand').addEventListener('click', async () => {
           const f = $('#editDemandForm');
           if (!f.reportValidity()) return;
@@ -1357,6 +1364,16 @@
             toast('Demanda atualizada', `${d.code} foi salva com as novas informações.`);
             await reload();
           } catch (e) { toast('Não foi possível salvar', e.message, 'error'); }
+        });
+        $('#deleteEditDemand')?.addEventListener('click', async () => {
+          if (confirm(`Tem certeza que deseja deletar esta demanda (${d.code})? Esta ação não pode ser desfeita.`)) {
+            try {
+              await api(`/api/demands/${d.id}`, { method: 'DELETE' });
+              closeModal();
+              toast('Demanda deletada', `${d.code} foi removida do sistema.`);
+              await reload();
+            } catch (e) { toast('Erro ao deletar', e.message, 'error'); }
+          }
         });
       }
     });
@@ -2955,7 +2972,7 @@
 
   async function renderAdmin() {
     if (!ctx.user.perm.can_manage_admin) { location.href = '/'; return; }
-    const TABS = [['geral', 'Visão Geral', 'grid'], ['categorias', 'Categorias', 'clipboard'], ['prioridades', 'Prioridades', 'warning'], ['kanban', 'Colunas do Kanban', 'kanban'], ['escolas', 'Unidades Escolares', 'school'], ['perfis', 'Perfis de Acesso', 'user'], ['usuarios', 'Usuários', 'user']];
+    const TABS = [['geral', 'Visão Geral', 'grid'], ['categorias', 'Categorias', 'clipboard'], ['prioridades', 'Prioridades', 'warning'], ['kanban', 'Colunas do Kanban', 'kanban'], ['escolas', 'Unidades Escolares', 'school'], ['perfis', 'Perfis de Acesso', 'user'], ['usuarios', 'Usuários', 'user'], ['logs', 'Logs do Sistema', 'history']];
     let active = new URLSearchParams(location.search).get('tab') || 'geral';
     if (!TABS.some(t => t[0] === active)) active = 'geral';
     async function paint() {
@@ -2973,6 +2990,7 @@
         else if (active === 'escolas') await renderAdminEscolas(body);
         else if (active === 'perfis') await renderAdminPerfis(body);
         else if (active === 'usuarios') await renderAdminUsuarios(body);
+        else if (active === 'logs') await renderAdminLogs(body);
       } catch (e) { body.innerHTML = `<div class="alert error">${esc(e.message)}</div>`; }
     }
     await paint();
@@ -3424,6 +3442,74 @@
     });
   }
 
+  async function renderAdminLogs(body) {
+    let logs = [];
+    let total = 0;
+    let offset = 0;
+    const limit = 50;
+
+    async function loadLogs() {
+      const result = await api(`/api/admin/logs?limit=${limit}&offset=${offset}`);
+      logs = result.logs || [];
+      total = result.total || 0;
+      render();
+    }
+
+    function render() {
+      body.innerHTML = `
+        <div style="margin-bottom:20px">
+          <h3>Logs do Sistema</h3>
+          <p>Histórico de ações realizadas no sistema</p>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th data-label="Data/Hora">Data/Hora</th>
+                <th data-label="Usuário">Usuário</th>
+                <th data-label="Ação">Ação</th>
+                <th data-label="Tipo">Tipo</th>
+                <th data-label="ID">ID da Entidade</th>
+                <th data-label="Detalhes">Detalhes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${logs.length ? logs.map(l => `
+                <tr>
+                  <td data-label="Data/Hora" style="font-size:12px">${new Date(l.created_at).toLocaleString('pt-BR')}</td>
+                  <td data-label="Usuário"><strong>${esc(l.user_name || 'Sistema')}</strong></td>
+                  <td data-label="Ação"><span class="badge">${esc(l.action)}</span></td>
+                  <td data-label="Tipo">${l.entity_type ? esc(l.entity_type) : '-'}</td>
+                  <td data-label="ID" class="mono">${l.entity_id ? esc(l.entity_id) : '-'}</td>
+                  <td data-label="Detalhes" style="font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis">${l.details ? esc(l.details) : '-'}</td>
+                </tr>
+              `).join('') : `<tr><td colspan="6" style="text-align:center;padding:20px">Nenhum log encontrado</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+        ${total > limit ? `
+          <div style="margin-top:20px;display:flex;gap:10px;justify-content:center;align-items:center">
+            <button class="btn btn-secondary" id="prevLogs" ${offset === 0 ? 'disabled' : ''}>${icon('arrow')}Anterior</button>
+            <span>Página ${Math.floor(offset / limit) + 1} de ${Math.ceil(total / limit)} (${total} total)</span>
+            <button class="btn btn-secondary" id="nextLogs" ${offset + limit >= total ? 'disabled' : ''}>Próxima${icon('arrow')}</button>
+          </div>
+        ` : ''}
+      `;
+
+      $('#prevLogs')?.addEventListener('click', () => {
+        offset = Math.max(0, offset - limit);
+        loadLogs();
+      });
+
+      $('#nextLogs')?.addEventListener('click', () => {
+        offset += limit;
+        loadLogs();
+      });
+    }
+
+    await loadLogs();
+  }
+
   async function renderAbout() {
     setLoading();
     const a = await api('/api/about');
@@ -3744,6 +3830,20 @@
       const detail = await api(`/api/demands/${id}`);
       await openEditDemand(detail.demand, () => location.reload());
     } catch (err) { toast('Não foi possível carregar a demanda', err.message, 'error'); }
+  });
+
+  content.addEventListener('click', async e => {
+    const deleteBtn = e.target.closest('[data-delete-demand]');
+    if (!deleteBtn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const id = Number(deleteBtn.dataset.deleteDemand);
+    if (!confirm('Tem certeza que deseja deletar esta demanda? Esta ação não pode ser desfeita.')) return;
+    try {
+      await api(`/api/demands/${id}`, { method: 'DELETE' });
+      toast('Demanda deletada com sucesso');
+      location.reload();
+    } catch (err) { toast('Não foi possível deletar a demanda', err.message, 'error'); }
   });
 
   content.addEventListener('click', e => {
