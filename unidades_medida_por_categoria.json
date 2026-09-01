@@ -1,0 +1,1240 @@
+{
+  "versao": "1.0",
+  "finalidade": "Filtrar unidades de medida conforme a categoria selecionada no sistema de demandas.",
+  "regra_ux": {
+    "quando_usar_unidade_medida_false": "Ocultar o campo de unidade de medida.",
+    "quando_usar_unidade_medida_true": "Exibir somente as unidades listadas em unidades_permitidas.",
+    "observacao": "A categoria faz o primeiro filtro. Quando houver descrição do item, use regras_por_item para reduzir ainda mais as opções."
+  },
+  "unidades": [
+    {
+      "codigo": "UN",
+      "nome": "Unidade",
+      "simbolo": "un"
+    },
+    {
+      "codigo": "PC",
+      "nome": "Peça",
+      "simbolo": "pç"
+    },
+    {
+      "codigo": "PAR",
+      "nome": "Par",
+      "simbolo": "par"
+    },
+    {
+      "codigo": "JG",
+      "nome": "Jogo",
+      "simbolo": "jg"
+    },
+    {
+      "codigo": "KIT",
+      "nome": "Kit",
+      "simbolo": "kit"
+    },
+    {
+      "codigo": "CJ",
+      "nome": "Conjunto",
+      "simbolo": "cj"
+    },
+    {
+      "codigo": "CX",
+      "nome": "Caixa",
+      "simbolo": "cx"
+    },
+    {
+      "codigo": "PCT",
+      "nome": "Pacote",
+      "simbolo": "pct"
+    },
+    {
+      "codigo": "RL",
+      "nome": "Rolo",
+      "simbolo": "rl"
+    },
+    {
+      "codigo": "BR",
+      "nome": "Barra",
+      "simbolo": "barra"
+    },
+    {
+      "codigo": "SC",
+      "nome": "Saco",
+      "simbolo": "sc"
+    },
+    {
+      "codigo": "BD",
+      "nome": "Balde",
+      "simbolo": "bd"
+    },
+    {
+      "codigo": "GL",
+      "nome": "Galão",
+      "simbolo": "gal"
+    },
+    {
+      "codigo": "LT",
+      "nome": "Lata",
+      "simbolo": "lata"
+    },
+    {
+      "codigo": "M",
+      "nome": "Metro",
+      "simbolo": "m"
+    },
+    {
+      "codigo": "M2",
+      "nome": "Metro quadrado",
+      "simbolo": "m²"
+    },
+    {
+      "codigo": "M3",
+      "nome": "Metro cúbico",
+      "simbolo": "m³"
+    },
+    {
+      "codigo": "MM",
+      "nome": "Milímetro",
+      "simbolo": "mm"
+    },
+    {
+      "codigo": "CM",
+      "nome": "Centímetro",
+      "simbolo": "cm"
+    },
+    {
+      "codigo": "L",
+      "nome": "Litro",
+      "simbolo": "L"
+    },
+    {
+      "codigo": "ML",
+      "nome": "Mililitro",
+      "simbolo": "mL"
+    },
+    {
+      "codigo": "KG",
+      "nome": "Quilograma",
+      "simbolo": "kg"
+    },
+    {
+      "codigo": "G",
+      "nome": "Grama",
+      "simbolo": "g"
+    },
+    {
+      "codigo": "T",
+      "nome": "Tonelada",
+      "simbolo": "t"
+    },
+    {
+      "codigo": "KWH",
+      "nome": "Quilowatt-hora",
+      "simbolo": "kWh"
+    },
+    {
+      "codigo": "H",
+      "nome": "Hora",
+      "simbolo": "h"
+    },
+    {
+      "codigo": "DIA",
+      "nome": "Diária",
+      "simbolo": "diária"
+    },
+    {
+      "codigo": "SERV",
+      "nome": "Serviço",
+      "simbolo": "serv."
+    },
+    {
+      "codigo": "VIS",
+      "nome": "Visita",
+      "simbolo": "visita"
+    },
+    {
+      "codigo": "APL",
+      "nome": "Aplicação",
+      "simbolo": "aplic."
+    },
+    {
+      "codigo": "DOC",
+      "nome": "Documento",
+      "simbolo": "doc."
+    },
+    {
+      "codigo": "LAU",
+      "nome": "Laudo",
+      "simbolo": "laudo"
+    },
+    {
+      "codigo": "FAT",
+      "nome": "Fatura",
+      "simbolo": "fatura"
+    },
+    {
+      "codigo": "VIAG",
+      "nome": "Viagem",
+      "simbolo": "viagem"
+    },
+    {
+      "codigo": "CARGA",
+      "nome": "Carga",
+      "simbolo": "carga"
+    }
+  ],
+  "categorias": [
+    {
+      "id": 1,
+      "categoria": "Elétrica",
+      "tipo_medicao": "material",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "M",
+        "RL",
+        "CX",
+        "PCT",
+        "KIT",
+        "JG",
+        "PC"
+      ],
+      "regras_por_item": {
+        "fio/cabo": [
+          "M",
+          "RL"
+        ],
+        "lâmpada": [
+          "UN",
+          "CX",
+          "PCT"
+        ],
+        "disjuntor": [
+          "UN",
+          "CX"
+        ],
+        "conector": [
+          "UN",
+          "PCT",
+          "CX"
+        ],
+        "interruptor": [
+          "UN",
+          "CX",
+          "PCT"
+        ],
+        "tomada": [
+          "UN",
+          "CX",
+          "PCT"
+        ],
+        "eletroduto": [
+          "M",
+          "BR"
+        ],
+        "fita isolante": [
+          "RL",
+          "UN"
+        ],
+        "quadro elétrico": [
+          "UN",
+          "KIT"
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "categoria": "Hidráulica",
+      "tipo_medicao": "material",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "M",
+        "BR",
+        "RL",
+        "CX",
+        "PCT",
+        "KIT",
+        "L",
+        "KG"
+      ],
+      "regras_por_item": {
+        "cano/tubo": [
+          "M",
+          "BR"
+        ],
+        "conexão": [
+          "UN",
+          "PCT",
+          "CX"
+        ],
+        "torneira": [
+          "UN"
+        ],
+        "registro": [
+          "UN"
+        ],
+        "mangueira": [
+          "M",
+          "RL"
+        ],
+        "fita veda rosca": [
+          "RL",
+          "UN"
+        ],
+        "adesivo pvc": [
+          "ML",
+          "L",
+          "UN"
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "categoria": "Cobertura/Telhado",
+      "tipo_medicao": "material",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "M",
+        "M2",
+        "RL",
+        "CX",
+        "PCT",
+        "SC",
+        "KG"
+      ]
+    },
+    {
+      "id": 4,
+      "categoria": "Pintura",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "L",
+        "ML",
+        "GL",
+        "BD",
+        "LT",
+        "KG",
+        "UN",
+        "RL",
+        "M2",
+        "SERV"
+      ],
+      "regras_por_item": {
+        "tinta": [
+          "L",
+          "GL",
+          "BD",
+          "LT"
+        ],
+        "massa corrida": [
+          "KG",
+          "BD",
+          "SC"
+        ],
+        "rolo": [
+          "UN"
+        ],
+        "pincel": [
+          "UN"
+        ],
+        "lixa": [
+          "UN",
+          "PCT"
+        ],
+        "área a pintar": [
+          "M2"
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "categoria": "Climatização",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "PC",
+        "KIT",
+        "M",
+        "RL",
+        "CX",
+        "KG",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 6,
+      "categoria": "Serralheria",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "PC",
+        "M",
+        "M2",
+        "BR",
+        "KG",
+        "KIT",
+        "SERV"
+      ]
+    },
+    {
+      "id": 7,
+      "categoria": "Alvenaria",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "M",
+        "M2",
+        "M3",
+        "SC",
+        "KG",
+        "CX",
+        "SERV"
+      ]
+    },
+    {
+      "id": 8,
+      "categoria": "Acessibilidade",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "M",
+        "M2",
+        "BR",
+        "RL",
+        "KIT",
+        "SERV"
+      ]
+    },
+    {
+      "id": 9,
+      "categoria": "Mobiliário",
+      "tipo_medicao": "material",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "PC",
+        "PAR",
+        "JG",
+        "CJ",
+        "KIT"
+      ]
+    },
+    {
+      "id": 10,
+      "categoria": "Equipamentos",
+      "tipo_medicao": "material",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "PC",
+        "KIT",
+        "CJ",
+        "PAR",
+        "JG"
+      ]
+    },
+    {
+      "id": 11,
+      "categoria": "Segurança",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "PC",
+        "KIT",
+        "CJ",
+        "M",
+        "RL",
+        "CX",
+        "PCT",
+        "SERV"
+      ]
+    },
+    {
+      "id": 12,
+      "categoria": "Saneamento",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "M",
+        "M3",
+        "L",
+        "KG",
+        "SC",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 13,
+      "categoria": "Estrutura",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "M",
+        "M2",
+        "M3",
+        "BR",
+        "KG",
+        "SC",
+        "SERV"
+      ]
+    },
+    {
+      "id": 14,
+      "categoria": "Área externa",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "M",
+        "M2",
+        "M3",
+        "UN",
+        "KG",
+        "SC",
+        "L",
+        "SERV"
+      ]
+    },
+    {
+      "id": 15,
+      "categoria": "Iluminação",
+      "tipo_medicao": "material",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "PC",
+        "CX",
+        "PCT",
+        "KIT",
+        "M",
+        "RL"
+      ],
+      "regras_por_item": {
+        "lâmpada": [
+          "UN",
+          "CX",
+          "PCT"
+        ],
+        "luminária": [
+          "UN",
+          "CX"
+        ],
+        "refletor": [
+          "UN"
+        ],
+        "soquete": [
+          "UN",
+          "PCT"
+        ],
+        "fio/cabo": [
+          "M",
+          "RL"
+        ]
+      }
+    },
+    {
+      "id": 16,
+      "categoria": "Portas e janelas",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "PC",
+        "M",
+        "M2",
+        "KIT",
+        "JG",
+        "SERV"
+      ]
+    },
+    {
+      "id": 17,
+      "categoria": "Reforma",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "M",
+        "M2",
+        "M3",
+        "KG",
+        "L",
+        "SC",
+        "CX",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 18,
+      "categoria": "Obra",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "M",
+        "M2",
+        "M3",
+        "KG",
+        "T",
+        "L",
+        "SC",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 19,
+      "categoria": "Aquisição",
+      "tipo_medicao": "generico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "PC",
+        "PAR",
+        "JG",
+        "KIT",
+        "CJ",
+        "CX",
+        "PCT",
+        "RL",
+        "M",
+        "M2",
+        "M3",
+        "L",
+        "KG"
+      ]
+    },
+    {
+      "id": 20,
+      "categoria": "Outros",
+      "tipo_medicao": "generico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "PC",
+        "PAR",
+        "JG",
+        "KIT",
+        "CJ",
+        "CX",
+        "PCT",
+        "RL",
+        "M",
+        "M2",
+        "M3",
+        "L",
+        "KG",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 21,
+      "categoria": "Agendamento",
+      "tipo_medicao": "administrativo",
+      "usar_unidade_medida": false,
+      "unidades_permitidas": []
+    },
+    {
+      "id": 22,
+      "categoria": "Assistência",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "SERV",
+        "H",
+        "DIA",
+        "VIS"
+      ]
+    },
+    {
+      "id": 23,
+      "categoria": "Automação",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "PC",
+        "KIT",
+        "CJ",
+        "M",
+        "RL",
+        "CX",
+        "PCT",
+        "SERV"
+      ]
+    },
+    {
+      "id": 24,
+      "categoria": "Avaliação",
+      "tipo_medicao": "tecnico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "LAU",
+        "VIS",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 25,
+      "categoria": "Boletim de Ocorrência",
+      "tipo_medicao": "administrativo",
+      "usar_unidade_medida": false,
+      "unidades_permitidas": []
+    },
+    {
+      "id": 26,
+      "categoria": "Bombeiro Hidráulico",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "SERV",
+        "H",
+        "DIA",
+        "VIS"
+      ]
+    },
+    {
+      "id": 27,
+      "categoria": "Capina",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "M2",
+        "SERV",
+        "H",
+        "DIA"
+      ]
+    },
+    {
+      "id": 28,
+      "categoria": "Comunicado",
+      "tipo_medicao": "administrativo",
+      "usar_unidade_medida": false,
+      "unidades_permitidas": []
+    },
+    {
+      "id": 29,
+      "categoria": "Conserto",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "SERV",
+        "H",
+        "PC",
+        "UN"
+      ]
+    },
+    {
+      "id": 30,
+      "categoria": "Consultoria",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "SERV",
+        "H",
+        "DIA",
+        "VIS"
+      ]
+    },
+    {
+      "id": 31,
+      "categoria": "Conta Luz",
+      "tipo_medicao": "administrativo",
+      "usar_unidade_medida": false,
+      "unidades_permitidas": []
+    },
+    {
+      "id": 32,
+      "categoria": "Corte",
+      "tipo_medicao": "administrativo",
+      "usar_unidade_medida": false,
+      "unidades_permitidas": []
+    },
+    {
+      "id": 33,
+      "categoria": "Declaração",
+      "tipo_medicao": "administrativo",
+      "usar_unidade_medida": false,
+      "unidades_permitidas": []
+    },
+    {
+      "id": 34,
+      "categoria": "Dedetização",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "M2",
+        "L",
+        "ML",
+        "APL",
+        "SERV"
+      ]
+    },
+    {
+      "id": 35,
+      "categoria": "Desratização",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "M2",
+        "KG",
+        "G",
+        "APL",
+        "SERV"
+      ]
+    },
+    {
+      "id": 36,
+      "categoria": "Desalojamento de pombos",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "M2",
+        "APL",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 37,
+      "categoria": "Desinfecção",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "M2",
+        "L",
+        "ML",
+        "APL",
+        "SERV"
+      ]
+    },
+    {
+      "id": 38,
+      "categoria": "Iluminação Interna",
+      "tipo_medicao": "material",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "PC",
+        "CX",
+        "PCT",
+        "KIT",
+        "M",
+        "RL"
+      ],
+      "regras_por_item": {
+        "lâmpada": [
+          "UN",
+          "CX",
+          "PCT"
+        ],
+        "luminária": [
+          "UN",
+          "CX"
+        ],
+        "soquete": [
+          "UN",
+          "PCT"
+        ],
+        "fio/cabo": [
+          "M",
+          "RL"
+        ]
+      }
+    },
+    {
+      "id": 39,
+      "categoria": "Iluminação Externa",
+      "tipo_medicao": "material",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "PC",
+        "CX",
+        "PCT",
+        "KIT",
+        "M",
+        "RL"
+      ],
+      "regras_por_item": {
+        "lâmpada": [
+          "UN",
+          "CX",
+          "PCT"
+        ],
+        "refletor": [
+          "UN"
+        ],
+        "luminária/poste": [
+          "UN"
+        ],
+        "fio/cabo": [
+          "M",
+          "RL"
+        ]
+      }
+    },
+    {
+      "id": 40,
+      "categoria": "Informação",
+      "tipo_medicao": "administrativo",
+      "usar_unidade_medida": false,
+      "unidades_permitidas": []
+    },
+    {
+      "id": 41,
+      "categoria": "Inspeção",
+      "tipo_medicao": "tecnico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "VIS",
+        "LAU",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 42,
+      "categoria": "Inspeção Gás",
+      "tipo_medicao": "tecnico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "VIS",
+        "LAU",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 43,
+      "categoria": "Instalação",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "PC",
+        "KIT",
+        "M",
+        "M2",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 44,
+      "categoria": "Isolamento",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "M",
+        "M2",
+        "RL",
+        "UN",
+        "PCT",
+        "SERV"
+      ]
+    },
+    {
+      "id": 45,
+      "categoria": "Jardinagem",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "M2",
+        "M3",
+        "UN",
+        "KG",
+        "SC",
+        "L",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 46,
+      "categoria": "Levantamento",
+      "tipo_medicao": "tecnico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "VIS",
+        "LAU",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 47,
+      "categoria": "Limpeza",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "M2",
+        "M3",
+        "L",
+        "KG",
+        "UN",
+        "PCT",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 48,
+      "categoria": "Manutenção",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "SERV",
+        "H",
+        "DIA",
+        "VIS",
+        "PC",
+        "UN"
+      ]
+    },
+    {
+      "id": 49,
+      "categoria": "Montagem",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "SERV",
+        "H",
+        "UN",
+        "PC",
+        "KIT",
+        "CJ"
+      ]
+    },
+    {
+      "id": 50,
+      "categoria": "Obra/Reparo",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "M",
+        "M2",
+        "M3",
+        "KG",
+        "L",
+        "SC",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 51,
+      "categoria": "Poda de árvore",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "SERV",
+        "H",
+        "DIA"
+      ]
+    },
+    {
+      "id": 52,
+      "categoria": "Poda e Roçada",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "M2",
+        "SERV",
+        "H",
+        "DIA"
+      ]
+    },
+    {
+      "id": 53,
+      "categoria": "Reciclagem",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "KG",
+        "T",
+        "M3",
+        "CX",
+        "PCT",
+        "UN",
+        "SERV"
+      ]
+    },
+    {
+      "id": 54,
+      "categoria": "Refrigeração",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "PC",
+        "KIT",
+        "M",
+        "KG",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 55,
+      "categoria": "Relatório",
+      "tipo_medicao": "administrativo",
+      "usar_unidade_medida": false,
+      "unidades_permitidas": []
+    },
+    {
+      "id": 56,
+      "categoria": "Reparo",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "SERV",
+        "H",
+        "PC",
+        "UN"
+      ]
+    },
+    {
+      "id": 57,
+      "categoria": "Resposta",
+      "tipo_medicao": "administrativo",
+      "usar_unidade_medida": false,
+      "unidades_permitidas": []
+    },
+    {
+      "id": 58,
+      "categoria": "Retirada",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "PC",
+        "KG",
+        "T",
+        "M3",
+        "CARGA",
+        "SERV"
+      ]
+    },
+    {
+      "id": 59,
+      "categoria": "Retorno",
+      "tipo_medicao": "administrativo",
+      "usar_unidade_medida": false,
+      "unidades_permitidas": []
+    },
+    {
+      "id": 60,
+      "categoria": "Serviço de solda",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "SERV",
+        "H",
+        "M",
+        "KG",
+        "PC",
+        "UN"
+      ]
+    },
+    {
+      "id": 61,
+      "categoria": "Solicitação",
+      "tipo_medicao": "administrativo",
+      "usar_unidade_medida": false,
+      "unidades_permitidas": []
+    },
+    {
+      "id": 62,
+      "categoria": "Substituição",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "PC",
+        "KIT",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 63,
+      "categoria": "Transporte",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "VIAG",
+        "CARGA",
+        "UN",
+        "KG",
+        "T",
+        "M3",
+        "SERV"
+      ]
+    },
+    {
+      "id": 64,
+      "categoria": "Troca",
+      "tipo_medicao": "hibrido",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "UN",
+        "PC",
+        "KIT",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 65,
+      "categoria": "Vacall",
+      "tipo_medicao": "servico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "M3",
+        "SERV",
+        "H",
+        "VIAG"
+      ]
+    },
+    {
+      "id": 66,
+      "categoria": "Visita técnica",
+      "tipo_medicao": "tecnico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "VIS",
+        "SERV",
+        "H"
+      ]
+    },
+    {
+      "id": 67,
+      "categoria": "Vistoria",
+      "tipo_medicao": "tecnico",
+      "usar_unidade_medida": true,
+      "unidades_permitidas": [
+        "VIS",
+        "LAU",
+        "SERV",
+        "H"
+      ]
+    }
+  ]
+}

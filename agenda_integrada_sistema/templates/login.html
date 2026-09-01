@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Entrar · Agenda Integrada</title>
+  <link rel="stylesheet" href="/static/styles.css?v=govbr-6-stats">
+</head>
+<body class="login-body">
+  <main class="login-layout">
+    <section class="login-hero">
+      <div class="login-brand"><div class="login-mark">AI</div><div><strong>Agenda Integrada</strong><span>Infraestrutura e Gestão Escolar em Ação</span></div></div>
+      <div class="hero-copy">
+        <span class="eyebrow">GESTÃO PÚBLICA · EDUCAÇÃO</span>
+        <h1>Demandas claras.<br>Decisões rastreáveis.<br><em>Execução visível.</em></h1>
+        <p>Centralize solicitações das Unidades Escolares, devolutivas técnicas, prazos, contratações e planejamento dos próximos exercícios.</p>
+        <div class="hero-flow"><span>Demanda</span><b>→</b><span>Análise</span><b>→</b><span>Ação</span><b>→</b><span>Resultado</span></div>
+      </div>
+      <small class="login-foot">Agenda Integrada · Ambiente demonstrativo</small>
+    </section>
+    <section class="login-panel">
+      <form class="login-card" method="post" action="/login">
+        <div class="mobile-login-brand"><strong>Agenda Integrada</strong><span>Gestão de Infraestrutura</span></div>
+        <span class="eyebrow">ACESSO AO SISTEMA</span>
+        <h2>Bem-vindo</h2>
+        <p>Entre com seu perfil institucional para continuar.</p>
+        {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+        <label>E-mail institucional<input type="email" name="email" value="{{ email or '' }}" placeholder="seu.nome@dominio.gov.br" required autofocus></label>
+        <label>Senha<input type="password" name="password" placeholder="••••••••" required></label>
+        <button class="btn btn-primary btn-login" type="submit">Entrar no sistema</button>
+        <div class="demo-credentials">
+          <strong>Acessos demonstrativos</strong>
+          <button type="button" data-demo="gestor@agenda.local|Gestor@2026"><span>Gestor</span><small>gestor@agenda.local</small></button>
+          <button type="button" data-demo="escola@agenda.local|Escola@2026"><span>Unidade Escolar</span><small>escola@agenda.local</small></button>
+          <button type="button" data-demo="planejamento@agenda.local|Planeja@2026"><span>Planejamento</span><small>planejamento@agenda.local</small></button>
+        </div>
+      </form>
+    </section>
+  </main>
+  <script>
+  document.querySelectorAll('[data-demo]').forEach(btn=>btn.addEventListener('click',()=>{const [e,p]=btn.dataset.demo.split('|');document.querySelector('[name=email]').value=e;document.querySelector('[name=password]').value=p;}));
+  </script>
+</body>
+</html>

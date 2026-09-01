@@ -1,0 +1,3 @@
+AGENDA INTEGRADA — GOV.BR V3
+Porta: 8017
+Interface: cabeçalho institucional + menu lateral off-canvas + stat-cards no padrão da TELA BASE.

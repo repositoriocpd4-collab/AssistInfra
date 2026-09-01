@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"/c/Users/Usuário/AppData/Local/Programs/Python/Python313/python.exe\" \"C:\\\\Users\\\\USURIO~2\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\G--AssistInfra-DevAssist\\\\b22340b1-b5f5-4d13-bbdd-e87a14fef85a\\\\scratchpad\\\\geocode_all_schools.py\")",
+      "Bash(xargs grep -l \"folium\\\\|leaflet\\\\|mapa.*html\")"
+    ]
+  }
+}
