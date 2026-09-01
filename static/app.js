@@ -1032,7 +1032,7 @@
         filters.overdue ? ['overdueChip', 'Prazo vencido'] : null,
         filters.due_soon ? ['dueSoonChip', 'Vence em 7 dias'] : null,
         filters.unassigned ? ['unassignedChip', 'Sem responsável'] : null,
-      ].filter(Boolean).map(([id, label]) => `<button class="chip active" id="${id}">${esc(label)} ×</button>`).join('')}<button class="chip-v2 chip-red" data-chip-priority="P1">${icon('warning')}<span>P1 Urgentes</span><b>${num(ds.urgent)}</b></button><button class="chip-v2 chip-orange" data-chip-status="Aguardando contratação">${icon('clock')}<span>Aguardando contratação</span><b>${num(ds.contract)}</b></button><button class="chip-v2 chip-blue" data-chip-status="Em execução">${icon('trend')}<span>Em execução</span><b>${num(ds.progress)}</b></button><button class="chip-v2 chip-violet" data-chip-status="Planejamento futuro">${icon('calendar')}<span>Planejamento futuro</span><b>${num(ds.future)}</b></button><button class="chip-v2 chip-green" data-chip-status="Concluída" id="completedChip">${icon('check-circle')}<span>Concluídas</span><b>${num(ds.completed)}</b></button></div>
+      ].filter(Boolean).map(([id, label]) => `<button class="chip active" id="${id}">${esc(label)} ×</button>`).join('')}<button class="chip-v2 chip-red" data-chip-priority="P1">${icon('warning')}<span>P1 Urgentes</span><b>${num(ds.urgent)}</b></button><button class="chip-v2 chip-orange" data-chip-priority="P2">${icon('warning')}<span>P2 · Alta</span><b>${num(ds.high)}</b></button><button class="chip-v2 chip-orange" data-chip-status="Aguardando contratação">${icon('clock')}<span>Aguardando contratação</span><b>${num(ds.contract)}</b></button><button class="chip-v2 chip-blue" data-chip-status="Em execução">${icon('trend')}<span>Em execução</span><b>${num(ds.progress)}</b></button><button class="chip-v2 chip-violet" data-chip-status="Planejamento futuro">${icon('calendar')}<span>Planejamento futuro</span><b>${num(ds.future)}</b></button><button class="chip-v2 chip-green" data-chip-status="Concluída" id="completedChip">${icon('check-circle')}<span>Concluídas</span><b>${num(ds.completed)}</b></button></div>
         <div class="quick-filters-divider"></div>
         <label class="toggle-field" data-tooltip="Mostra ou oculta demandas concluídas na tabela abaixo">
           <div class="toggle-field-copy">${icon('eye')}<div><strong>Exibir concluídas</strong><small>Mostra ou oculta demandas concluídas.</small></div></div>
@@ -1336,9 +1336,17 @@
   // pode alterar no backend: title, description, category, subcategory, location, impact,
   // affected_people, risk, blocks_activity.
   async function openEditDemand(d, reload) {
+    // A unidade escolar de uma demanda só pode ser trocada pelo Gestor da Infraestrutura
+    // (perfil com can_manage_admin) — o PUT /api/demands/{id} aplica a mesma regra no backend.
+    const canMoveSchool = !!ctx.user.perm.can_manage_admin;
+    let schools = [];
+    if (canMoveSchool) {
+      try { schools = await api('/api/schools'); } catch { schools = []; }
+    }
     modal({
       title: 'Editar demanda', subtitle: `${d.code} · ${d.school_name || ''}`, mode: 'drawer', body: `<form id="editDemandForm"><div class="form-grid">
       <div class="field span-2"><label>Nome curto</label><input class="input" name="title" maxlength="140" value="${esc(d.title || '')}" required></div>
+      ${canMoveSchool ? `<div class="field span-2"><label>Unidade Escolar</label><select class="select" name="school_id">${schools.map(x => `<option value="${x.id}" ${x.id === d.school_id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>` : ''}
       <div class="field"><label>Prioridade</label><select class="select" name="priority"><option value="P1 - Urgente" ${d.priority === 'P1 - Urgente' ? 'selected' : ''}>P1 - Urgente</option><option value="P2 - Alta" ${d.priority === 'P2 - Alta' ? 'selected' : ''}>P2 - Alta</option><option value="P3 - Programada" ${d.priority === 'P3 - Programada' ? 'selected' : ''}>P3 - Programada</option></select></div>
       <div class="field"><label>Status</label><select class="select" name="status"><option value="P1 Urgentes" ${d.status === 'P1 Urgentes' ? 'selected' : ''}>P1 Urgentes</option><option value="Aguardando contratação" ${d.status === 'Aguardando contratação' ? 'selected' : ''}>Aguardando contratação</option><option value="Em execução" ${d.status === 'Em execução' ? 'selected' : ''}>Em execução</option><option value="Planejamento futuro" ${d.status === 'Planejamento futuro' ? 'selected' : ''}>Planejamento futuro</option><option value="Concluída" ${d.status === 'Concluída' ? 'selected' : ''}>Concluída</option></select></div>
       <div class="field"><label>Tipo de problema</label><select class="select" name="category">${ctx.categories.map(c => `<option ${c === d.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
@@ -1352,6 +1360,13 @@
       <div class="field span-2"><label>Sinais de impacto</label><div class="check-grid"><label class="check"><input type="checkbox" name="blocks_activity" ${d.blocks_activity ? 'checked' : ''}> Impede atividade escolar</label><label class="check"><input type="checkbox" name="risk" ${d.risk ? 'checked' : ''}> Risco de acidente</label></div></div>
     </div></form>`,
       footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-danger" id="deleteEditDemand" style="margin-left:auto;margin-right:auto">${icon('trash')}Deletar</button><button class="btn btn-primary" id="saveEditDemand">Salvar alterações</button>`, onOpen() {
+        // Espelha no subtítulo do modal a escola escolhida, para quem está corrigindo
+        // uma unidade selecionada por engano ver a troca antes de salvar.
+        const schoolSelect = $('#editDemandForm [name="school_id"]');
+        schoolSelect?.addEventListener('change', () => {
+          const head = $('.modal-header p');
+          if (head) head.textContent = `${d.code} · ${schoolSelect.selectedOptions[0]?.textContent || ''}`;
+        });
         $('#saveEditDemand').addEventListener('click', async () => {
           const f = $('#editDemandForm');
           if (!f.reportValidity()) return;
@@ -1441,15 +1456,16 @@
     setLoading();
     const id = Number(document.body.dataset.entityId);
     let [payload, staff] = await Promise.all([api(`/api/demands/${id}`), loadStaff().catch(() => [])]);
-    payload.staff = staff; let active = 'summary';
+    // A aba de Devolutivas abre primeiro: e o que a escola precisa ver ao entrar na demanda.
+    payload.staff = staff; let active = 'responses';
     const render = () => {
       const d = payload.demand, due = dueInfo(d);
       content.innerHTML = `<div class="breadcrumb"><a href="/">Painel</a><span>›</span><a href="/demandas">Demandas</a><span>›</span><span>${esc(d.code)}</span></div>
         <div class="detail-head"><div><div class="detail-code-line"><span class="code-label">${esc(d.code)}</span><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span><span class="deadline ${due.cls}">${esc(due.text)}</span></div><h1>${esc(d.title)}</h1></div><div class="page-actions">${ctx.user.perm.can_edit_analysis ? `<button class="btn btn-secondary" id="editDemand">${icon('edit')}Editar análise</button>` : ''}<button class="btn btn-primary" id="quickUpdate">${icon('message')}Devolutiva</button></div></div>
         <nav class="tabs" aria-label="Detalhes da demanda">
+          <button class="tab ${active === 'responses' ? 'active' : ''}" data-tab="responses">${icon('message')}Devolutivas</button>
           <button class="tab ${active === 'summary' ? 'active' : ''}" data-tab="summary">${icon('file')}Resumo</button>
           <button class="tab ${active === 'technical' ? 'active' : ''}" data-tab="technical">${icon('settings')}Análise Técnica</button>
-          <button class="tab ${active === 'responses' ? 'active' : ''}" data-tab="responses">${icon('message')}Devolutivas</button>
           <button class="tab ${active === 'attachments' ? 'active' : ''}" data-tab="attachments">${icon('paperclip')}Anexos <span class="badge P3">${payload.attachments.length}</span></button>
           <button class="tab ${active === 'history' ? 'active' : ''}" data-tab="history">${icon('clock')}Histórico</button>
           <button class="tab ${active === 'planning' ? 'active' : ''}" data-tab="planning">${icon('calendar')}Planejamento</button>

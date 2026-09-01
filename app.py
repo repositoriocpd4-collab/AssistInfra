@@ -1043,10 +1043,20 @@ async def update_demand(request: Request, demand_id: int):
     allowed = ["title", "description", "category", "subcategory", "location", "impact", "affected_people", "risk", "blocks_activity"]
     if user["perm"]["can_edit_analysis"]:
         allowed += ["priority", "status", "due_date", "responsible", "sector", "cost_estimate", "action_defined", "technical_opinion", "dependencies", "needs_visit", "needs_budget", "needs_material", "needs_contract", "future_year", "planning_kind", "planned_quantity", "planned_unit", "prov_description", "prov_action_type", "prov_responsible", "prov_due_date", "prov_priority", "prov_note", "prov_notify_school"]
+    # Trocar a unidade escolar da demanda é exclusivo do Gestor da Infraestrutura
+    # (unico perfil com can_manage_admin); os demais nem recebem o campo no formulario.
+    if user["perm"]["can_manage_admin"]:
+        allowed += ["school_id"]
     changes = []
     for key in allowed:
         if key in payload:
             new = payload[key]
+            if key == "school_id":
+                if new in (None, ""):
+                    continue
+                new = int(new)
+                if not conn.execute("SELECT id FROM schools WHERE id=%s AND active=1", (new,)).fetchone():
+                    conn.close(); raise HTTPException(400, "Unidade escolar inválida ou inativa")
             if key in ("risk", "blocks_activity", "needs_visit", "needs_budget", "needs_material", "needs_contract", "prov_notify_school"):
                 new = int(bool(new))
             if key in ("affected_people", "future_year") and new not in (None, ""):
@@ -1058,8 +1068,13 @@ async def update_demand(request: Request, demand_id: int):
                 conn.execute(f"UPDATE demands SET {key}=%s WHERE id=%s", (new if new != "" else None, demand_id))
     conn.execute("UPDATE demands SET updated_at=%s WHERE id=%s", (now_iso(), demand_id))
     if changes:
-        labels = {"priority":"Prioridade", "status":"Status", "due_date":"Prazo", "responsible":"Responsável", "future_year":"Exercício futuro", "prov_action_type":"Tipo de ação", "prov_responsible":"Responsável pela providência", "prov_due_date":"Prazo da providência", "prov_priority":"Prioridade da providência", "prov_description":"Descrição da providência", "prov_note":"Observação da providência"}
-        summary = "; ".join(f"{labels.get(k,k)}: {a or '—'} → {b or '—'}" for k,a,b in changes[:6])
+        labels = {"priority":"Prioridade", "status":"Status", "due_date":"Prazo", "responsible":"Responsável", "future_year":"Exercício futuro", "prov_action_type":"Tipo de ação", "prov_responsible":"Responsável pela providência", "prov_due_date":"Prazo da providência", "prov_priority":"Prioridade da providência", "prov_description":"Descrição da providência", "prov_note":"Observação da providência", "school_id":"Unidade Escolar"}
+        school_names = {}
+        if any(k == "school_id" for k, _, _ in changes):
+            school_names = {r["id"]: r["name"] for r in conn.execute("SELECT id, name FROM schools").fetchall()}
+        def show(key, value):
+            return school_names.get(value, value) if key == "school_id" else value
+        summary = "; ".join(f"{labels.get(k,k)}: {show(k,a) or '—'} → {show(k,b) or '—'}" for k,a,b in changes[:6])
         conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(%s,%s,%s,%s,%s)", (demand_id, "Alteração", summary, user["name"], now_iso()))
     conn.commit(); conn.close()
     return {"ok": True}
