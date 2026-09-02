@@ -8,7 +8,7 @@ rem  Para trocar de destino, altere as tres linhas abaixo.
 rem ---------------------------------------------------------------------------
 set "REPO_URL=https://github.com/repositoriocpd4-collab/AssistInfra.git"
 set "REMOTE=origin"
-set "BRANCH=DevAssis"
+set "BRANCH=DevAssist"
 
 echo ======================================================
 echo   PUBLICAR NO GITHUB - Agenda Integrada
@@ -132,14 +132,34 @@ if errorlevel 1 (
   echo.
   echo [ERRO] O envio falhou.
   echo.
-  echo Se a mensagem acima fala em "non-fast-forward" ou "rejected", o GitHub
-  echo tem commits que nao existem aqui. Traga-os primeiro:
+  echo O GitHub tem commits na "%BRANCH%" que nao existem neste computador.
   echo.
-  echo   git pull %REMOTE% %BRANCH% --allow-unrelated-histories
+  echo Voce tem duas saidas:
   echo.
-  echo Resolva os conflitos, se houver, e rode este arquivo de novo.
-  pause
-  exit /b 1
+  echo   A^) TRAZER o que esta la e juntar com o que esta aqui:
+  echo      git pull %REMOTE% %BRANCH% --allow-unrelated-histories
+  echo      ^(pode gerar conflitos para resolver a mao^)
+  echo.
+  echo   B^) SOBRESCREVER o GitHub com o que esta neste computador.
+  echo      ATENCAO: os commits que estao la serao DESCARTADOS e nao ha
+  echo      como recupera-los pela interface do GitHub.
+  echo.
+  set "CONFIRMA="
+  set /p "CONFIRMA=Para a opcao B, digite SOBRESCREVER. Enter cancela: "
+  if /i not "!CONFIRMA!"=="SOBRESCREVER" (
+    echo Cancelado. Nada foi enviado.
+    pause
+    exit /b 1
+  )
+  echo.
+  echo Sobrescrevendo a "%BRANCH%" no GitHub...
+  git push --force-with-lease %REMOTE% %BRANCH%
+  if errorlevel 1 (
+    echo.
+    echo [ERRO] A sobrescrita tambem falhou. Veja a mensagem acima.
+    pause
+    exit /b 1
+  )
 )
 
 echo.
