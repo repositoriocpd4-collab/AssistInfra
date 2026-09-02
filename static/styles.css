@@ -13775,3 +13775,169 @@ body[data-page="dashboard"] .data-table td:last-child {
       transform: none
    }
 }
+
+/* ===========================================================================
+   DEMAIS TELAS — mesma linguagem (planejamento, escolas, relatorios,
+   administracao, mapa/kanban e sobre)
+   =========================================================================== */
+
+body[data-page="planning"],
+body[data-page="schools"],
+body[data-page="reports"],
+body[data-page="admin"],
+body[data-page="map"],
+body[data-page="kanban"],
+body[data-page="about"] {
+   min-height: 100vh;
+   background:
+      radial-gradient(720px 420px at 4% -4%, rgba(0, 90, 156, .16), transparent 62%),
+      radial-gradient(640px 380px at 100% 6%, rgba(36, 95, 202, .13), transparent 60%),
+      radial-gradient(900px 520px at 76% 98%, rgba(13, 60, 117, .12), transparent 66%),
+      linear-gradient(180deg, #eef3fa 0%, #e2e9f4 100%)
+}
+
+body.dark-mode[data-page="planning"],
+body.dark-mode[data-page="schools"],
+body.dark-mode[data-page="reports"],
+body.dark-mode[data-page="admin"],
+body.dark-mode[data-page="map"],
+body.dark-mode[data-page="kanban"],
+body.dark-mode[data-page="about"] {
+   background:
+      radial-gradient(720px 420px at 4% -4%, rgba(0, 90, 156, .22), transparent 62%),
+      linear-gradient(180deg, #181c22 0%, #131619 100%)
+}
+
+body[data-page="planning"] .panel,
+body[data-page="planning"] .filters-card,
+body[data-page="planning"] .info-card,
+body[data-page="schools"] .panel,
+body[data-page="schools"] .filters-card,
+body[data-page="schools"] .school-card,
+body[data-page="schools"] .info-card,
+body[data-page="reports"] .panel,
+body[data-page="reports"] .report-card,
+body[data-page="reports"] .info-card,
+body[data-page="admin"] .panel,
+body[data-page="admin"] .admin-card,
+body[data-page="admin"] .info-card,
+body[data-page="map"] .panel,
+body[data-page="map"] .info-card,
+body[data-page="kanban"] .panel,
+body[data-page="kanban"] .info-card,
+body[data-page="about"] .panel,
+body[data-page="about"] .info-card {
+   background: rgba(255, 255, 255, .68);
+   -webkit-backdrop-filter: blur(16px) saturate(1.5);
+   backdrop-filter: blur(16px) saturate(1.5);
+   border: 1px solid rgba(255, 255, 255, .9);
+   border-radius: 16px;
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .95),
+      0 0 0 1px rgba(13, 60, 117, .07),
+      0 12px 30px -20px rgba(13, 60, 117, .4)
+}
+
+body.dark-mode[data-page="planning"] .panel,
+body.dark-mode[data-page="planning"] .info-card,
+body.dark-mode[data-page="schools"] .panel,
+body.dark-mode[data-page="schools"] .school-card,
+body.dark-mode[data-page="schools"] .info-card,
+body.dark-mode[data-page="reports"] .panel,
+body.dark-mode[data-page="reports"] .report-card,
+body.dark-mode[data-page="admin"] .panel,
+body.dark-mode[data-page="admin"] .admin-card,
+body.dark-mode[data-page="map"] .panel,
+body.dark-mode[data-page="kanban"] .panel,
+body.dark-mode[data-page="about"] .panel {
+   background: rgba(36, 40, 46, .68);
+   border-color: rgba(255, 255, 255, .07)
+}
+
+body[data-page="planning"] .page-header h1,
+body[data-page="schools"] .page-header h1,
+body[data-page="reports"] .page-header h1,
+body[data-page="admin"] .page-header h1,
+body[data-page="about"] .page-header h1,
+body[data-page="planning"] .panel-header h2,
+body[data-page="schools"] .panel-header h2,
+body[data-page="reports"] .panel-header h2,
+body[data-page="admin"] .panel-header h2,
+body[data-page="about"] .panel-header h2 {
+   color: var(--primary-2)
+}
+
+body.dark-mode[data-page="planning"] .page-header h1,
+body.dark-mode[data-page="schools"] .page-header h1,
+body.dark-mode[data-page="reports"] .page-header h1,
+body.dark-mode[data-page="admin"] .page-header h1,
+body.dark-mode[data-page="about"] .page-header h1 {
+   color: var(--ink)
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+
+   body[data-page="planning"] .panel,
+   body[data-page="schools"] .panel,
+   body[data-page="schools"] .school-card,
+   body[data-page="reports"] .panel,
+   body[data-page="reports"] .report-card,
+   body[data-page="admin"] .panel,
+   body[data-page="admin"] .admin-card,
+   body[data-page="map"] .panel,
+   body[data-page="kanban"] .panel,
+   body[data-page="about"] .panel {
+      background: #fff
+   }
+}
+
+/* Os cartoes do Painel sao .stat-group (agrupam .stat-tile), nao .stat-card */
+body[data-page="dashboard"] .stat-group {
+   background: rgba(255, 255, 255, .68);
+   -webkit-backdrop-filter: blur(16px) saturate(1.5);
+   backdrop-filter: blur(16px) saturate(1.5);
+   border: 1px solid rgba(255, 255, 255, .9);
+   border-radius: 16px;
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .95),
+      0 0 0 1px rgba(13, 60, 117, .07),
+      0 12px 30px -20px rgba(13, 60, 117, .4)
+}
+
+body.dark-mode[data-page="dashboard"] .stat-group {
+   background: rgba(36, 40, 46, .68);
+   border-color: rgba(255, 255, 255, .07)
+}
+
+body[data-page="dashboard"] .stat-group-label {
+   color: var(--primary-2)
+}
+
+body[data-page="dashboard"] .stat-tile {
+   transition: transform .16s ease
+}
+
+body[data-page="dashboard"] .stat-tile:hover {
+   transform: translateY(-1px)
+}
+
+body[data-page="dashboard"] .stat-tile-value {
+   color: var(--primary-2)
+}
+
+body.dark-mode[data-page="dashboard"] .stat-group-label,
+body.dark-mode[data-page="dashboard"] .stat-tile-value {
+   color: var(--ink)
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+   body[data-page="dashboard"] .stat-group {
+      background: #fff
+   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+   body[data-page="dashboard"] .stat-tile:hover {
+      transform: none
+   }
+}
