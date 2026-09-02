@@ -1880,7 +1880,7 @@ def admin_summary(request: Request):
     conn.close(); return data
 
 
-def _pdf_response(filename: str, title: str, subtitle: str, headers: list, rows: list, col_widths=None):
+def _pdf_response(filename: str, title: str, subtitle: str, headers: list, rows: list, col_widths=None, logo: str = None):
     """Monta um PDF tabular simples (relatório) e devolve como download.
     Import feito aqui dentro (não no topo do arquivo) para que, se alguém rodar
     `python app.py` direto sem passar pelos .bat (que reinstalam requirements.txt
@@ -1891,7 +1891,8 @@ def _pdf_response(filename: str, title: str, subtitle: str, headers: list, rows:
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import cm
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
+        from reportlab.lib.utils import ImageReader
     except ImportError:
         raise HTTPException(500, "Geração de PDF indisponível: instale as dependências com 'pip install -r requirements.txt' (pacote reportlab) e reinicie o sistema.")
     from xml.sax.saxutils import escape as _xesc
@@ -1903,7 +1904,25 @@ def _pdf_response(filename: str, title: str, subtitle: str, headers: list, rows:
     cell_style = ParagraphStyle("cell", parent=styles["Normal"], fontSize=8, leading=10)
     head_style = ParagraphStyle("head", parent=styles["Normal"], fontSize=8.5, leading=10, textColor=colors.white, fontName="Helvetica-Bold")
 
-    story = [
+    story = []
+    # Logo institucional no cabecalho. O arquivo fica em static/images para o PDF
+    # nao depender de rede na hora de gerar; ausente, o relatorio sai sem ele.
+    if logo:
+        caminho = BASE_DIR / "static" / "images" / logo
+        if caminho.exists():
+            try:
+                leitor = ImageReader(str(caminho))
+                larg, alt = leitor.getSize()
+                # Forca a decodificacao agora: o reportlab so leria os pixels na
+                # hora de montar o documento, e um arquivo corrompido derrubaria
+                # a geracao inteira do relatorio em vez de apenas omitir a logo.
+                leitor.getRGBData()
+                altura = 1.5 * cm
+                story.append(RLImage(str(caminho), width=altura * larg / alt, height=altura, hAlign="LEFT"))
+                story.append(Spacer(1, 0.25 * cm))
+            except Exception:
+                pass
+    story += [
         Paragraph(_xesc(title), styles["Title"]),
         Paragraph(_xesc(subtitle), styles["Normal"]),
         Paragraph(f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles["Normal"]),
@@ -2008,7 +2027,7 @@ def export_planning_pdf(request: Request, year: Optional[int] = None):
     filename = f"planejamento_{year or 'todos'}_{date.today().isoformat()}.pdf"
     return _pdf_response(filename, "Agenda Integrada — Planejamento Futuro", subtitle,
                           ["Código", "Objeto consolidado", "Tipo", "Escolas", "Estimativa", "Status"],
-                          table_rows, col_widths)
+                          table_rows, col_widths, logo="logo-cabecalho.png")
 
 
 
