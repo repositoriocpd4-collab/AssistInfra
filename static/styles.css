@@ -11294,3 +11294,2076 @@ body.dark-mode .dp-footer {
    background: var(--blue-soft);
    color: #2452a0;
 }
+
+/* ===========================================================================
+   DETALHE DA DEMANDA — painel de decisão (dv-*)
+   A página é leitura e orientação; toda escrita passa pelo assistente
+   "Registrar andamento" (pw-*), em 3 etapas.
+   =========================================================================== */
+
+.dv-head {
+   display: flex;
+   align-items: flex-start;
+   justify-content: space-between;
+   gap: 20px;
+   flex-wrap: wrap;
+   margin: 4px 0 20px
+}
+
+.dv-title {
+   margin: 0;
+   font-size: clamp(23px, 2.3vw, 31px);
+   font-weight: 650;
+   letter-spacing: -.021em;
+   line-height: 1.2;
+   max-width: 26ch;
+   text-wrap: balance
+}
+
+.dv-badges {
+   display: flex;
+   align-items: center;
+   gap: 8px;
+   flex-wrap: wrap;
+   margin-top: 12px
+}
+
+.dv-code {
+   font-variant-numeric: tabular-nums;
+   letter-spacing: .04em;
+   font-size: 11.5px;
+   font-weight: 700;
+   color: var(--muted)
+}
+
+.dv-head-actions {
+   display: flex;
+   align-items: center;
+   gap: 8px;
+   position: relative
+}
+
+.dv-menu-btn {
+   width: 40px;
+   height: 40px;
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   border-radius: var(--radius-sm);
+   border: 1px solid var(--line-strong);
+   background: var(--surface);
+   color: var(--ink);
+   cursor: pointer
+}
+
+.dv-menu-btn:hover {
+   background: var(--surface-soft)
+}
+
+.dv-menu-pop {
+   position: absolute;
+   top: calc(100% + 6px);
+   right: 0;
+   z-index: 30;
+   min-width: 246px;
+   padding: 6px;
+   background: var(--surface);
+   border: 1px solid var(--line);
+   border-radius: 12px;
+   box-shadow: var(--shadow-lg)
+}
+
+.dv-menu-pop button {
+   display: flex;
+   align-items: center;
+   gap: 10px;
+   width: 100%;
+   padding: 9px 10px;
+   border: 0;
+   background: none;
+   border-radius: 8px;
+   font-size: 13px;
+   text-align: left;
+   cursor: pointer;
+   color: var(--ink)
+}
+
+.dv-menu-pop button:hover {
+   background: var(--surface-blue)
+}
+
+.dv-menu-pop button svg {
+   width: 16px;
+   height: 16px;
+   flex: none;
+   color: var(--muted)
+}
+
+.dv-menu-pop hr {
+   border: 0;
+   border-top: 1px solid var(--line);
+   margin: 5px 2px
+}
+
+.dv-menu-pop .danger,
+.dv-menu-pop .danger svg {
+   color: var(--red)
+}
+
+.dv-now {
+   display: flex;
+   gap: 18px;
+   align-items: flex-start;
+   padding: 22px 24px;
+   border-radius: var(--radius);
+   border: 1px solid #cfe0fb;
+   background: linear-gradient(180deg, #f3f8ff 0%, #e9f1fe 100%)
+}
+
+body.dark-mode .dv-now {
+   border-color: #2b4b6d;
+   background: linear-gradient(180deg, #1b2c3f 0%, #16232f 100%)
+}
+
+.dv-now-icon {
+   flex: none;
+   width: 46px;
+   height: 46px;
+   display: grid;
+   place-items: center;
+   border-radius: 50%;
+   background: var(--surface);
+   border: 1px solid #cfe0fb;
+   color: var(--blue);
+   box-shadow: 0 2px 8px rgba(20, 60, 130, .12)
+}
+
+.dv-now-icon svg {
+   width: 22px;
+   height: 22px
+}
+
+.dv-now h2 {
+   margin: 0;
+   font-size: 17px;
+   font-weight: 650;
+   color: var(--primary)
+}
+
+body.dark-mode .dv-now h2 {
+   color: #cfe3ff
+}
+
+.dv-now p {
+   margin: 5px 0 0;
+   font-size: 13.5px;
+   line-height: 1.55;
+   color: var(--muted);
+   max-width: 58ch
+}
+
+.dv-now .btn {
+   margin-top: 16px
+}
+
+.dv-rail {
+   list-style: none;
+   display: grid;
+   grid-template-columns: repeat(4, 1fr);
+   margin: 22px 0 0;
+   padding: 0
+}
+
+.dv-rail li {
+   position: relative;
+   text-align: center;
+   padding: 0 8px
+}
+
+.dv-rail li::before {
+   content: "";
+   position: absolute;
+   top: 17px;
+   right: 50%;
+   width: 100%;
+   height: 2px;
+   background: var(--line-strong);
+   z-index: 0
+}
+
+.dv-rail li:first-child::before {
+   display: none
+}
+
+.dv-rail li.done::before,
+.dv-rail li.current::before {
+   background: var(--blue)
+}
+
+.dv-rail-marker {
+   position: relative;
+   z-index: 1;
+   width: 34px;
+   height: 34px;
+   margin: 0 auto 10px;
+   display: grid;
+   place-items: center;
+   border-radius: 50%;
+   font-size: 13px;
+   font-weight: 700;
+   font-variant-numeric: tabular-nums;
+   background: var(--surface);
+   border: 2px solid var(--line-strong);
+   color: var(--muted)
+}
+
+.dv-rail li.done .dv-rail-marker {
+   background: var(--blue);
+   border-color: var(--blue);
+   color: #fff
+}
+
+.dv-rail li.current .dv-rail-marker {
+   background: var(--blue);
+   border-color: var(--blue);
+   color: #fff;
+   box-shadow: 0 0 0 4px var(--blue-soft)
+}
+
+.dv-rail li.done .dv-rail-marker svg {
+   width: 17px;
+   height: 17px
+}
+
+.dv-rail strong {
+   display: block;
+   font-size: 12.8px;
+   font-weight: 620;
+   line-height: 1.35;
+   color: var(--ink)
+}
+
+.dv-rail li.todo strong {
+   color: var(--muted)
+}
+
+.dv-rail small {
+   display: block;
+   margin-top: 3px;
+   font-size: 11px;
+   color: var(--muted);
+   font-variant-numeric: tabular-nums
+}
+
+.dv-facts {
+   display: grid;
+   grid-template-columns: repeat(auto-fit, minmax(212px, 1fr));
+   gap: 14px;
+   margin-top: 24px
+}
+
+.dv-fact {
+   background: var(--surface);
+   border: 1px solid var(--line);
+   border-radius: 12px;
+   padding: 15px 16px;
+   box-shadow: 0 1px 2px rgba(12, 35, 64, .04)
+}
+
+.dv-fact-head {
+   display: flex;
+   align-items: center;
+   gap: 8px;
+   font-size: 12px;
+   font-weight: 650;
+   color: var(--muted)
+}
+
+.dv-fact-head svg {
+   width: 16px;
+   height: 16px;
+   color: var(--blue)
+}
+
+.dv-fact strong {
+   display: block;
+   margin-top: 9px;
+   font-size: 14px;
+   font-weight: 620;
+   line-height: 1.4
+}
+
+.dv-fact-sub {
+   display: block;
+   margin-top: 4px;
+   font-size: 11.5px;
+   color: var(--muted)
+}
+
+.dv-fact-link {
+   display: inline-flex;
+   align-items: center;
+   gap: 4px;
+   margin-top: 10px;
+   padding: 0;
+   border: 0;
+   background: none;
+   font-size: 12px;
+   font-weight: 600;
+   color: var(--blue);
+   cursor: pointer
+}
+
+.dv-fact-link:hover {
+   text-decoration: underline
+}
+
+.dv-fact-link svg {
+   width: 13px;
+   height: 13px
+}
+
+.dv-panels {
+   display: grid;
+   grid-template-columns: repeat(auto-fit, minmax(262px, 1fr));
+   gap: 14px;
+   margin-top: 14px
+}
+
+.dv-panel {
+   background: var(--surface);
+   border: 1px solid var(--line);
+   border-radius: 12px;
+   padding: 17px 18px;
+   box-shadow: 0 1px 2px rgba(12, 35, 64, .04)
+}
+
+.dv-panel h3 {
+   display: flex;
+   align-items: center;
+   gap: 8px;
+   margin: 0 0 13px;
+   font-size: 13.5px;
+   font-weight: 650
+}
+
+.dv-panel h3 svg {
+   width: 17px;
+   height: 17px;
+   color: var(--blue)
+}
+
+.dv-panel p {
+   margin: 0 0 10px;
+   font-size: 13px;
+   line-height: 1.6;
+   color: var(--ink)
+}
+
+.dv-panel .dv-muted {
+   color: var(--muted)
+}
+
+.dv-kv {
+   display: flex;
+   justify-content: space-between;
+   gap: 12px;
+   padding: 7px 0;
+   border-top: 1px dashed var(--line);
+   font-size: 12.5px
+}
+
+.dv-kv span {
+   color: var(--muted)
+}
+
+.dv-kv strong {
+   font-weight: 620;
+   text-align: right
+}
+
+.dv-moves {
+   display: grid;
+   gap: 13px
+}
+
+.dv-move {
+   position: relative;
+   padding-left: 18px
+}
+
+.dv-move::before {
+   content: "";
+   position: absolute;
+   left: 0;
+   top: 5px;
+   width: 8px;
+   height: 8px;
+   border-radius: 50%;
+   background: var(--blue)
+}
+
+.dv-move.is-old::before {
+   background: var(--line-strong)
+}
+
+.dv-move strong {
+   display: block;
+   font-size: 12.8px;
+   font-weight: 640
+}
+
+.dv-move p {
+   margin: 2px 0 0;
+   font-size: 12.2px;
+   line-height: 1.5;
+   color: var(--ink)
+}
+
+.dv-move small {
+   display: block;
+   margin-top: 3px;
+   font-size: 10.5px;
+   color: var(--muted);
+   text-transform: uppercase;
+   letter-spacing: .04em
+}
+
+.dv-panel-foot {
+   display: inline-flex;
+   align-items: center;
+   gap: 5px;
+   margin-top: 14px;
+   padding: 0;
+   border: 0;
+   background: none;
+   font-size: 12.5px;
+   font-weight: 600;
+   color: var(--blue);
+   cursor: pointer
+}
+
+.dv-panel-foot:hover {
+   text-decoration: underline
+}
+
+.dv-panel-foot svg {
+   width: 14px;
+   height: 14px
+}
+
+.dv-next {
+   list-style: none;
+   margin: 0;
+   padding: 0;
+   display: grid;
+   gap: 12px
+}
+
+.dv-next li {
+   display: flex;
+   align-items: flex-start;
+   gap: 10px;
+   font-size: 12.6px;
+   line-height: 1.45;
+   color: var(--muted)
+}
+
+.dv-next li.is-now {
+   color: var(--ink);
+   font-weight: 600
+}
+
+.dv-next-dot {
+   flex: none;
+   width: 17px;
+   height: 17px;
+   margin-top: 1px;
+   border-radius: 50%;
+   border: 1.5px solid var(--line-strong);
+   display: grid;
+   place-items: center
+}
+
+.dv-next li.is-now .dv-next-dot {
+   border-color: var(--blue);
+   background: var(--blue);
+   color: #fff
+}
+
+.dv-next-dot svg {
+   width: 10px;
+   height: 10px
+}
+
+@media (max-width:760px) {
+   .dv-rail {
+      grid-template-columns: 1fr;
+      gap: 14px
+   }
+
+   .dv-rail li {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      column-gap: 12px;
+      text-align: left;
+      padding: 0
+   }
+
+   .dv-rail li::before {
+      display: none
+   }
+
+   .dv-rail-marker {
+      margin: 0
+   }
+
+   .dv-rail strong,
+   .dv-rail small {
+      grid-column: 2
+   }
+}
+
+/* ===========================================================================
+   ASSISTENTE "REGISTRAR ANDAMENTO" (pw-*)
+   =========================================================================== */
+
+.modal.drawer:has(.pw) {
+   width: min(780px, calc(100vw - 30px))
+}
+
+.pw-steps {
+   display: grid;
+   grid-template-columns: 1fr 1fr 1fr;
+   margin: 0 0 20px;
+   padding: 0
+}
+
+.pw-steps li {
+   position: relative;
+   list-style: none;
+   text-align: center
+}
+
+.pw-steps li::before {
+   content: "";
+   position: absolute;
+   top: 15px;
+   right: 50%;
+   width: 100%;
+   height: 2px;
+   background: var(--line-strong)
+}
+
+.pw-steps li:first-child::before {
+   display: none
+}
+
+.pw-steps li.done::before,
+.pw-steps li.current::before {
+   background: var(--blue)
+}
+
+.pw-disc {
+   position: relative;
+   z-index: 1;
+   width: 30px;
+   height: 30px;
+   margin: 0 auto 8px;
+   display: grid;
+   place-items: center;
+   border-radius: 50%;
+   background: var(--surface);
+   border: 2px solid var(--line-strong);
+   color: var(--muted);
+   font-size: 12.5px;
+   font-weight: 700
+}
+
+.pw-steps li.done .pw-disc,
+.pw-steps li.current .pw-disc {
+   background: var(--blue);
+   border-color: var(--blue);
+   color: #fff
+}
+
+.pw-steps li.current .pw-disc {
+   box-shadow: 0 0 0 4px var(--blue-soft)
+}
+
+.pw-steps span {
+   font-size: 11.8px;
+   font-weight: 600;
+   color: var(--muted)
+}
+
+.pw-steps li.current span {
+   color: var(--blue)
+}
+
+.pw-lead {
+   margin: 0 0 16px;
+   font-size: 12.8px;
+   line-height: 1.55;
+   color: var(--muted)
+}
+
+.pw-legend {
+   margin: 0 0 10px;
+   font-size: 13px;
+   font-weight: 650
+}
+
+.pw-type-grid {
+   display: grid;
+   grid-template-columns: repeat(auto-fit, minmax(196px, 1fr));
+   gap: 12px
+}
+
+.pw-type {
+   position: relative;
+   text-align: left;
+   padding: 15px 14px;
+   border-radius: 12px;
+   border: 1.5px solid var(--line);
+   background: var(--surface);
+   cursor: pointer;
+   transition: border-color .15s, background .15s
+}
+
+.pw-type:hover {
+   border-color: var(--line-strong);
+   background: var(--surface-soft)
+}
+
+.pw-type[aria-pressed="true"] {
+   border-color: var(--blue);
+   background: var(--blue-soft)
+}
+
+.pw-type-icon {
+   width: 38px;
+   height: 38px;
+   display: grid;
+   place-items: center;
+   border-radius: 10px;
+   background: var(--gray-soft);
+   color: var(--muted);
+   margin-bottom: 11px
+}
+
+.pw-type[aria-pressed="true"] .pw-type-icon {
+   background: var(--blue);
+   color: #fff
+}
+
+.pw-type-icon svg {
+   width: 19px;
+   height: 19px
+}
+
+.pw-type b {
+   display: block;
+   font-size: 13px;
+   font-weight: 640
+}
+
+.pw-type small {
+   display: block;
+   margin-top: 4px;
+   font-size: 11.5px;
+   line-height: 1.45;
+   color: var(--muted)
+}
+
+.pw-check {
+   position: absolute;
+   top: 11px;
+   right: 11px;
+   width: 19px;
+   height: 19px;
+   border-radius: 50%;
+   background: var(--blue);
+   color: #fff;
+   display: none;
+   place-items: center
+}
+
+.pw-type[aria-pressed="true"] .pw-check {
+   display: grid
+}
+
+.pw-check svg {
+   width: 12px;
+   height: 12px
+}
+
+.pw-preview {
+   margin-top: 18px;
+   border: 1px solid #cfe0fb;
+   background: var(--surface-blue);
+   border-radius: 12px;
+   padding: 15px 16px
+}
+
+body.dark-mode .pw-preview {
+   border-color: #2b4b6d
+}
+
+.pw-preview-head {
+   display: flex;
+   gap: 10px;
+   align-items: flex-start
+}
+
+.pw-preview-head svg {
+   width: 17px;
+   height: 17px;
+   flex: none;
+   color: var(--blue);
+   margin-top: 1px
+}
+
+.pw-preview-head b {
+   display: block;
+   font-size: 12.8px;
+   font-weight: 650
+}
+
+.pw-preview-head small {
+   display: block;
+   margin-top: 2px;
+   font-size: 11.5px;
+   color: var(--muted)
+}
+
+.pw-preview-rows {
+   margin-top: 12px;
+   background: var(--surface);
+   border: 1px solid var(--line);
+   border-radius: 10px;
+   padding: 4px 12px
+}
+
+.pw-prow {
+   display: flex;
+   align-items: center;
+   gap: 10px;
+   padding: 9px 0;
+   font-size: 12.2px;
+   border-top: 1px solid var(--line)
+}
+
+.pw-prow:first-child {
+   border-top: 0
+}
+
+.pw-prow>svg {
+   width: 15px;
+   height: 15px;
+   flex: none;
+   color: var(--muted)
+}
+
+.pw-prow-label {
+   flex: none;
+   width: 150px;
+   color: var(--muted)
+}
+
+.pw-prow-value {
+   color: var(--ink);
+   font-weight: 560
+}
+
+.pw-prow-value.is-empty {
+   color: var(--muted);
+   font-weight: 400
+}
+
+.pw-field {
+   margin-bottom: 16px
+}
+
+.pw-field>label,
+.pw-field>.pw-field-label {
+   display: block;
+   margin-bottom: 7px;
+   font-size: 12px;
+   font-weight: 650;
+   color: var(--ink)
+}
+
+.pw-field-hint {
+   margin: -3px 0 8px;
+   font-size: 11.5px;
+   line-height: 1.45;
+   color: var(--muted)
+}
+
+.pw-field.is-key {
+   padding: 14px;
+   border-radius: 12px;
+   background: var(--blue-soft);
+   border: 1px solid #cfe0fb
+}
+
+body.dark-mode .pw-field.is-key {
+   border-color: #2b4b6d
+}
+
+.pw-grid-2 {
+   display: grid;
+   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+   gap: 14px
+}
+
+.pw-req {
+   color: var(--red);
+   font-weight: 700
+}
+
+.pw-review {
+   border: 1px solid var(--line);
+   border-radius: 12px;
+   overflow: hidden
+}
+
+.pw-review-row {
+   display: flex;
+   align-items: baseline;
+   gap: 12px;
+   padding: 11px 14px;
+   border-top: 1px solid var(--line);
+   font-size: 12.5px
+}
+
+.pw-review-row:first-child {
+   border-top: 0
+}
+
+.pw-review-row .pw-prow-label {
+   width: 152px
+}
+
+.pw-from {
+   color: var(--muted);
+   text-decoration: line-through
+}
+
+.pw-to {
+   font-weight: 640
+}
+
+.pw-arrow {
+   color: var(--muted)
+}
+
+.pw-note-preview {
+   margin-top: 14px;
+   padding: 14px;
+   border-radius: 12px;
+   background: var(--surface-soft);
+   border: 1px solid var(--line);
+   font-size: 12.8px;
+   line-height: 1.6;
+   white-space: pre-wrap
+}
+
+.pw-nochange {
+   padding: 14px;
+   font-size: 12.5px;
+   color: var(--muted)
+}
+
+@media (prefers-reduced-motion:reduce) {
+   .modal.drawer {
+      animation: none
+   }
+}
+
+.dv-next-dot.is-done {
+   border-color: var(--blue);
+   background: var(--surface);
+   color: var(--blue)
+}
+
+.dv-next li:has(.is-done) {
+   color: var(--ink)
+}
+
+.pw-field .field>label.pw-lbl,
+label.pw-lbl {
+   display: block;
+   margin-bottom: 7px;
+   font-size: 12px;
+   font-weight: 650;
+   letter-spacing: 0;
+   text-transform: none;
+   color: var(--ink)
+}
+
+/* O calendario e anexado ao body; sem isto ele abre atras do drawer (z-index 80). */
+.popover.dp-panel {
+   z-index: 90
+}
+
+/* Material: verde = temos, laranja = precisa comprar — mesma leitura do cartao
+   "Material" na tela da demanda. As classes toggle-btn-no/yes pintavam o
+   estado bom de vermelho. */
+.tg-ok svg {
+   color: var(--green)
+}
+
+.tg-buy svg {
+   color: var(--orange)
+}
+
+.tg-ok.active {
+   border-color: var(--green);
+   background: var(--green-soft);
+   color: #14613f
+}
+
+.tg-buy.active {
+   border-color: var(--orange);
+   background: var(--orange-soft);
+   color: #9a4c02
+}
+
+/* ===========================================================================
+   COMBOBOX — campo de busca sobre um <select> (data-search)
+   =========================================================================== */
+
+.has-combo {
+   position: relative;
+   display: flex;
+   align-items: center
+}
+
+.combo-hidden {
+   position: absolute;
+   width: 1px;
+   height: 1px;
+   opacity: 0;
+   pointer-events: none;
+   clip-path: inset(50%)
+}
+
+.combo-input {
+   width: 100%;
+   padding-right: 36px
+}
+
+.select-wrap .combo-input {
+   padding-left: 38px
+}
+
+.combo-caret {
+   position: absolute;
+   right: 12px;
+   display: grid;
+   place-items: center;
+   color: var(--muted);
+   cursor: pointer
+}
+
+.combo-caret svg {
+   width: 15px;
+   height: 15px;
+   transform: rotate(90deg)
+}
+
+.combo-input[aria-expanded="true"]+.combo-caret svg {
+   transform: rotate(-90deg)
+}
+
+.popover.combo-pop {
+   z-index: 90;
+   padding: 5px;
+   overflow-y: auto;
+   overscroll-behavior: contain
+}
+
+.combo-group {
+   padding: 9px 10px 5px;
+   font-size: 10.5px;
+   font-weight: 700;
+   letter-spacing: .05em;
+   text-transform: uppercase;
+   color: var(--muted)
+}
+
+.combo-option {
+   padding: 8px 10px;
+   border-radius: 8px;
+   font-size: 13px;
+   line-height: 1.35;
+   cursor: pointer
+}
+
+.combo-option:hover,
+.combo-option.is-active {
+   background: var(--surface-blue)
+}
+
+.combo-option.is-current {
+   font-weight: 650;
+   color: var(--blue)
+}
+
+.combo-empty {
+   margin: 0;
+   padding: 14px 10px;
+   font-size: 12.5px;
+   color: var(--muted)
+}
+
+/* ===========================================================================
+   REGISTRAR ANDAMENTO — acabamento visual
+   Escopado ao assistente (.modal:has(.pw)) para não afetar os demais modais.
+   Paleta: azul de marca GOV.BR (--govbr-blue) nos estados ativos e
+   --primary-2 (#0d3c75) nos títulos e no botão principal.
+   =========================================================================== */
+
+.modal:has(.pw) .modal-header {
+   padding: 22px 26px 18px
+}
+
+.modal:has(.pw) .modal-header h2 {
+   font-size: 20px;
+   font-weight: 700;
+   color: var(--primary-2);
+   letter-spacing: -.018em
+}
+
+.modal:has(.pw) .modal-header p {
+   margin-top: 5px;
+   font-size: 12.5px;
+   color: #5b6b80
+}
+
+/* O corpo é a mesa de trabalho: fundo levemente frio, cartões brancos por cima */
+.modal:has(.pw) .modal-body {
+   padding: 26px;
+   background: #f2f4f8
+}
+
+body.dark-mode .modal:has(.pw) .modal-body {
+   background: #191919
+}
+
+/* --- trilho de etapas ----------------------------------------------------- */
+.pw-steps {
+   margin: 4px 0 26px
+}
+
+.pw-steps li::before {
+   top: 17px;
+   height: 2px;
+   background: #dbe2ec;
+   width: calc(100% - 44px);
+   right: calc(50% + 22px)
+}
+
+.pw-disc {
+   width: 36px;
+   height: 36px;
+   margin-bottom: 12px;
+   border: 2px solid #cdd7e4;
+   color: #8493a7;
+   font-size: 14px;
+   font-weight: 700;
+   transition: box-shadow .18s ease, background .18s ease
+}
+
+.pw-steps li.done .pw-disc,
+.pw-steps li.current .pw-disc {
+   background: var(--govbr-blue);
+   border-color: var(--govbr-blue)
+}
+
+.pw-steps li.current .pw-disc {
+   box-shadow: 0 0 0 5px rgba(0, 90, 156, .15)
+}
+
+.pw-disc svg {
+   width: 18px;
+   height: 18px
+}
+
+.pw-steps span {
+   font-size: 13px;
+   font-weight: 600;
+   color: #46586e
+}
+
+.pw-steps li.current span {
+   color: var(--govbr-blue);
+   font-weight: 650
+}
+
+/* --- textos de condução --------------------------------------------------- */
+.pw-lead {
+   margin: 0 0 22px;
+   font-size: 13.5px;
+   line-height: 1.6;
+   color: #55647a
+}
+
+.pw-legend {
+   margin: 0 0 14px;
+   font-size: 15px;
+   font-weight: 620;
+   color: var(--primary-2)
+}
+
+/* --- cartões de tipo de atualização --------------------------------------- */
+.pw-type-grid {
+   gap: 16px
+}
+
+.pw-type {
+   padding: 20px 18px 21px;
+   border: 1.5px solid #e2e8f1;
+   border-radius: 14px;
+   box-shadow: 0 1px 2px rgba(16, 40, 80, .05);
+   transition: border-color .16s ease, box-shadow .16s ease, background .16s ease
+}
+
+.pw-type:hover {
+   background: var(--surface);
+   border-color: #c4d2e4;
+   box-shadow: 0 4px 14px rgba(16, 40, 80, .09)
+}
+
+.pw-type[aria-pressed="true"] {
+   border-color: var(--govbr-blue);
+   background: linear-gradient(160deg, #eef4fc 0%, #e1ecf9 100%);
+   box-shadow: 0 0 0 1px var(--govbr-blue), 0 6px 18px rgba(0, 90, 156, .13)
+}
+
+body.dark-mode .pw-type[aria-pressed="true"] {
+   background: linear-gradient(160deg, #16293c 0%, #12202f 100%)
+}
+
+.pw-type-icon {
+   width: 46px;
+   height: 46px;
+   border-radius: 13px;
+   background: #f0f3f8;
+   color: #4a5b70;
+   margin-bottom: 14px;
+   transition: background .16s ease, color .16s ease
+}
+
+.pw-type[aria-pressed="true"] .pw-type-icon {
+   background: var(--govbr-blue);
+   color: #fff;
+   box-shadow: 0 4px 10px rgba(0, 90, 156, .28)
+}
+
+.pw-type-icon svg {
+   width: 21px;
+   height: 21px
+}
+
+.pw-type b {
+   font-size: 14px;
+   font-weight: 640;
+   color: var(--primary-2);
+   letter-spacing: -.008em
+}
+
+body.dark-mode .pw-type b {
+   color: var(--ink)
+}
+
+.pw-type small {
+   margin-top: 5px;
+   font-size: 12.5px;
+   line-height: 1.5;
+   color: #64748b
+}
+
+.pw-check {
+   top: 14px;
+   right: 14px;
+   width: 24px;
+   height: 24px;
+   background: var(--govbr-blue);
+   box-shadow: 0 2px 6px rgba(0, 90, 156, .3)
+}
+
+.pw-check svg {
+   width: 14px;
+   height: 14px
+}
+
+/* --- prévia da próxima etapa ---------------------------------------------- */
+.pw-preview {
+   margin-top: 22px;
+   padding: 20px;
+   border: 1px solid #cfdef2;
+   border-radius: 14px;
+   background: #e9f1fb
+}
+
+body.dark-mode .pw-preview {
+   background: #16283a;
+   border-color: #2b4b6d
+}
+
+.pw-preview-head {
+   gap: 12px
+}
+
+.pw-preview-head svg {
+   width: 20px;
+   height: 20px;
+   color: var(--govbr-blue)
+}
+
+.pw-preview-head b {
+   font-size: 14.5px;
+   font-weight: 650;
+   color: var(--primary-2)
+}
+
+body.dark-mode .pw-preview-head b {
+   color: var(--ink)
+}
+
+.pw-preview-head small {
+   margin-top: 3px;
+   font-size: 12.5px;
+   line-height: 1.5;
+   color: #5b6b80
+}
+
+.pw-preview-rows {
+   margin-top: 14px;
+   padding: 2px 16px;
+   border: 1px solid #e4eaf2;
+   border-radius: 12px
+}
+
+.pw-prow {
+   gap: 12px;
+   padding: 12px 0;
+   font-size: 13px;
+   border-top-color: #eef2f7
+}
+
+.pw-prow>svg {
+   width: 17px;
+   height: 17px;
+   color: #94a3b8
+}
+
+.pw-prow-label {
+   width: 216px;
+   color: #64748b
+}
+
+.pw-prow-value {
+   font-weight: 620;
+   color: var(--primary-2)
+}
+
+body.dark-mode .pw-prow-value {
+   color: var(--ink)
+}
+
+/* --- rodapé --------------------------------------------------------------- */
+.modal:has(.pw) .modal-footer {
+   padding: 18px 26px;
+   gap: 12px;
+   background: var(--surface);
+   border-top: 1px solid #e3e8f0
+}
+
+.modal:has(.pw) .modal-footer .btn {
+   padding: 13px 22px;
+   font-size: 14px;
+   font-weight: 700;
+   border-radius: 8px !important
+}
+
+.modal:has(.pw) .modal-footer .btn-secondary {
+   border: 1.5px solid var(--primary-2);
+   color: var(--primary-2)
+}
+
+.modal:has(.pw) .modal-footer .btn-secondary:hover {
+   background: #f2f6fc
+}
+
+.modal:has(.pw) .modal-footer .btn-primary {
+   background: var(--primary-2) !important;
+   box-shadow: 0 4px 12px rgba(13, 60, 117, .22)
+}
+
+.modal:has(.pw) .modal-footer .btn-primary:hover {
+   background: #0a3164 !important
+}
+
+.modal:has(.pw) .modal-footer .btn svg {
+   width: 16px;
+   height: 16px
+}
+
+/* --- etapa 2: campos sobre o fundo frio ----------------------------------- */
+.modal:has(.pw) .pw-field>label,
+.modal:has(.pw) .pw-field>.pw-field-label,
+.modal:has(.pw) label.pw-lbl {
+   font-size: 12.5px;
+   color: var(--primary-2)
+}
+
+body.dark-mode .modal:has(.pw) .pw-field>label,
+body.dark-mode .modal:has(.pw) .pw-field>.pw-field-label,
+body.dark-mode .modal:has(.pw) label.pw-lbl {
+   color: var(--ink)
+}
+
+.modal:has(.pw) .pw-field .input,
+.modal:has(.pw) .pw-field .select,
+.modal:has(.pw) .pw-field .textarea,
+.modal:has(.pw) .pw-field .combo-input {
+   background: var(--surface)
+}
+
+.pw-field.is-key {
+   background: #e9f1fb;
+   border-color: #cfdef2
+}
+
+body.dark-mode .pw-field.is-key {
+   background: #16283a;
+   border-color: #2b4b6d
+}
+
+.modal:has(.pw) .prov-form-footer {
+   margin-top: 4px;
+   padding-top: 16px;
+   border-top-color: #e3e8f0
+}
+
+/* --- etapa 3: revisão ------------------------------------------------------ */
+.pw-review {
+   border-color: #e4eaf2;
+   border-radius: 12px;
+   background: var(--surface)
+}
+
+.pw-review-row {
+   padding: 12px 16px;
+   font-size: 13px;
+   border-top-color: #eef2f7
+}
+
+.pw-review-row .pw-prow-label {
+   width: 216px
+}
+
+.pw-to {
+   color: var(--primary-2)
+}
+
+body.dark-mode .pw-to {
+   color: var(--ink)
+}
+
+.pw-note-preview {
+   margin-top: 14px;
+   padding: 16px;
+   border-radius: 12px;
+   border-color: #e4eaf2;
+   background: var(--surface);
+   font-size: 13px
+}
+
+/* Ajuste fino contra a referência: ícones e textos com mais presença,
+   cartões um pouco mais generosos. */
+.pw-type {
+   padding: 22px 20px 24px
+}
+
+.pw-type-icon {
+   background: #eef1f7;
+   color: #334155
+}
+
+.pw-type b {
+   font-size: 14.5px
+}
+
+.pw-type small {
+   color: #5d6b7d
+}
+
+.pw-lead {
+   color: #4b5b70
+}
+
+.pw-preview-head small {
+   color: #4f6076
+}
+
+.pw-prow-label {
+   color: #5d6b7d
+}
+
+/* Etapas 2 e 3: os campos e a revisão ficam sobre uma superfície branca,
+   igual aos cartões da etapa 1 sobre o fundo frio do corpo. */
+.pw-card {
+   padding: 22px 20px 20px;
+   border: 1px solid #e2e8f1;
+   border-radius: 14px;
+   background: var(--surface);
+   box-shadow: 0 1px 2px rgba(16, 40, 80, .05)
+}
+
+.pw-card>.pw-field:last-of-type {
+   margin-bottom: 0
+}
+
+.pw-card .pw-review,
+.pw-card .pw-note-preview {
+   box-shadow: none
+}
+
+/* ===========================================================================
+   REGISTRAR ANDAMENTO — refinamento: vidro, hierarquia, ícones e paleta
+   Tudo escopado ao assistente. O texto permanece sobre superfícies claras o
+   bastante para manter o contraste do corpo em ~9:1.
+   =========================================================================== */
+
+/* 1. AMBIENTE — o corpo ganha um leve degradê para o vidro ter o que revelar */
+.modal:has(.pw) .modal-body {
+   background:
+      radial-gradient(760px 400px at 8% -10%, rgba(0, 90, 156, .12), transparent 60%),
+      radial-gradient(620px 360px at 106% 4%, rgba(36, 95, 202, .10), transparent 58%),
+      linear-gradient(180deg, #eff3fa 0%, #e8edf6 100%)
+}
+
+body.dark-mode .modal:has(.pw) .modal-body {
+   background:
+      radial-gradient(760px 400px at 8% -10%, rgba(0, 90, 156, .22), transparent 60%),
+      linear-gradient(180deg, #181c22 0%, #14171c 100%)
+}
+
+/* 2. VIDRO — cartões translúcidos com desfoque e aresta de luz */
+.pw-type {
+   background: rgba(255, 255, 255, .72);
+   -webkit-backdrop-filter: blur(16px) saturate(1.5);
+   backdrop-filter: blur(16px) saturate(1.5);
+   border: 1px solid rgba(255, 255, 255, .9);
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .95),
+      0 0 0 1px rgba(13, 60, 117, .07),
+      0 10px 26px -16px rgba(13, 60, 117, .35);
+   transition: transform .18s ease, box-shadow .18s ease, background .18s ease
+}
+
+.pw-type:hover {
+   transform: translateY(-2px);
+   background: rgba(255, 255, 255, .86);
+   border-color: rgba(255, 255, 255, 1);
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .95),
+      0 0 0 1px rgba(13, 60, 117, .12),
+      0 16px 34px -18px rgba(13, 60, 117, .45)
+}
+
+/* 3. HIERARQUIA — o cartão escolhido sai do plano dos demais */
+.pw-type[aria-pressed="true"] {
+   transform: translateY(-2px);
+   background:
+      linear-gradient(158deg, rgba(255, 255, 255, .92) 0%, rgba(223, 236, 251, .82) 100%);
+   border-color: rgba(255, 255, 255, .95);
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 1),
+      0 0 0 2px var(--govbr-blue),
+      0 18px 38px -18px rgba(0, 90, 156, .55)
+}
+
+body.dark-mode .pw-type {
+   background: rgba(36, 40, 46, .66);
+   border-color: rgba(255, 255, 255, .07)
+}
+
+body.dark-mode .pw-type[aria-pressed="true"] {
+   background: linear-gradient(158deg, rgba(24, 44, 66, .92) 0%, rgba(18, 32, 47, .86) 100%)
+}
+
+/* 4. PALETA — os ladrilhos entram na mesma família fria do restante */
+.pw-type-icon {
+   background: linear-gradient(160deg, #eef2f9 0%, #e5ebf5 100%);
+   color: #3d5470;
+   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9)
+}
+
+.pw-type[aria-pressed="true"] .pw-type-icon {
+   background: linear-gradient(160deg, #0f6cb0 0%, var(--govbr-blue) 100%);
+   color: #fff;
+   box-shadow: 0 6px 14px -4px rgba(0, 90, 156, .55)
+}
+
+body.dark-mode .pw-type-icon {
+   background: rgba(255, 255, 255, .07);
+   color: #cbd5e1
+}
+
+/* 5. ÍCONES — traço mais firme e presença maior dentro do assistente */
+.modal:has(.pw) .pw-type-icon svg {
+   width: 22px;
+   height: 22px;
+   stroke-width: 1.9
+}
+
+.modal:has(.pw) .pw-type[aria-pressed="true"] .pw-type-icon svg {
+   stroke-width: 2.05
+}
+
+.modal:has(.pw) .pw-disc svg {
+   stroke-width: 2.5
+}
+
+.modal:has(.pw) .pw-check svg {
+   stroke-width: 2.6
+}
+
+.modal:has(.pw) .pw-prow>svg,
+.modal:has(.pw) .pw-preview-head svg {
+   stroke-width: 1.9
+}
+
+/* 6. PRÉVIA e SUPERFÍCIES de etapa — mesmo vidro, tom azul */
+.pw-preview {
+   background: linear-gradient(160deg, rgba(233, 241, 251, .86) 0%, rgba(221, 233, 249, .78) 100%);
+   -webkit-backdrop-filter: blur(16px) saturate(1.4);
+   backdrop-filter: blur(16px) saturate(1.4);
+   border: 1px solid rgba(255, 255, 255, .8);
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .9),
+      0 0 0 1px rgba(0, 90, 156, .12),
+      0 12px 30px -20px rgba(13, 60, 117, .4)
+}
+
+body.dark-mode .pw-preview {
+   background: linear-gradient(160deg, rgba(22, 40, 58, .9) 0%, rgba(18, 32, 47, .85) 100%);
+   border-color: rgba(255, 255, 255, .08)
+}
+
+.pw-preview-rows {
+   background: rgba(255, 255, 255, .88);
+   border-color: rgba(255, 255, 255, .9);
+   box-shadow: 0 0 0 1px rgba(13, 60, 117, .06)
+}
+
+body.dark-mode .pw-preview-rows {
+   background: rgba(30, 34, 40, .8)
+}
+
+.pw-card {
+   background: rgba(255, 255, 255, .78);
+   -webkit-backdrop-filter: blur(16px) saturate(1.5);
+   backdrop-filter: blur(16px) saturate(1.5);
+   border: 1px solid rgba(255, 255, 255, .9);
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .95),
+      0 0 0 1px rgba(13, 60, 117, .07),
+      0 12px 30px -20px rgba(13, 60, 117, .4)
+}
+
+body.dark-mode .pw-card {
+   background: rgba(36, 40, 46, .7);
+   border-color: rgba(255, 255, 255, .07)
+}
+
+/* Campos dentro do vidro ficam sólidos: legibilidade não é negociável */
+.modal:has(.pw) .pw-card .input,
+.modal:has(.pw) .pw-card .select,
+.modal:has(.pw) .pw-card .textarea,
+.modal:has(.pw) .pw-card .combo-input,
+.modal:has(.pw) .pw-review,
+.modal:has(.pw) .pw-note-preview {
+   background: var(--surface)
+}
+
+.pw-field.is-key {
+   background: linear-gradient(160deg, rgba(233, 241, 251, .9) 0%, rgba(223, 235, 250, .85) 100%);
+   border-color: rgba(0, 90, 156, .18)
+}
+
+/* 7. HIERARQUIA no rodapé — a ação principal domina, a secundária recua */
+.modal:has(.pw) .modal-footer {
+   background: rgba(255, 255, 255, .82);
+   -webkit-backdrop-filter: blur(18px) saturate(1.4);
+   backdrop-filter: blur(18px) saturate(1.4);
+   border-top: 1px solid rgba(13, 60, 117, .1)
+}
+
+body.dark-mode .modal:has(.pw) .modal-footer {
+   background: rgba(30, 30, 30, .85)
+}
+
+.modal:has(.pw) .modal-footer .btn-primary {
+   background: linear-gradient(160deg, #14477f 0%, var(--primary-2) 100%) !important;
+   box-shadow: 0 10px 24px -10px rgba(13, 60, 117, .75);
+   transition: transform .16s ease, box-shadow .16s ease
+}
+
+.modal:has(.pw) .modal-footer .btn-primary:hover {
+   transform: translateY(-1px);
+   background: linear-gradient(160deg, #17518f 0%, #0e4179 100%) !important;
+   box-shadow: 0 14px 30px -10px rgba(13, 60, 117, .8)
+}
+
+.modal:has(.pw) .modal-footer .btn-secondary {
+   border-color: rgba(13, 60, 117, .35);
+   background: rgba(255, 255, 255, .6)
+}
+
+.modal:has(.pw) .modal-footer .btn-secondary:hover {
+   border-color: var(--primary-2);
+   background: #fff
+}
+
+/* 8. Trilho de etapas com o mesmo brilho */
+.pw-steps li.current .pw-disc {
+   background: linear-gradient(160deg, #0f6cb0 0%, var(--govbr-blue) 100%);
+   box-shadow:
+      0 0 0 5px rgba(0, 90, 156, .16),
+      0 6px 14px -6px rgba(0, 90, 156, .7)
+}
+
+.pw-steps li.done .pw-disc {
+   background: linear-gradient(160deg, #0f6cb0 0%, var(--govbr-blue) 100%)
+}
+
+.pw-check {
+   background: linear-gradient(160deg, #0f6cb0 0%, var(--govbr-blue) 100%);
+   box-shadow: 0 3px 8px -2px rgba(0, 90, 156, .6)
+}
+
+/* Sem suporte a desfoque, tudo vira sólido — nada de texto sobre transparência */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+
+   .pw-type,
+   .pw-card,
+   .pw-preview-rows {
+      background: #fff
+   }
+
+   .pw-preview {
+      background: #e9f1fb
+   }
+
+   .modal:has(.pw) .modal-footer {
+      background: #fff
+   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+   .pw-type,
+   .pw-type:hover,
+   .pw-type[aria-pressed="true"],
+   .modal:has(.pw) .modal-footer .btn-primary:hover {
+      transform: none
+   }
+}
+
+/* O desfoque só se percebe quando há cor atrás dele: três halos suaves
+   (dois azuis e um teal, todos da paleta do sistema) dão o que revelar. */
+.modal:has(.pw) .modal-body {
+   background:
+      radial-gradient(560px 320px at 6% -6%, rgba(0, 90, 156, .22), transparent 62%),
+      radial-gradient(520px 300px at 104% 2%, rgba(36, 95, 202, .18), transparent 60%),
+      radial-gradient(680px 420px at 82% 88%, rgba(15, 123, 121, .13), transparent 64%),
+      linear-gradient(180deg, #eef3fa 0%, #e6ecf6 100%)
+}
+
+.pw-type {
+   background: rgba(255, 255, 255, .62)
+}
+
+.pw-type:hover {
+   background: rgba(255, 255, 255, .8)
+}
+
+.pw-card {
+   background: rgba(255, 255, 255, .7)
+}
+
+.pw-preview-rows {
+   background: rgba(255, 255, 255, .82)
+}
+
+.modal:has(.pw) .modal-footer {
+   background: rgba(255, 255, 255, .74)
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+
+   .pw-type,
+   .pw-type:hover,
+   .pw-card,
+   .pw-preview-rows,
+   .modal:has(.pw) .modal-footer {
+      background: #fff
+   }
+}
+
+/* Refinamento sobre a segunda referência: o azul sobe para o cabeçalho, o
+   conector da etapa corrente acende, e os ícones da prévia entram no acento. */
+.modal:has(.pw) .modal-header {
+   background: linear-gradient(180deg, #e2ecf8 0%, #eef3fa 100%);
+   border-bottom-color: rgba(13, 60, 117, .1)
+}
+
+body.dark-mode .modal:has(.pw) .modal-header {
+   background: linear-gradient(180deg, #1b2b3d 0%, #181c22 100%);
+   border-bottom-color: rgba(255, 255, 255, .08)
+}
+
+/* Vidro um pouco mais frio, como na referência */
+.pw-type {
+   background: rgba(248, 251, 255, .66)
+}
+
+.pw-type:hover {
+   background: rgba(250, 252, 255, .84)
+}
+
+/* Trilho: o trecho que sai da etapa corrente acende e afina até a próxima */
+.pw-steps li::before {
+   height: 3px;
+   border-radius: 3px
+}
+
+.pw-steps li.done::before,
+.pw-steps li.current::before {
+   background: linear-gradient(90deg, #0f6cb0 0%, var(--govbr-blue) 100%);
+   box-shadow: 0 0 10px -2px rgba(0, 90, 156, .55)
+}
+
+.pw-steps li.current+li::before {
+   background: linear-gradient(90deg, var(--govbr-blue) 0%, #c9d5e4 88%)
+}
+
+.pw-steps li.current .pw-disc {
+   box-shadow:
+      0 0 0 6px rgba(0, 90, 156, .14),
+      0 0 22px -4px rgba(0, 90, 156, .75),
+      0 6px 14px -6px rgba(0, 90, 156, .6)
+}
+
+/* Ícones da prévia no acento, em vez do cinza neutro */
+.modal:has(.pw) .pw-prow>svg {
+   color: var(--govbr-blue);
+   opacity: .82
+}
+
+/* Cabeçalho um pouco mais azul, para a faixa se ler de fato */
+.modal:has(.pw) .modal-header {
+   background: linear-gradient(180deg, #d7e5f6 0%, #e9f0f9 100%)
+}
+
+/* Ícones da prévia: cor por assunto, nos tokens do sistema */
+.pw-prow-ico {
+   flex: none;
+   display: grid;
+   place-items: center
+}
+
+.modal:has(.pw) .pw-prow-ico svg {
+   width: 17px;
+   height: 17px;
+   stroke-width: 1.95
+}
+
+/* O acento único deixa de valer agora que cada linha tem a sua cor */
+.modal:has(.pw) .pw-prow>svg {
+   color: inherit;
+   opacity: 1
+}
+
+/* Brilho nos botões do rodapé, como na referência */
+.modal:has(.pw) .modal-footer .btn-primary {
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .28),
+      0 10px 24px -10px rgba(13, 60, 117, .75)
+}
+
+.modal:has(.pw) .modal-footer .btn-primary:hover {
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .34),
+      0 14px 30px -10px rgba(13, 60, 117, .8)
+}
+
+.modal:has(.pw) .modal-footer .btn-secondary {
+   background: rgba(255, 255, 255, .78);
+   border-color: rgba(13, 60, 117, .28);
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .9),
+      0 4px 12px -8px rgba(13, 60, 117, .5)
+}
+
+/* A lavagem azul ganha corpo na parte de baixo, como no recorte */
+.modal:has(.pw) .modal-body {
+   background:
+      radial-gradient(560px 320px at 6% -6%, rgba(0, 90, 156, .22), transparent 62%),
+      radial-gradient(520px 300px at 104% 2%, rgba(36, 95, 202, .18), transparent 60%),
+      radial-gradient(760px 460px at 78% 96%, rgba(13, 60, 117, .16), transparent 66%),
+      linear-gradient(180deg, #eef3fa 0%, #dfe7f3 100%)
+}
+
+/* ===========================================================================
+   DETALHE DA DEMANDA — mesma linguagem de vidro do assistente
+   =========================================================================== */
+
+body[data-page="demand-detail"] {
+   background:
+      radial-gradient(720px 420px at 4% -4%, rgba(0, 90, 156, .16), transparent 62%),
+      radial-gradient(640px 380px at 100% 6%, rgba(36, 95, 202, .13), transparent 60%),
+      radial-gradient(900px 520px at 76% 98%, rgba(13, 60, 117, .12), transparent 66%),
+      linear-gradient(180deg, #eef3fa 0%, #e2e9f4 100%)
+}
+
+body.dark-mode[data-page="demand-detail"] {
+   background:
+      radial-gradient(720px 420px at 4% -4%, rgba(0, 90, 156, .22), transparent 62%),
+      linear-gradient(180deg, #181c22 0%, #131619 100%)
+}
+
+/* Superfícies de vidro compartilhadas */
+.dv-now,
+.dv-fact,
+.dv-panel {
+   background: rgba(255, 255, 255, .66);
+   -webkit-backdrop-filter: blur(16px) saturate(1.5);
+   backdrop-filter: blur(16px) saturate(1.5);
+   border: 1px solid rgba(255, 255, 255, .9);
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .95),
+      0 0 0 1px rgba(13, 60, 117, .07),
+      0 12px 30px -20px rgba(13, 60, 117, .4)
+}
+
+body.dark-mode .dv-now,
+body.dark-mode .dv-fact,
+body.dark-mode .dv-panel {
+   background: rgba(36, 40, 46, .68);
+   border-color: rgba(255, 255, 255, .07)
+}
+
+.dv-fact,
+.dv-panel {
+   border-radius: 16px;
+   transition: transform .18s ease, box-shadow .18s ease
+}
+
+.dv-fact:hover,
+.dv-panel:hover {
+   transform: translateY(-1px);
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .95),
+      0 0 0 1px rgba(13, 60, 117, .11),
+      0 18px 36px -22px rgba(13, 60, 117, .5)
+}
+
+/* Cartão "o que fazer agora": aro azul e selo circular */
+.dv-now {
+   border-radius: 18px;
+   border-color: rgba(0, 90, 156, .28);
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .95),
+      0 0 0 1px rgba(0, 90, 156, .18),
+      0 18px 40px -24px rgba(13, 60, 117, .55);
+   background: linear-gradient(160deg, rgba(255, 255, 255, .8) 0%, rgba(236, 243, 252, .7) 100%)
+}
+
+.dv-now-icon {
+   width: 52px;
+   height: 52px;
+   background: linear-gradient(160deg, #0f6cb0 0%, var(--govbr-blue) 100%);
+   border: 0;
+   color: #fff;
+   box-shadow: 0 8px 18px -6px rgba(0, 90, 156, .65)
+}
+
+.dv-now-icon svg {
+   width: 24px;
+   height: 24px;
+   stroke-width: 2.2
+}
+
+.dv-now .btn {
+   background: linear-gradient(160deg, #14477f 0%, var(--primary-2) 100%) !important;
+   color: #fff;
+   border-radius: 8px !important;
+   padding: 13px 22px;
+   font-size: 14px;
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .28),
+      0 10px 24px -10px rgba(13, 60, 117, .75)
+}
+
+/* Trilho de marcos: discos com brilho e trilho grosso que acende */
+.dv-rail li::before {
+   top: 20px;
+   height: 6px;
+   border-radius: 6px;
+   background: rgba(190, 205, 224, .75);
+   width: calc(100% - 52px);
+   right: calc(50% + 26px)
+}
+
+.dv-rail li.done::before,
+.dv-rail li.current::before {
+   background: linear-gradient(90deg, #0f6cb0 0%, var(--govbr-blue) 100%);
+   box-shadow: 0 0 14px -2px rgba(0, 90, 156, .6)
+}
+
+.dv-rail-marker {
+   width: 44px;
+   height: 44px;
+   background: linear-gradient(160deg, #ffffff 0%, #e8eef7 100%);
+   border: 1px solid rgba(255, 255, 255, .9);
+   color: #62748c;
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 1),
+      0 0 0 1px rgba(13, 60, 117, .09),
+      0 6px 14px -8px rgba(13, 60, 117, .5)
+}
+
+.dv-rail-marker svg {
+   width: 20px;
+   height: 20px;
+   stroke-width: 1.9
+}
+
+.dv-rail li.done .dv-rail-marker,
+.dv-rail li.current .dv-rail-marker {
+   background: linear-gradient(160deg, #0f6cb0 0%, var(--govbr-blue) 100%);
+   border-color: rgba(255, 255, 255, .55);
+   color: #fff
+}
+
+.dv-rail li.done .dv-rail-marker svg,
+.dv-rail li.current .dv-rail-marker svg {
+   width: 20px;
+   height: 20px
+}
+
+.dv-rail li.current .dv-rail-marker {
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .5),
+      0 0 0 6px rgba(0, 90, 156, .14),
+      0 0 22px -4px rgba(0, 90, 156, .7)
+}
+
+.dv-rail strong {
+   font-size: 13.2px;
+   color: var(--primary-2)
+}
+
+body.dark-mode .dv-rail strong {
+   color: var(--ink)
+}
+
+/* Cabeçalhos e títulos entram no marinho do sistema */
+.dv-title,
+.dv-panel h3,
+.dv-now h2 {
+   color: var(--primary-2)
+}
+
+body.dark-mode .dv-title,
+body.dark-mode .dv-panel h3,
+body.dark-mode .dv-now h2 {
+   color: var(--ink)
+}
+
+.dv-fact-head svg,
+.dv-panel h3 svg,
+.dv-fact-link svg,
+.dv-panel-foot svg {
+   color: var(--govbr-blue)
+}
+
+.dv-fact-link,
+.dv-panel-foot {
+   color: var(--govbr-blue)
+}
+
+.dv-fact strong {
+   color: var(--primary-2)
+}
+
+body.dark-mode .dv-fact strong {
+   color: var(--ink)
+}
+
+/* Passos concluídos e pontos da linha do tempo no mesmo azul */
+.dv-next-dot.is-done {
+   border-color: var(--govbr-blue);
+   color: var(--govbr-blue)
+}
+
+.dv-next li.is-now .dv-next-dot {
+   border-color: var(--govbr-blue);
+   background: linear-gradient(160deg, #0f6cb0 0%, var(--govbr-blue) 100%);
+   box-shadow: 0 3px 8px -3px rgba(0, 90, 156, .6)
+}
+
+.dv-move::before {
+   background: var(--govbr-blue);
+   box-shadow: 0 0 0 3px rgba(0, 90, 156, .13)
+}
+
+.dv-move.is-old::before {
+   background: #b8c6d8;
+   box-shadow: none
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+
+   .dv-now,
+   .dv-fact,
+   .dv-panel {
+      background: #fff
+   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+   .dv-fact:hover,
+   .dv-panel:hover {
+      transform: none
+   }
+}
+
+/* Garante que a lavagem cubra a tela mesmo com pouco conteúdo */
+body[data-page="demand-detail"] {
+   min-height: 100vh
+}
+
+/* Título da demanda ocupa a largura disponível em vez de quebrar em coluna
+   estreita: 26ch espremia títulos longos em cinco linhas. */
+.dv-title {
+   max-width: none
+}
+
+.dv-head>div:first-child {
+   flex: 1 1 560px;
+   min-width: 0
+}
+
+.dv-head-actions {
+   flex: none
+}
