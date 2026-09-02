@@ -1094,38 +1094,53 @@ async def update_demand(request: Request, demand_id: int):
         summary = "; ".join(f"{labels.get(k,k)}: {show(k,a) or '—'} → {show(k,b) or '—'}" for k,a,b in changes[:6])
         conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(%s,%s,%s,%s,%s)", (demand_id, "Alteração", summary, user["name"], now_iso()))
 
-    # Destinar a demanda a um exercicio futuro precisa criar o item correspondente
-    # em planning_items: sem isso a demanda so guardava future_year e nao aparecia
+    # Destinar a demanda a um exercicio futuro cria o item correspondente em
+    # planning_items: sem isso a demanda so guardava future_year e nao aparecia
     # na tela de Planejamento, que lista apenas aquela tabela.
+    #
+    # Um item pode ser um consolidado criado a mao servindo varias demandas
+    # (planning_links e N:N). So o item exclusivo desta demanda pode ser
+    # reescrito ou apagado aqui; consolidados compartilhados apenas ganham ou
+    # perdem o vinculo.
     if "future_year" in payload:
         atual = conn.execute("SELECT * FROM demands WHERE id=%s", (demand_id,)).fetchone()
         ano = atual["future_year"]
         vinculo = conn.execute(
-            "SELECT p.id FROM planning_items p JOIN planning_links l ON l.planning_id=p.id WHERE l.demand_id=%s",
+            """SELECT p.id, (SELECT COUNT(*) FROM planning_links x WHERE x.planning_id=p.id) demandas
+               FROM planning_items p JOIN planning_links l ON l.planning_id=p.id
+               WHERE l.demand_id=%s ORDER BY p.id LIMIT 1""",
             (demand_id,)).fetchone()
+        exclusivo = bool(vinculo) and int(vinculo["demandas"] or 0) <= 1
         if ano:
             tipo = atual["planning_kind"] or "Aquisição futura"
-            custo = float(atual["cost_estimate"] or 0)
             qtd = float(atual["planned_quantity"] or 0)
-            if vinculo:
+            unitario = float(atual["cost_estimate"] or 0)
+            # A estimativa do item e o total do exercicio: quantidade x valor
+            # informado. Sem quantidade, o valor informado ja e o total.
+            total = unitario * qtd if qtd else unitario
+            if vinculo and exclusivo:
                 conn.execute("""UPDATE planning_items SET year=%s, title=%s, category=%s, kind=%s,
                                 estimated_cost=%s, quantity=%s, unit=%s, updated_at=%s WHERE id=%s""",
-                             (int(ano), atual["title"], atual["category"], tipo, custo, qtd,
+                             (int(ano), atual["title"], atual["category"], tipo, total, qtd,
                               atual["planned_unit"], now_iso(), vinculo["id"]))
-            else:
+            elif not vinculo:
                 cur = conn.execute("""INSERT INTO planning_items(year,title,category,kind,status,estimated_cost,
                                       quantity,unit,justification,schools_count,created_at,updated_at)
                                       VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-                                   (int(ano), atual["title"], atual["category"], tipo, "Identificada", custo, qtd,
+                                   (int(ano), atual["title"], atual["category"], tipo, "Identificada", total, qtd,
                                     atual["planned_unit"], atual["description"], 1, now_iso(), now_iso()))
                 pid = cur.lastrowid
                 conn.execute("UPDATE planning_items SET code=%s WHERE id=%s", (f"PLAN-{int(ano)}-{pid:04d}", pid))
                 conn.execute("INSERT INTO planning_links(planning_id,demand_id) VALUES(%s,%s) ON CONFLICT DO NOTHING",
                              (pid, demand_id))
+            # Consolidado compartilhado permanece intacto: a demanda so segue vinculada.
         elif vinculo:
-            # Exercicio em branco remove o vinculo, como diz a dica do formulario.
-            conn.execute("DELETE FROM planning_links WHERE demand_id=%s", (demand_id,))
-            conn.execute("DELETE FROM planning_items WHERE id=%s", (vinculo["id"],))
+            # Exercicio em branco desvincula esta demanda. O item so e apagado
+            # quando nao servia mais ninguem.
+            conn.execute("DELETE FROM planning_links WHERE planning_id=%s AND demand_id=%s",
+                         (vinculo["id"], demand_id))
+            if exclusivo:
+                conn.execute("DELETE FROM planning_items WHERE id=%s", (vinculo["id"],))
 
     conn.commit(); conn.close()
     return {"ok": True}
