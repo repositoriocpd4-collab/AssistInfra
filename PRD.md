@@ -1,8 +1,8 @@
 # PRD — Agenda Integrada: Infraestrutura e Gestão Escolar em Ação
 
-**Versão do documento:** 1.0
-**Versão do sistema:** 1.1.0 (GOV.BR V3)
-**Data:** 28/08/2026
+**Versão do documento:** 1.1
+**Versão do sistema:** 1.2.0 (GOV.BR V3)
+**Data:** 01/09/2026
 **Organização:** Secretaria Municipal de Educação — Prefeitura Municipal de Itaguaí (RJ)
 **Status:** Em uso demonstrativo — pendente de homologação para produção
 
@@ -74,18 +74,25 @@ O controle de acesso é aplicado tanto nas rotas de página quanto na API (ex.: 
 - RF10 — Cadastro de nova demanda em fluxo por etapas (dados básicos, impacto, escola).
 - RF11 — Listagem com busca textual (título, código, escola), filtros (status, prioridade, categoria, ano) e chips rápidos.
 - RF12 — Exportação da lista filtrada em CSV (`;` como separador, BOM UTF-8, compatível com Excel).
-- RF13 — Tela de detalhe com abas: Resumo, Análise Técnica, Devolutivas, Anexos, Histórico e Planejamento.
+- RF13 — Tela de detalhe como painel de decisão único, sem abas: cartão "o que fazer agora" com orientação conforme o estágio, trilho de quatro marcos (solicitação registrada, providência definida, em execução, conclusão), cartões de fato (unidade escolar, responsável, prazo, categoria, material) e painéis de resumo, últimas movimentações, próximos passos, análise técnica, planejamento e anexos. As leituras profundas — histórico completo, anexos, devolutivas, dados da escola, análise técnica e planejamento — abrem em gavetas.
 - RF14 — Atualização técnica (somente perfis não-escola): prioridade, status, responsável, setor, prazo, custo estimado, parecer técnico, ação definida, dependências, flags operacionais (visita, orçamento, material, contratação) e exercício futuro.
 - RF15 — Toda alteração técnica gera um registro automático na linha do tempo (`demand_updates`), com o resumo de "antes → depois".
 - RF16 — Qualquer perfil pode registrar uma devolutiva/mensagem (pública) associada à demanda.
 - RF17 — Upload de anexos (até 12 MB, extensões permitidas: pdf, doc(x), xls(x), png, jpg/jpeg, webp, txt, csv) e download individual.
 - RF18 — Código único gerado automaticamente no padrão `INF-{ano}-{sequencial}`.
+- RF38 — Assistente "Registrar andamento", único caminho de escrita da demanda, em três etapas: escolha do tipo de atualização, preenchimento dos detalhes e revisão antes de salvar.
+- RF39 — Tipos de atualização disponíveis: atualização geral, serviço iniciado, aguardando material, alterar responsável, reprogramar prazo e serviço executado (substituído por "reabrir demanda" quando a demanda está concluída). Cada tipo predefine status e campos, destaca o campo que exige preenchimento e valida só o que aquele tipo precisa.
+- RF40 — A etapa de revisão lista as alterações no formato "antes → depois" e o texto da devolutiva que será publicada, antes de qualquer gravação.
+- RF41 — Troca da unidade escolar de uma demanda restrita ao perfil com permissão de administração (Gestor da Infraestrutura), validada também no `PUT /api/demands/{id}`, que recusa escola inexistente ou inativa e registra a troca no histórico pelos nomes das escolas.
+- RF42 — Exclusão de demanda restrita ao mesmo perfil, com remoção em cascata das atualizações e anexos e registro no log de ações.
+- RF43 — Demanda com status "Concluída" tem o andamento limitado: o sistema avisa que restam apenas destiná-la a um exercício futuro, em Planejamento, e consultar o histórico completo. Os painéis de próximos passos, análise técnica e anexos, os atalhos de responsável e prazo e as entradas de escrita do menu ficam indisponíveis.
 
 ### 4.4 Planejamento Futuro
 - RF19 — Cadastro de itens de planejamento por exercício (ano), categoria, tipo (aquisição, contratação, obra, projeto, serviço continuado), custo estimado, quantidade/unidade e justificativa.
 - RF20 — Vínculo de demandas existentes a um item de planejamento, atualizando automaticamente o status da demanda para "Planejamento futuro" e preenchendo o `future_year`.
 - RF21 — Consolidação por ano com total de itens, custo total e quantidade de escolas envolvidas.
 - RF22 — Código único gerado no padrão `PLAN-{ano}-{sequencial}`.
+- RF44 — Catálogo de 83 unidades de medida, agrupadas por natureza (contagem e embalagem, construção, comprimento, área, volume, capacidade, massa, tempo, serviços, energia, pressão/temperatura/velocidade, documentos e índices). Os campos de unidade oferecem primeiro as sugestões da categoria da demanda — afinadas por palavras da descrição —, depois as mais usadas em infraestrutura e por fim os grupos completos. Valores gravados fora do catálogo são preservados.
 
 ### 4.5 Unidades Escolares
 - RF23 — Listagem de escolas com indicadores (total de demandas, concluídas, urgências, % de execução).
@@ -111,6 +118,9 @@ O controle de acesso é aplicado tanto nas rotas de página quanto na API (ex.: 
 - RF35 — Modo noturno e ampliação de texto, ambos persistidos em `localStorage`.
 - RF36 — Tooltips (`data-tooltip`) em todos os controles interativos relevantes: navegação, ícones de ação, cartões, itens de configuração e botões de fechar/baixar, para reforçar a função de cada elemento sem poluir a tela.
 - RF37 — Estados vazios, skeleton loading, toasts de sucesso/erro e modais (central e drawer) padronizados.
+- RF45 — Campos de seleção com muitas opções (unidade de medida e unidade escolar) funcionam como campo de busca: a digitação filtra sem depender de acentos ou maiúsculas e casa também com o nome do grupo, de modo que "area" encontra as unidades de área. O `<select>` original permanece como fonte do valor, e a obrigatoriedade migra para o campo visível.
+- RF46 — Linguagem visual unificada no Painel, na lista de Demandas Escolares, no detalhe da demanda e no assistente: fundo em degradê azul da paleta GOV.BR, superfícies translúcidas com desfoque, ícones de traço reforçado e cor por assunto, e a ação principal sempre em azul-marinho sólido. Campos de formulário e tabelas permanecem em superfície opaca para preservar o contraste.
+- RF47 — Chip de filtro rápido "P2 · Alta" na carteira de demandas, ao lado dos chips de status, usando a contagem de demandas P2 em aberto já calculada pelo painel.
 
 ---
 
@@ -147,11 +157,12 @@ Prioridades: `P1` Urgente · `P2` Alta · `P3` Programada · `P4` Planejamento/P
 
 1. **Unidade Escolar** registra a demanda (título, descrição, categoria, impacto, pessoas afetadas, se bloqueia atividade).
 2. Demanda entra como **Nova** e passa por triagem da equipe de Infraestrutura.
-3. **Gestor/Planejamento** define prioridade, status, responsável, prazo, custo estimado e parecer técnico.
+3. **Gestor/Planejamento** registra o andamento pelo assistente, escolhendo o tipo de atualização e confirmando, na revisão, o que muda na demanda.
 4. Cada mudança técnica ou devolutiva fica registrada na **linha do tempo** da demanda, visível à escola.
 5. Anexos (fotos, orçamentos, laudos) podem ser incluídos por qualquer perfil autorizado.
-6. Se a demanda depende de projeto, licitação ou orçamento de exercício futuro, ela é vinculada a um **item de Planejamento Futuro**.
+6. Se a providência indicar que falta material, a demanda é sinalizada para o Planejamento e pode ser vinculada a um **item de Planejamento Futuro**.
 7. A demanda é concluída, cancelada ou reprogramada, sempre com registro do motivo na linha do tempo.
+8. Uma vez **concluída**, a demanda deixa de aceitar andamento comum: restam destiná-la a um exercício futuro e consultar o histórico.
 
 ---
 
@@ -204,6 +215,7 @@ Prioridades: `P1` Urgente · `P2` Alta · `P3` Programada · `P4` Planejamento/P
 - Dashboard comparativo entre escolas (ranking de execução, tempo médio de atendimento).
 - Anexos por devolutiva (não apenas por demanda).
 - Assinatura eletrônica de pareceres técnicos.
+- Reabertura controlada de demanda concluída — removida nesta versão junto com a trava do estado concluído; hoje só se corrige o status por "Editar dados da demanda".
 
 **Longo prazo**
 - Integração com sistemas de licitação/contratos da Prefeitura.
@@ -225,3 +237,33 @@ Prioridades: `P1` Urgente · `P2` Alta · `P3` Programada · `P4` Planejamento/P
 - `README.md` — instruções de instalação, execução e credenciais demonstrativas.
 - `VERSAO_VISUAL.txt` — identificação da versão visual ativa.
 - `/sobre` (rota da aplicação) — versão, tecnologia e perfis, consumível também via `GET /api/about`.
+- `PUBLICAR_GITHUB.bat` — publicação da branch de trabalho no GitHub, com conferência do que será enviado, verificação de acesso ao repositório e sobrescrita apenas mediante confirmação digitada.
+- `unidades_medida_por_categoria.json` — origem das sugestões de unidade por categoria de demanda.
+
+---
+
+## 14. Histórico de versões
+
+### 1.2.0 — 01/09/2026
+
+**Detalhe da demanda reformulado.** As seis abas deram lugar a um painel de decisão único, com o trilho de marcos como espinha da tela e as leituras profundas em gavetas (RF13).
+
+**Assistente "Registrar andamento"** (RF38–RF40) passa a ser o único caminho de escrita da demanda, em três etapas, com validação por tipo de atualização e revisão do "antes → depois" antes de gravar. Substituiu o formulário de providência de doze campos e as ações rápidas de avanço.
+
+**Regras de permissão e de estado.** Troca da unidade escolar e exclusão de demanda restritas ao Gestor da Infraestrutura, validadas no backend (RF41, RF42). Demanda concluída passa a avisar que só admite destinação a exercício futuro e consulta ao histórico, com as demais ações desabilitadas (RF43).
+
+**Unidades de medida** (RF44): catálogo ampliado de 35 para 83 unidades, agrupado, com sugestões por categoria e por palavras da descrição. Os campos de unidade e de unidade escolar viraram campos de busca (RF45).
+
+**Identidade visual** (RF46) unificada entre Painel, Demandas Escolares, detalhe e assistente. Chip de filtro "P2 · Alta" na carteira (RF47).
+
+**Correções de defeito**
+- Ícones ausentes no sprite SVG (`trash`, `layers`, `refresh`): o botão de excluir demanda existia mas renderizava vazio, ficando invisível na coluna Ações.
+- O calendário abria atrás do drawer, por conflito de `z-index` entre o popover e o modal.
+- O toggle de material pintava de vermelho o estado "Sim, tem material"; agora verde para disponível e laranja para "precisa comprar", igual ao cartão Material.
+- A quantidade de material era exigida mesmo quando o campo não estava em tela, deixando a etapa sem saída.
+- O prazo reprogramado gravava apenas `prov_due_date`; agora acompanha `due_date`, que é o campo lido pela listagem.
+- Título longo da demanda quebrava em coluna estreita por um `max-width` de 26 caracteres.
+
+**Pendências conhecidas**
+- O modal "Editar demanda" grava prioridade e status fora do padrão do sistema (`"P2 - Alta"` em vez de `"P2"`, `"P1 Urgentes"` — nome de coluna do kanban — em vez de um status válido). Demandas salvas por ele somem dos chips, do filtro de prioridade e das estatísticas. Requer ajuste dos `value` dos dois selects e normalização dos registros já afetados.
+- `app.py` mantém a senha de seed e o fallback do segredo de sessão em texto claro; ambos devem sair para variável de ambiente antes de produção.
