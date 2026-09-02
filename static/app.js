@@ -271,16 +271,57 @@
     'Transporte': 'servicos', 'Visita técnica': 'servicos', 'Vistoria': 'servicos',
     'Aquisição': 'administrativo', 'Boletim de Ocorrência': 'administrativo', 'Conta Luz': 'administrativo',
     'Declaração': 'administrativo', 'Informação': 'administrativo', 'Relatório': 'administrativo',
-    'Resposta': 'administrativo', 'Solicitação': 'administrativo'
+    'Resposta': 'administrativo', 'Solicitação': 'administrativo',
+    'Impressora': 'cpdti', 'Computador': 'cpdti', 'Notebook': 'cpdti', 'Tablet': 'cpdti',
+    'Câmeras': 'cpdti', 'Alarme': 'cpdti', 'Voip': 'cpdti', 'Wi-Fi': 'cpdti',
+    'Rede e Cabeamento': 'cpdti', 'DataShow': 'cpdti', 'No-Break': 'cpdti', 'Servidor': 'cpdti',
+    'Sistema/Software': 'cpdti', 'Sala de Informática': 'cpdti'
   };
   const CATEGORY_TABS = [
     { key: 'usadas', label: 'Mais usadas', icon: 'star' },
+    { key: 'cpdti', label: 'CPD/TI', icon: 'monitor' },
     { key: 'infra', label: 'Infraestrutura', icon: 'building' },
     { key: 'manutencao', label: 'Manutenção', icon: 'wrench' },
     { key: 'servicos', label: 'Serviços', icon: 'clipboard' },
     { key: 'administrativo', label: 'Administrativo', icon: 'user' },
     { key: 'outros', label: 'Outros', icon: 'dots' }
   ];
+
+  // Sub-tipo de problema por categoria (passo 2 do assistente). Em Impressora, toner, mancha,
+  // atolamento e falha no documento exigem um técnico no local — em vez de abrir chamado, a
+  // pessoa liga direto pro ramal do CPD/TI (opção "blocked: true"). Nas demais categorias
+  // listadas aqui, o sub-tipo é só uma etiqueta a mais pra ajudar a triagem; o fluxo de
+  // chamado continua normal. Categoria não listada aqui não ganha esse seletor.
+  const SUPPORT_PHONE_EXT = '9090';
+  const CAMERA_ALARM_ISSUES = [
+    { value: 'problema_tv', label: 'Problema na TV' },
+    { value: 'extracao_imagem', label: 'Extração de imagem' },
+    { value: 'remanejamento', label: 'Remanejamento' },
+    { value: 'remocao', label: 'Remoção' },
+    { value: 'defeito', label: 'Defeito' },
+    { value: 'outros', label: 'Outros' },
+  ];
+  const CATEGORY_ISSUE_OPTIONS = {
+    'Impressora': [
+      { value: 'nao_imprime', label: 'Não imprime' },
+      { value: 'nao_digitaliza', label: 'Não digitaliza' },
+      { value: 'trocar_toner', label: 'Trocar toner', blocked: true },
+      { value: 'falha_documento', label: 'Falha no documento', blocked: true },
+      { value: 'mancha_impressao', label: 'Mancha na impressão', blocked: true },
+      { value: 'atolamento', label: 'Atolamento', blocked: true },
+      { value: 'outros', label: 'Outros' },
+    ],
+    'Câmeras': CAMERA_ALARM_ISSUES,
+    'Alarme': CAMERA_ALARM_ISSUES,
+    'Wi-Fi': [
+      { value: 'wifi_7lan', label: 'Wi-Fi 7LAN' },
+      { value: 'wifi_escola', label: 'Wi-Fi da Escola' },
+      { value: 'wifi_fust', label: 'Wi-Fi FUST' },
+      { value: 'outros', label: 'Outros' },
+    ]
+  };
+  const isItemBlocked = it => !!CATEGORY_ISSUE_OPTIONS[it.category]?.find(o => o.value === it.issue)?.blocked;
+  const needsIssuePick = it => !!CATEGORY_ISSUE_OPTIONS[it.category] && !it.issue;
 
   const icon = name => `<svg aria-hidden="true"><use href="#i-${name}"></use></svg>`;
   const esc = (v = '') => String(v ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
@@ -853,7 +894,7 @@
 
         const syncNextEnabled = () => {
           if (step === 1) next.disabled = !state.categories.length || (!ctx.user.perm.school_scoped && !form.elements.school_id.value);
-          else if (step === 2) next.disabled = !state.items.length || state.items.some(it => !it.description.trim());
+          else if (step === 2) next.disabled = !state.items.length || state.items.some(it => needsIssuePick(it) || (!isItemBlocked(it) && !it.description.trim()));
           else next.disabled = false;
         };
 
@@ -896,7 +937,7 @@
               return;
             }
             state.categories.push(cat);
-            state.items.push({ category: cat, location: '', description: '', title: '' });
+            state.items.push({ category: cat, location: '', description: '', title: '', titleAuto: true, issue: '' });
             dupCards.forEach(el => { el.classList.add('selected'); el.setAttribute('aria-pressed', 'true'); });
           }
           refreshCategoryOrder();
@@ -957,10 +998,25 @@
           const multi = state.items.length > 1;
           container.innerHTML = (multi ? `<p class="wizard-question">Conte os detalhes e insira fotos de cada problema</p><p class="wizard-hint">Você escolheu ${state.items.length} tipos — cada um vira uma demanda independente com seu próprio registro e foto.</p>` : '') +
             state.items.map((it, i) => {
-              const c = CATEGORY_COLORS[it.category] || 'blue'; return `
-            <div class="detail-block ${multi ? '' : 'detail-block-single'}" ${multi ? `style="border-left:4px solid var(--${c})"` : ''}>
-              <div class="detail-block-head" style="color:var(--${c})"><span class="detail-icon-badge" style="background:var(--${c}-soft);color:var(--${c})">${icon(CATEGORY_ICONS[it.category] || 'clipboard')}</span><strong>${i + 1}. ${esc(it.category)}</strong></div>
-              <p class="wizard-question">Onde isso está acontecendo?</p>
+              const c = CATEGORY_COLORS[it.category] || 'blue';
+              const issueOpts = CATEGORY_ISSUE_OPTIONS[it.category];
+              const blocked = isItemBlocked(it);
+              const issuePicker = issueOpts ? `
+              <p class="wizard-question mt-16">Qual é o problema? *</p>
+              <p class="wizard-hint">Escolha uma opção pra continuar — assim a gente já sabe como te ajudar.</p>
+              <div class="issue-chip-row" role="group" aria-label="Tipo de problema — ${esc(it.category)}">
+                ${issueOpts.map(o => `<button type="button" class="issue-chip${o.blocked ? ' issue-chip-blocked' : ''}${it.issue === o.value ? ' selected' : ''}" data-issue-opt data-idx="${i}" data-issue="${esc(o.value)}" aria-pressed="${it.issue === o.value}">${o.blocked ? icon('phone') : ''}<span>${esc(o.label)}</span></button>`).join('')}
+              </div>` : '';
+              const blockedNotice = blocked ? `
+              <div class="issue-block-notice" role="status">
+                <span class="issue-block-notice-icon">${icon('phone')}</span>
+                <div class="issue-block-notice-body">
+                  <strong>Esse problema a gente resolve por telefone</strong>
+                  <p>Ligue direto pro <strong class="issue-block-phone">Ramal ${SUPPORT_PHONE_EXT}</strong> — o Técnico da Impressora já vai te atender. Essa demanda não será enviada como chamado.</p>
+                </div>
+              </div>` : '';
+              const restOfFields = blocked ? '' : `
+              <p class="wizard-question mt-16">Onde isso está acontecendo?</p>
               <div class="field span-2"><input class="input" data-field="location" data-idx="${i}" placeholder="Ex.: Sala 3, banheiro do pátio, cozinha..." autocomplete="off" value="${esc(it.location)}"></div>
               <p class="wizard-question mt-16">Descreva com suas palavras</p>
               <p class="wizard-hint">O que está acontecendo, desde quando e o que você já percebeu.</p>
@@ -971,19 +1027,37 @@
                 <strong>${it.photo ? 'Foto selecionada' : `Anexar foto para ${esc(it.category)}`}</strong>
                 <small id="photoName_${i}">${it.photo ? `${esc(it.photo.name)} · ${Math.max(1, Math.round(it.photo.size / 1024))} KB` : 'Nenhuma foto selecionada'}</small>
                 <input type="file" class="item-photo-input" data-item-photo="${i}" accept="image/*,.pdf" hidden>
-              </label>
-              ${!multi ? `<div class="field span-2 mt-16"><label>Nome curto para essa demanda</label><input class="input" data-field="title" data-idx="${i}" maxlength="140" placeholder="Preenchemos pra você — pode ajustar se quiser" value="${esc(it.title)}"></div>` : ''}
-            </div>`}).join('');
+              </label>`;
+              const titleField = !multi ? `<div class="field span-2 mt-16"><label>Nome curto para essa demanda</label><input class="input" data-field="title" data-idx="${i}" maxlength="140" placeholder="Preenchemos pra você — pode ajustar se quiser" value="${esc(it.title)}"></div>` : '';
+              return `
+            <div class="detail-block ${multi ? '' : 'detail-block-single'}" ${multi ? `style="border-left:4px solid var(--${c})"` : ''}>
+              <div class="detail-block-head" style="color:var(--${c})"><span class="detail-icon-badge" style="background:var(--${c}-soft);color:var(--${c})">${icon(CATEGORY_ICONS[it.category] || 'clipboard')}</span><strong>${i + 1}. ${esc(it.category)}</strong></div>
+              ${issuePicker}
+              ${blockedNotice}
+              ${restOfFields}
+              ${titleField}
+            </div>`;
+            }).join('');
           const suggestItemTitle = (i) => {
             const it = state.items[i];
-            const suggestion = [it.category, it.location].filter(Boolean).join(' — ') || it.category || '';
+            if (it.titleAuto === false) return;
+            const issueLabel = CATEGORY_ISSUE_OPTIONS[it.category]?.find(o => o.value === it.issue)?.label;
+            const suggestion = [it.category, issueLabel, it.location].filter(Boolean).join(' — ') || it.category || '';
             const titleInput = container.querySelector(`[data-field="title"][data-idx="${i}"]`);
-            if (titleInput && (!titleInput.value || titleInput.dataset.auto === '1')) { titleInput.value = suggestion; titleInput.dataset.auto = '1'; it.title = suggestion; }
+            if (titleInput) titleInput.value = suggestion;
+            it.title = suggestion;
           };
+          $$('[data-issue-opt]', container).forEach(btn => btn.addEventListener('click', () => {
+            const i = Number(btn.dataset.idx), val = btn.dataset.issue;
+            state.items[i].issue = state.items[i].issue === val ? '' : val;
+            renderDetailsFields();
+            syncNextEnabled();
+            container.querySelector(`[data-issue-opt][data-idx="${i}"][data-issue="${val}"]`)?.focus();
+          }));
           $$('[data-field]', container).forEach(el => {
             const i = Number(el.dataset.idx), field = el.dataset.field;
             el.addEventListener('input', () => {
-              if (field === 'title') el.dataset.auto = '0';
+              if (field === 'title') state.items[i].titleAuto = false;
               state.items[i][field] = el.value;
               if (field === 'location') suggestItemTitle(i);
               syncNextEnabled();
@@ -1062,6 +1136,13 @@
               reviewPhotoUrls.push(url);
               return `<div class="review-photo-block"><span class="review-label">Foto deste problema</span><img class="review-photo-thumb" src="${url}" alt="Foto anexada"></div>`;
             };
+            const blockedCount = state.items.filter(isItemBlocked).length;
+            const toSendCount = state.items.length - blockedCount;
+            const summaryText = blockedCount
+              ? (toSendCount
+                ? `Serão registradas ${toSendCount} de ${state.items.length} demandas — ${blockedCount > 1 ? `${blockedCount} são resolvidas` : 'uma é resolvida'} por telefone (Ramal ${SUPPORT_PHONE_EXT}) e não geram chamado.`
+                : `${blockedCount > 1 ? 'Esses problemas são' : 'Esse problema é'} resolvido por telefone — ligue pro Ramal ${SUPPORT_PHONE_EXT}. Nenhum chamado será enviado.`)
+              : (state.items.length > 1 ? `Serão registradas ${state.items.length} demandas, uma para cada tipo de problema — cada uma recebe um código único e sua própria foto.` : 'Depois de enviada, a demanda recebe um código único e você poderá acompanhar todo o andamento.');
             $('#demandReview').innerHTML = `<div class="review-summary">
               <div class="review-summary-head">
                 <span class="review-summary-badge">${icon('check-circle')}</span>
@@ -1077,27 +1158,29 @@
                 <div class="review-item"><span class="review-item-icon">${icon('shield')}</span><div class="review-item-body"><span class="review-label">Risco de acidente?</span>${boolPill(state.risk, 'Há risco', 'Não há risco')}</div></div>
               </div>
             </div>
-            <div class="alert info review-alert">${icon('info')}<span>${state.items.length > 1 ? `Serão registradas ${state.items.length} demandas, uma para cada tipo de problema — cada uma recebe um código único e sua própria foto.` : 'Depois de enviada, a demanda recebe um código único e você poderá acompanhar todo o andamento.'}</span></div>
-            ${state.items.map((it, i) => `<section class="review-category-card">
-              <div class="review-category-head"><span class="review-category-icon" style="background:var(--${CATEGORY_COLORS[it.category] || 'blue'}-soft);color:var(--${CATEGORY_COLORS[it.category] || 'blue'})">${icon(CATEGORY_ICONS[it.category] || 'clipboard')}</span><h4>${state.items.length > 1 ? `${i + 1}. ` : ''}${esc(it.category)}</h4></div>
+            <div class="alert info review-alert">${icon('info')}<span>${summaryText}</span></div>
+            ${state.items.map((it, i) => { const blocked = isItemBlocked(it); return `<section class="review-category-card">
+              <div class="review-category-head"><span class="review-category-icon" style="background:var(--${CATEGORY_COLORS[it.category] || 'blue'}-soft);color:var(--${CATEGORY_COLORS[it.category] || 'blue'})">${icon(CATEGORY_ICONS[it.category] || 'clipboard')}</span><h4>${state.items.length > 1 ? `${i + 1}. ` : ''}${esc(it.category)}</h4>${blocked ? `<span class="review-pill blue" style="margin-left:auto">${icon('phone')}<span>Não será enviado — Ramal ${SUPPORT_PHONE_EXT}</span></span>` : ''}</div>
+              ${blocked ? `<p class="wizard-hint" style="margin:0">Sem local, descrição ou foto — esse problema é resolvido por telefone, não por chamado.</p>` : `
               <div class="review-fields">
                 <div class="review-item"><span class="review-item-icon">${icon('map')}</span><div class="review-item-body"><span class="review-label">Local</span><strong>${esc(it.location || 'Não informado')}</strong></div></div>
                 <div class="review-item"><span class="review-item-icon">${icon('clipboard')}</span><div class="review-item-body"><span class="review-label">Descrição</span><strong>${esc(it.description)}</strong></div></div>
               </div>
-              ${photoThumb(it.photo || state.photo)}
-            </section>`).join('')}`;
+              ${photoThumb(it.photo || state.photo)}`}
+            </section>`; }).join('')}`;
           }
         };
         prev.addEventListener('click', () => { step--; updateStep(); });
         next.addEventListener('click', async () => {
           if (step === 1 && !state.categories.length) return;
-          if (step === 2 && (!state.items.length || state.items.some(it => !it.description.trim()))) return;
+          if (step === 2 && (!state.items.length || state.items.some(it => needsIssuePick(it) || (!isItemBlocked(it) && !it.description.trim())))) return;
           if (step < totalSteps) { step++; updateStep(); return; }
           const reach = state.customReach ? (Number($('[name=affected_people_custom]', form).value) || 0) : state.reach;
           const schoolId = ctx.user.perm.school_scoped ? ctx.user.school_id : form.elements.school_id.value;
-          const created = [], failed = [];
+          const created = [], failed = [], skipped = [];
           next.disabled = true; setNextLabel('Enviando...');
           for (const it of state.items) {
+            if (isItemBlocked(it)) { skipped.push({ category: it.category }); continue; }
             const title = (it.title || '').trim() || [it.category, it.location].filter(Boolean).join(' — ') || it.category;
             const payload = {
               school_id: schoolId,
@@ -1127,9 +1210,13 @@
             closeModal();
             if (created.length > 1) toast('Demandas registradas com sucesso!', `${created.length} códigos gerados: ${created.map(c => c.code).join(', ')}.`);
             else toast('Demanda registrada com sucesso!', `Código ${created[0].code} — acompanhe o andamento a qualquer momento.`);
+            if (skipped.length) toast('Resolvido por telefone', `${skipped.map(s => s.category).join(', ')} não ${skipped.length > 1 ? 'geraram chamado' : 'gerou chamado'} — ligue pro Ramal ${SUPPORT_PHONE_EXT}.`, 'info');
             if (failed.length) toast('Algumas demandas não puderam ser enviadas', failed.map(f => `${f.category}: ${f.message}`).join(' · '), 'error');
             const isInfraManager = ctx.user && ctx.user.role === 'gestor';
             location.href = (created.length > 1 || isInfraManager) ? '/demandas' : `/demandas/${created[0].id}`;
+          } else if (skipped.length && !failed.length) {
+            closeModal();
+            toast('Resolvido por telefone', `${skipped.length > 1 ? 'Esses problemas são' : 'Esse problema é'} resolvido por telefone — ligue pro Ramal ${SUPPORT_PHONE_EXT}. Nenhum chamado foi enviado.`, 'info');
           } else {
             toast('Não foi possível enviar', failed.map(f => f.message).join(' · ') || 'Tente novamente.', 'error');
             next.disabled = false; setNextLabel(state.items.length > 1 ? 'Enviar demandas' : 'Enviar demanda', 'Finalizar registro');
@@ -1218,7 +1305,7 @@
       ? { eyebrow: 'PRECISOU DE ALGO?', title: 'Viu um problema na escola? Conte pra gente.', text: 'Leva menos de 2 minutos. Escolha o tipo de problema, descreva com suas palavras e, se quiser, envie uma foto.' }
       : { eyebrow: 'REGISTRO RÁPIDO', title: 'Uma escola reportou algo? Registre em segundos.', text: 'Use o assistente guiado para abrir uma demanda com categoria, urgência e impacto já organizados.' };
     content.innerHTML =
-      `<section class="report-hero"><a class="report-hero-export" href="/api/export/demands.csv" data-tooltip="Baixar a lista completa em CSV">${icon('download')}<span>Exportar</span></a><div class="report-hero-copy"><span class="eyebrow">${heroCopy.eyebrow}</span><h2>${heroCopy.title}</h2><p>${heroCopy.text}</p></div><button class="btn-report" data-open-demand data-tooltip="Abrir o assistente de registro em 4 passos">${icon('plus')}Registrar Demanda/CI</button></section>` +
+      `<section class="report-hero"><a class="report-hero-export" href="/api/export/dashboard.pdf" data-tooltip="Baixar o Painel completo em PDF (A4 paisagem): indicadores, execução, o que precisa de atenção, categorias e atividade recente">${icon('download')}<span>Exportar Painel</span></a><div class="report-hero-copy"><span class="eyebrow">${heroCopy.eyebrow}</span><h2>${heroCopy.title}</h2><p>${heroCopy.text}</p></div><button class="btn-report" data-open-demand data-tooltip="Abrir o assistente de registro em 4 passos">${icon('plus')}Registrar Demanda/CI</button></section>` +
       statsGroupsHtml +
       `<div class="content-grid">
         <section class="panel"><div class="panel-header"><div><h2>Precisa de atenção</h2><p>Priorizado por criticidade e prazo.</p></div><a class="link-btn" href="/demandas">Ver todas</a></div>
@@ -1335,6 +1422,14 @@
       </div>
       <section class="panel" id="demandsPanel"><div class="panel-header"><div><h2>Carteira de demandas</h2><p id="demandCount">Carregando...</p></div></div><div id="demandTable"></div></section>`;
     $('[data-open-demand]', content).addEventListener('click', openDemandForm);
+    // Os chips sao atalhos de um clique, nao filtros que se somam. Antes cada um
+    // apenas acrescentava a sua condicao: com "P1 Urgentes" ligado, clicar em
+    // "Concluidas" mantinha os dois e a lista continuava igual (quase sempre
+    // vazia) — parecia que o botao nao filtrava. Agora cada chip aplica so o seu
+    // recorte, limpa o dos outros e se desliga no segundo clique.
+    const quickChips = $$('[data-chip-status], [data-chip-priority]', content);
+    const syncChips = () => quickChips.forEach(b => b.classList.toggle('is-active',
+      (b.dataset.chipStatus || '') === $('#fStatus').value && (b.dataset.chipPriority || '') === $('#fPriority').value));
     const load = async () => {
       const params = new URLSearchParams();
       const map = { q: $('#fQ').value, status: $('#fStatus').value, priority: $('#fPriority').value, category: $('#fCategory').value, year: $('#fYear').value };
@@ -1342,6 +1437,7 @@
       if (filters.overdue) params.set('overdue', '1');
       if (filters.due_soon) params.set('due_soon', '1');
       if (filters.unassigned) params.set('unassigned', '1');
+      syncChips();
       $('#demandTable').innerHTML = `<div class="empty-state"><p>Atualizando lista...</p></div>`;
       const rows = await api('/api/demands?' + params.toString());
       // "Exibir concluídas" é um filtro só de exibição, aplicado sobre os dados já
@@ -1383,14 +1479,17 @@
     let timer; $('#fQ').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(load, 250) });
     ['#fYear', '#fStatus', '#fPriority', '#fCategory'].forEach(id => $(id).addEventListener('change', load));
     $('#clearFilters').addEventListener('click', () => { filters.overdue = false; filters.due_soon = false; filters.unassigned = false;['#fQ', '#fStatus', '#fPriority', '#fCategory'].forEach(id => $(id).value = ''); $('#fYear').value = '2026'; $('#overdueChip')?.remove(); $('#dueSoonChip')?.remove(); $('#unassignedChip')?.remove(); load(); });
-    $$('[data-chip-status]').forEach(b => b.addEventListener('click', () => {
-      $('#fStatus').value = b.dataset.chipStatus;
+    quickChips.forEach(b => b.addEventListener('click', () => {
+      const status = b.dataset.chipStatus || '';
+      const priority = b.dataset.chipPriority || '';
+      const jaAtivo = b.classList.contains('is-active');
+      $('#fStatus').value = jaAtivo ? '' : status;
+      $('#fPriority').value = jaAtivo ? '' : priority;
       // Ao clicar em "Concluídas", garante que o toggle "Exibir concluídas" esteja
       // ligado — senão o filtro de exibição esconderia o próprio resultado pedido.
-      if (b.dataset.chipStatus === 'Concluída' && $('#toggleCompleted')) $('#toggleCompleted').checked = true;
+      if (!jaAtivo && status === 'Concluída' && $('#toggleCompleted')) $('#toggleCompleted').checked = true;
       load();
     }));
-    $$('[data-chip-priority]').forEach(b => b.addEventListener('click', () => { $('#fPriority').value = b.dataset.chipPriority; load() }));
     $('#toggleCompleted')?.addEventListener('change', load);
     $('#overdueChip')?.addEventListener('click', () => { filters.overdue = false; $('#overdueChip').remove(); load() });
     $('#dueSoonChip')?.addEventListener('click', () => { filters.due_soon = false; $('#dueSoonChip').remove(); load() });
@@ -1464,8 +1563,12 @@
     return stage === 4 ? fmtDateTime(d.updated_at) : 'Aguardando';
   }
 
-  function dvFact({ icon: ic, label, value, sub = '', action = '', actionLabel = '', actionType = '' }) {
-    return `<article class="dv-fact">
+  // `tip` e o tooltip do cartao. O cartao ja mostra rotulo, valor e complemento;
+  // o tooltip responde o que nao esta na tela — o que aquele campo significa e
+  // o que ele muda em outros lugares do sistema (indicadores do Painel,
+  // planejamento). Repetir o que ja se le seria so ruido.
+  function dvFact({ icon: ic, label, value, sub = '', action = '', actionLabel = '', actionType = '', tip = '' }) {
+    return `<article class="dv-fact"${tip ? ` data-tooltip="${esc(tip)}"` : ''}>
       <div class="dv-fact-head">${icon(ic)}<span>${esc(label)}</span></div>
       <strong>${value}</strong>
       ${sub ? `<span class="dv-fact-sub">${sub}</span>` : ''}
@@ -1554,27 +1657,32 @@
     <div class="dv-facts">
       ${dvFact({
       icon: 'school', label: 'Unidade Escolar', value: esc(d.school_name),
+      tip: 'Escola onde a demanda foi registrada. Em "Ver detalhes" está o histórico de infraestrutura da unidade.',
       sub: d.director ? `Direção: ${esc(d.director)}` : '',
       action: 'school', actionLabel: 'Ver detalhes'
     })}
       ${dvFact({
       icon: 'user', label: 'Responsável atual',
+      tip: 'Quem responde pelo atendimento hoje. Enquanto ninguém for designado, a demanda entra em "Sem responsável" no Painel.',
       value: resp ? esc(resp) : '<span class="dv-muted">Não definido</span>',
       sub: d.sector ? esc(d.sector) : (provType ? esc(provType.label) : ''),
       action: canEdit && !travado ? 'wizard' : '', actionType: 'responsavel', actionLabel: resp ? 'Alterar responsável' : 'Designar responsável'
     })}
       ${dvFact({
       icon: 'calendar', label: 'Prazo previsto',
+      tip: 'Data de conclusão prevista pela equipe técnica. É ela que alimenta "Prazo vencido" e "Vence em 7 dias" no Painel.',
       value: esc(fmtDate(d.prov_due_date || d.due_date)),
       sub: due.cls ? `<span class="deadline ${due.cls}">${esc(due.text)}</span>` : '',
       action: canEdit && !travado ? 'wizard' : '', actionType: 'prazo', actionLabel: 'Reprogramar prazo'
     })}
       ${dvFact({
       icon: CATEGORY_ICONS[d.category] || 'clipboard', label: 'Categoria',
+      tip: 'Classificação técnica do serviço. Define as unidades sugeridas no planejamento e a fatia da categoria no Painel.',
       value: esc(d.category), sub: d.subcategory ? esc(d.subcategory) : ''
     })}
       ${dvFact({
       icon: 'cart', label: 'Material',
+      tip: 'Diz se o serviço depende de compra. Em "Precisa comprar", o item é levado para a carteira de planejamento.',
       value: d.needs_material ? '<span style="color:var(--orange)">Precisa comprar</span>' : 'Disponível no estoque',
       sub: d.needs_material && d.planned_quantity ? `${num(d.planned_quantity)} ${esc(d.planned_unit || '')}` : '',
       action: 'planning', actionLabel: d.needs_material ? 'Ver no planejamento' : 'Ver planejamento'
@@ -1883,15 +1991,19 @@
     function openProgressWizard(preType) {
       const d = payload.demand;
       const isDone = statusClass(d.status) === 'completed';
+      // `hint` fica no cartao e diz o que o tipo significa; `tip` e o tooltip e
+      // responde outra pergunta — quando escolher este e o que ele muda sozinho
+      // (o status que applyPreset aplica). Sao papeis diferentes de proposito:
+      // repetir o hint no tooltip so acrescentaria ruido.
       const TYPES = [
-        { key: 'atualizacao', icon: 'edit', label: 'Atualização', hint: 'Informar andamento geral da demanda.' },
-        { key: 'iniciado', icon: 'bolt', label: 'Serviço iniciado', hint: 'A equipe começou o atendimento no local.' },
-        { key: 'material', icon: 'cart', label: 'Aguardando material', hint: 'O serviço depende de material para continuar.' },
-        { key: 'responsavel', icon: 'users', label: 'Alterar responsável', hint: 'Trocar quem responde pela demanda.' },
-        { key: 'prazo', icon: 'calendar', label: 'Reprogramar prazo', hint: 'Ajustar a data de conclusão prevista.' },
+        { key: 'atualizacao', icon: 'edit', label: 'Atualização', hint: 'Informar andamento geral da demanda.', tip: 'Quando há novidade a registrar e o status continua o mesmo.' },
+        { key: 'iniciado', icon: 'bolt', label: 'Serviço iniciado', hint: 'A equipe começou o atendimento no local.', tip: 'Quando a equipe chegou ao local. Marca a demanda como Em execução.' },
+        { key: 'material', icon: 'cart', label: 'Aguardando material', hint: 'O serviço depende de material para continuar.', tip: 'Quando o serviço depende de compra ou entrega. Marca como Aguardando material.' },
+        { key: 'responsavel', icon: 'users', label: 'Alterar responsável', hint: 'Trocar quem responde pela demanda.', tip: 'Quando outra pessoa assume a demanda. O status continua o mesmo.' },
+        { key: 'prazo', icon: 'calendar', label: 'Reprogramar prazo', hint: 'Ajustar a data de conclusão prevista.', tip: 'Quando a data prevista não se sustenta. O status continua o mesmo.' },
         isDone
-          ? { key: 'reabrir', icon: 'refresh', label: 'Reabrir demanda', hint: 'O local precisa de retorno da equipe.' }
-          : { key: 'executado', icon: 'check-circle', label: 'Serviço executado', hint: 'Serviço concluído com sucesso.' }
+          ? { key: 'reabrir', icon: 'refresh', label: 'Reabrir demanda', hint: 'O local precisa de retorno da equipe.', tip: 'Quando o problema voltou depois de concluído. Devolve para Em triagem.' }
+          : { key: 'executado', icon: 'check-circle', label: 'Serviço executado', hint: 'Serviço concluído com sucesso.', tip: 'Quando o atendimento terminou. Conclui a demanda e liga o aviso à escola.' }
       ];
       const KEY_FIELD = { atualizacao: 'note', iniciado: 'action', material: 'material', responsavel: 'responsible', prazo: 'due', executado: 'note', reabrir: 'note' };
       const REQUIRED = { responsavel: 'responsible', prazo: 'due', executado: 'note' };
@@ -1968,7 +2080,7 @@
         return `${stepsHTML()}
           <p class="pw-lead">Escolha primeiro o tipo de atualização. Os detalhes são preenchidos na próxima etapa.</p>
           <p class="pw-legend">1. Escolha o tipo de atualização</p>
-          <div class="pw-type-grid">${TYPES.map(x => `<button type="button" class="pw-type" data-pw-type="${x.key}" aria-pressed="${x.key === st.type}">
+          <div class="pw-type-grid">${TYPES.map(x => `<button type="button" class="pw-type" data-pw-type="${x.key}" aria-pressed="${x.key === st.type}" data-tooltip="${esc(x.tip)}">
             <span class="pw-check">${icon('arrow')}</span>
             <span class="pw-type-icon">${icon(x.icon)}</span>
             <b>${esc(x.label)}</b><small>${esc(x.hint)}</small>
@@ -1977,6 +2089,21 @@
             <div class="pw-preview-head">${icon('info')}<div><b>Próxima etapa: detalhes da atualização</b><small>Com "${esc(t.label)}", você confirma os campos abaixo.</small></div></div>
             <div class="pw-preview-rows">${rows}</div>
           </div>`;
+      };
+
+      // Quando o registro aponta compra, quem responde pela aquisicao pode ser a
+      // Direcao Escolar da unidade, e nao so a equipe de Infraestrutura. Os dois
+      // conjuntos vao em <optgroup> separados para o gestor ver de onde vem cada
+      // nome; a Direcao so entra com "Precisa comprar" ligado -- ou quando ja e
+      // a responsavel gravada, para uma opcao escolhida nunca sumir sozinha.
+      const direcaoEscolar = (d.director || '').trim();
+      const respOptionsHTML = comDirecao => {
+        const equipe = (payload.staff || []).map(x => `<option ${x.name === st.responsible ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
+        let html = equipe ? `<optgroup label="Equipe de Infraestrutura">${equipe}</optgroup>` : '';
+        if (direcaoEscolar && comDirecao) {
+          html += `<optgroup label="Direção Escolar · ${esc(d.school_name || 'Unidade')}"><option ${direcaoEscolar === st.responsible ? 'selected' : ''}>${esc(direcaoEscolar)}</option></optgroup>`;
+        }
+        return html;
       };
 
       const stepTwoHTML = () => {
@@ -2006,7 +2133,7 @@
 
           <div class="pw-grid-2">
             <div class="pw-field"><label for="pwStatus">Status da demanda</label><select class="select" id="pwStatus">${ctx.statuses.map(s => `<option ${s === st.status ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></div>
-            <div class="pw-field${k('responsible')}"><label for="pwResponsible">Responsável ${REQUIRED[st.type] === 'responsible' ? '<span class="pw-req">*</span>' : ''}</label><select class="select" id="pwResponsible"><option value="">Selecionar responsável...</option>${(payload.staff || []).map(s => `<option ${s.name === st.responsible ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></div>
+            <div class="pw-field${k('responsible')}"><label for="pwResponsible">Responsável ${REQUIRED[st.type] === 'responsible' ? '<span class="pw-req">*</span>' : ''}</label><select class="select" id="pwResponsible"><option value="">Selecionar responsável...</option>${respOptionsHTML(st.needsMaterial || st.responsible === direcaoEscolar)}</select><p class="pw-field-hint pw-resp-hint${st.needsMaterial && direcaoEscolar ? '' : ' hidden'}" id="pwRespHint">${icon('cart')}<span>Compras também podem ficar sob a Direção Escolar da unidade.</span></p></div>
           </div>
 
           <div class="pw-field${k('due')}">
@@ -2142,10 +2269,21 @@
             $$('#pwTypeRow .prov-type-chip', root).forEach(c => c.classList.remove('active'));
             if (!on) chip.classList.add('active');
           }));
+          const sincronizaResponsavel = comprar => {
+            const sel = $('#pwResponsible', root);
+            if (!sel) return;
+            const atual = sel.value;
+            st.responsible = atual;
+            sel.innerHTML = `<option value="">Selecionar responsável...</option>` + respOptionsHTML(comprar || atual === direcaoEscolar);
+            sel.value = atual;
+            $('#pwRespHint', root)?.classList.toggle('hidden', !(comprar && direcaoEscolar));
+          };
           $$('[data-pw-material]', root).forEach(b => b.addEventListener('click', () => {
             $$('[data-pw-material]', root).forEach(x => x.classList.remove('active'));
             b.classList.add('active');
-            $('#pwMaterialPanel', root)?.classList.toggle('hidden', b.dataset.pwMaterial !== '1');
+            const comprar = b.dataset.pwMaterial === '1';
+            $('#pwMaterialPanel', root)?.classList.toggle('hidden', !comprar);
+            sincronizaResponsavel(comprar);
           }));
           const fileInput = $('#pwAttachInput', root);
           $('#pwAttachBtn', root)?.addEventListener('click', () => fileInput.click());
@@ -3587,7 +3725,7 @@
 
   async function renderAdmin() {
     if (!ctx.user.perm.can_manage_admin) { location.href = '/'; return; }
-    const TABS = [['geral', 'Visão Geral', 'grid'], ['categorias', 'Categorias', 'clipboard'], ['prioridades', 'Prioridades', 'warning'], ['kanban', 'Colunas do Kanban', 'kanban'], ['escolas', 'Unidades Escolares', 'school'], ['perfis', 'Perfis de Acesso', 'user'], ['usuarios', 'Usuários', 'user'], ['logs', 'Logs do Sistema', 'history']];
+    const TABS = [['geral', 'Visão Geral', 'grid'], ['categorias', 'Categorias', 'clipboard'], ['prioridades', 'Prioridades', 'warning'], ['kanban', 'Colunas do Kanban', 'kanban'], ['escolas', 'Unidades Escolares', 'school'], ['perfis', 'Perfis de Acesso', 'user'], ['usuarios', 'Usuários', 'user'], ['logo', 'Logo do Sistema', 'paint'], ['logs', 'Logs do Sistema', 'history']];
     let active = new URLSearchParams(location.search).get('tab') || 'geral';
     if (!TABS.some(t => t[0] === active)) active = 'geral';
     async function paint() {
@@ -3605,6 +3743,7 @@
         else if (active === 'escolas') await renderAdminEscolas(body);
         else if (active === 'perfis') await renderAdminPerfis(body);
         else if (active === 'usuarios') await renderAdminUsuarios(body);
+        else if (active === 'logo') await renderAdminLogo(body);
         else if (active === 'logs') await renderAdminLogs(body);
       } catch (e) { body.innerHTML = `<div class="alert error">${esc(e.message)}</div>`; }
     }
@@ -4057,14 +4196,127 @@
     });
   }
 
+  // Tipos de entidade que o back-end grava em system_logs (registrar(...) em app.py).
+  const LOG_TIPOS = [
+    ['auth', 'Acesso'], ['demand', 'Demandas'], ['planning', 'Planejamento'],
+    ['school', 'Unidades escolares'], ['user', 'Usuários'], ['profile', 'Perfis de acesso'],
+    ['category', 'Categorias'], ['priority', 'Prioridades'], ['kanban', 'Colunas do Kanban']
+  ];
+
+  // Troca da logo do cabecalho. O arquivo vai para o Storage do Supabase (bucket
+  // publico) e o endereco fica gravado em app_settings; o template le de la. A
+  // previa usa URL.createObjectURL para o gestor conferir o recorte antes de
+  // publicar — trocar a logo e visivel para todo mundo.
+  async function renderAdminLogo(body) {
+    const info = await api('/api/admin/logo');
+    let arquivo = null;
+    let previaUrl = '';
+
+    const pintar = () => {
+      body.innerHTML = `
+        <div style="margin-bottom:16px">
+          <h3>Logo do Sistema</h3>
+          <p>Imagem exibida no cabeçalho, em todas as telas e para todos os usuários.</p>
+        </div>
+        <div class="logo-admin">
+          <section class="panel logo-preview-card">
+            <div class="panel-header"><div><h2>${previaUrl ? 'Prévia do novo arquivo' : 'Logo em uso'}</h2><p>${previaUrl ? 'Ainda não publicada — confira antes de salvar.' : (info.is_default ? 'Padrão do sistema (portal da Prefeitura).' : 'Enviada por Administração.')}</p></div></div>
+            <div class="logo-preview-box"><img src="${esc(previaUrl || info.url)}" alt="Logo do sistema"></div>
+            <p class="logo-preview-src mono">${esc(previaUrl ? (arquivo?.name || '') : info.url)}</p>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header"><div><h2>Enviar nova logo</h2><p>Vai para o bucket <strong>${esc(info.bucket)}</strong> do Supabase Storage.</p></div></div>
+            <div class="panel-body">
+              <label class="logo-drop" id="logoDrop">
+                ${icon('download')}
+                <strong>Escolher arquivo</strong>
+                <small>${info.formatos.map(f => f.toUpperCase()).join(' · ')} — até ${info.max_mb} MB</small>
+                <input type="file" id="logoInput" accept="image/*" hidden>
+              </label>
+              <p class="wizard-hint" id="logoNome">${arquivo ? esc(arquivo.name) + ' · ' + Math.max(1, Math.round(arquivo.size / 1024)) + ' KB' : 'Nenhum arquivo escolhido.'}</p>
+              <div class="logo-actions">
+                <button class="btn btn-primary" id="logoSalvar" ${arquivo ? '' : 'disabled'}>${icon('check-circle')}Publicar logo</button>
+                <button class="btn btn-secondary" id="logoCancelar" ${arquivo ? '' : 'disabled'}>Cancelar</button>
+                <button class="btn btn-secondary" id="logoPadrao" ${info.is_default ? 'disabled' : ''} data-tooltip="Volta a usar a logo do portal da Prefeitura">${icon('refresh')}Restaurar padrão</button>
+              </div>
+              ${info.updated_at && !info.is_default ? `<p class="wizard-hint">Última alteração em ${esc(fmtDateTime(info.updated_at))}.</p>` : ''}
+            </div>
+          </section>
+        </div>`;
+
+      const entrada = $('#logoInput', body);
+      $('#logoDrop', body).addEventListener('click', e => { e.preventDefault(); entrada.click(); });
+      entrada.addEventListener('change', () => {
+        const f = entrada.files[0];
+        if (!f) return;
+        if (f.size > info.max_mb * 1024 * 1024) { toast('Arquivo muito grande', `O limite é ${info.max_mb} MB.`, 'error'); return; }
+        if (previaUrl) URL.revokeObjectURL(previaUrl);
+        arquivo = f; previaUrl = URL.createObjectURL(f);
+        pintar();
+      });
+
+      $('#logoCancelar', body).addEventListener('click', () => {
+        if (previaUrl) URL.revokeObjectURL(previaUrl);
+        arquivo = null; previaUrl = '';
+        pintar();
+      });
+
+      $('#logoSalvar', body).addEventListener('click', async () => {
+        if (!arquivo) return;
+        const botao = $('#logoSalvar', body);
+        botao.disabled = true; botao.textContent = 'Publicando...';
+        try {
+          const dados = new FormData();
+          dados.append('file', arquivo);
+          const r = await api('/api/admin/logo', { method: 'POST', body: dados });
+          if (previaUrl) URL.revokeObjectURL(previaUrl);
+          arquivo = null; previaUrl = '';
+          info.url = r.url; info.is_default = false; info.updated_at = new Date().toISOString();
+          toast('Logo publicada', 'O cabeçalho será atualizado ao recarregar as telas abertas.');
+          atualizaCabecalho(r.url);
+          pintar();
+        } catch (e) {
+          toast('Não foi possível publicar a logo', e.message, 'error');
+          botao.disabled = false; pintar();
+        }
+      });
+
+      $('#logoPadrao', body).addEventListener('click', async () => {
+        if (!await confirmAction('Restaurar a logo padrão?', 'O arquivo enviado será removido do Storage e o sistema volta a usar a logo do portal da Prefeitura.', { confirmLabel: 'Restaurar', danger: false })) return;
+        try {
+          const r = await api('/api/admin/logo', { method: 'DELETE' });
+          info.url = r.url; info.is_default = true; info.updated_at = null;
+          toast('Logo padrão restaurada');
+          atualizaCabecalho(r.url);
+          pintar();
+        } catch (e) { toast('Não foi possível restaurar', e.message, 'error'); }
+      });
+    };
+
+    // Atualiza a logo desta aba sem esperar um F5.
+    const atualizaCabecalho = url => {
+      const img = $('.header-logo');
+      if (img) { img.src = url; img.hidden = false; }
+    };
+
+    pintar();
+  }
+
   async function renderAdminLogs(body) {
     let logs = [];
     let total = 0;
     let offset = 0;
     const limit = 50;
+    // O endpoint ja aceitava action/entity_type; a tela nunca ofereceu os filtros.
+    // Com o log recebendo registros de verdade, sem eles a busca fica inviavel.
+    const filtros = { action: '', entity_type: '' };
 
     async function loadLogs() {
-      const result = await api(`/api/admin/logs?limit=${limit}&offset=${offset}`);
+      const params = new URLSearchParams({ limit, offset });
+      if (filtros.action) params.set('action', filtros.action);
+      if (filtros.entity_type) params.set('entity_type', filtros.entity_type);
+      const result = await api(`/api/admin/logs?${params}`);
       logs = result.logs || [];
       total = result.total || 0;
       render();
@@ -4072,10 +4324,15 @@
 
     function render() {
       body.innerHTML = `
-        <div style="margin-bottom:20px">
+        <div style="margin-bottom:16px">
           <h3>Logs do Sistema</h3>
-          <p>Histórico de ações realizadas no sistema</p>
+          <p>Histórico de ações realizadas no sistema · ${num(total)} registro${total === 1 ? '' : 's'}</p>
         </div>
+        <section class="filters-card" style="margin-bottom:16px">
+          <div class="field"><label>Buscar ação</label><div class="search-field">${icon('search')}<input class="input" id="logQ" value="${esc(filtros.action)}" placeholder="Ex.: excluiu, entrou, editou..."></div></div>
+          <div class="field"><label>Tipo</label><select class="select" id="logTipo"><option value="">Todos</option>${LOG_TIPOS.map(([v, l]) => `<option value="${v}" ${v === filtros.entity_type ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
+          <button class="btn btn-secondary" id="logLimpar">${icon('filter')}Limpar</button>
+        </section>
         <div class="table-wrap">
           <table class="data-table">
             <thead>
@@ -4086,6 +4343,7 @@
                 <th data-label="Tipo">Tipo</th>
                 <th data-label="ID">ID da Entidade</th>
                 <th data-label="Detalhes">Detalhes</th>
+                <th data-label="Origem">Origem</th>
               </tr>
             </thead>
             <tbody>
@@ -4097,8 +4355,9 @@
                   <td data-label="Tipo">${l.entity_type ? esc(l.entity_type) : '-'}</td>
                   <td data-label="ID" class="mono">${l.entity_id ? esc(l.entity_id) : '-'}</td>
                   <td data-label="Detalhes" style="font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis">${l.details ? esc(l.details) : '-'}</td>
+                  <td data-label="Origem" class="mono" style="font-size:11.5px">${l.ip_address ? esc(l.ip_address) : '-'}</td>
                 </tr>
-              `).join('') : `<tr><td colspan="6" style="text-align:center;padding:20px">Nenhum log encontrado</td></tr>`}
+              `).join('') : `<tr><td colspan="7" style="text-align:center;padding:20px">${filtros.action || filtros.entity_type ? 'Nenhum registro corresponde a este filtro.' : 'Nenhuma ação registrada ainda.'}</td></tr>`}
             </tbody>
           </table>
         </div>
@@ -4110,6 +4369,19 @@
           </div>
         ` : ''}
       `;
+
+      let tq;
+      $('#logQ')?.addEventListener('input', e => {
+        clearTimeout(tq);
+        const v = e.target.value;
+        tq = setTimeout(() => { filtros.action = v.trim(); offset = 0; loadLogs(); }, 300);
+      });
+      $('#logTipo')?.addEventListener('change', e => {
+        filtros.entity_type = e.target.value; offset = 0; loadLogs();
+      });
+      $('#logLimpar')?.addEventListener('click', () => {
+        filtros.action = ''; filtros.entity_type = ''; offset = 0; loadLogs();
+      });
 
       $('#prevLogs')?.addEventListener('click', () => {
         offset = Math.max(0, offset - limit);

@@ -2881,9 +2881,19 @@ body.text-large {
    font-weight: 700
 }
 
-.department-context {
-   color: #555;
-   font-size: .95rem
+/* `.department-info span` (0,1,1) colore os separadores "|" e vencia
+   `.department-context` (0,1,0) — a assinatura saia cinza-claro. Sobe para
+   (0,2,0) para que o destaque valha. Com a fonte maior o texto passa a nao
+   caber entre 980px e ~1120px, entao encolhe com reticencias em vez de ser
+   cortado no meio da palavra. */
+.department-info .department-context {
+   color: var(--govbr-blue-dark);
+   font-size: 1.12rem;
+   font-weight: 800;
+   letter-spacing: -.01em;
+   min-width: 0;
+   overflow: hidden;
+   text-overflow: ellipsis
 }
 
 .header-search.global-search-wrap {
@@ -3593,7 +3603,7 @@ body.dark-mode .actions-separator {
 }
 
 body.dark-mode .state-name,
-body.dark-mode .department-context {
+body.dark-mode .department-info .department-context {
    color: #d6d6d6
 }
 
@@ -5081,6 +5091,9 @@ body.dark-mode .modal-footer {
    min-height: 150px
 }
 
+/* Os dois circulos sao enfeite. Sendo pseudo-elementos posicionados, eles sao
+   pintados depois do conteudo e capturavam o clique: o circulo do topo cobre
+   exatamente onde fica o "Exportar", e o link ficava inerte. */
 .report-hero::after {
    content: "";
    position: absolute;
@@ -5089,7 +5102,8 @@ body.dark-mode .modal-footer {
    border-radius: 50%;
    background: rgba(255, 255, 255, .07);
    right: -90px;
-   top: -120px
+   top: -120px;
+   pointer-events: none
 }
 
 .report-hero::before {
@@ -5100,7 +5114,8 @@ body.dark-mode .modal-footer {
    border-radius: 50%;
    background: rgba(255, 255, 255, .05);
    left: -60px;
-   bottom: -90px
+   bottom: -90px;
+   pointer-events: none
 }
 
 .report-hero-copy {
@@ -5761,6 +5776,155 @@ body.dark-mode .detail-block-single {
    .detail-block {
       padding: 12px
    }
+}
+
+/* Seletor de sub-tipo de problema por categoria (ex.: Impressora) + aviso de atendimento
+   por telefone quando o problema exige um técnico em vez de abertura de chamado. */
+.issue-chip-row {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 8px;
+   margin-bottom: 4px
+}
+
+.issue-chip {
+   display: inline-flex;
+   align-items: center;
+   gap: 6px;
+   border: 1.5px solid var(--line);
+   background: var(--surface);
+   color: var(--ink);
+   border-radius: 11px;
+   padding: 9px 14px;
+   font-size: 12.5px;
+   font-weight: 700;
+   cursor: pointer;
+   transition: .15s ease
+}
+
+.issue-chip svg {
+   width: 14px;
+   height: 14px;
+   flex: none
+}
+
+.issue-chip:hover {
+   border-color: var(--line-strong);
+   background: var(--surface-soft)
+}
+
+.issue-chip.selected {
+   background: var(--primary);
+   border-color: var(--primary);
+   color: #fff
+}
+
+.issue-chip-blocked {
+   background: var(--orange-soft);
+   border-color: transparent;
+   color: var(--orange)
+}
+
+.issue-chip-blocked:hover {
+   border-color: var(--orange)
+}
+
+.issue-chip-blocked.selected {
+   background: var(--orange);
+   border-color: var(--orange);
+   color: #fff
+}
+
+.issue-block-notice {
+   display: flex;
+   align-items: flex-start;
+   gap: 14px;
+   margin: 14px 0 4px;
+   padding: 18px 20px;
+   border-radius: 12px;
+   background: var(--orange-soft);
+   border: 1px solid rgba(201, 103, 7, .3);
+   animation: issueNoticeIn .2s ease
+}
+
+.issue-block-notice-icon {
+   width: 40px;
+   height: 40px;
+   border-radius: 50%;
+   background: var(--orange);
+   color: #fff;
+   display: grid;
+   place-items: center;
+   flex: none
+}
+
+.issue-block-notice-icon svg {
+   width: 19px;
+   height: 19px
+}
+
+.issue-block-notice-body {
+   min-width: 0
+}
+
+.issue-block-notice-body strong {
+   display: block;
+   font-size: 17px;
+   font-weight: 800;
+   color: var(--ink);
+   margin-bottom: 5px;
+   letter-spacing: -.01em
+}
+
+.issue-block-notice-body p {
+   margin: 0;
+   font-size: 15px;
+   line-height: 1.5;
+   color: var(--ink)
+}
+
+.issue-block-phone {
+   font-size: 1.2em;
+   color: var(--orange)
+}
+
+@keyframes issueNoticeIn {
+   from {
+      opacity: 0;
+      transform: translateY(-4px)
+   }
+
+   to {
+      opacity: 1;
+      transform: translateY(0)
+   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+   .issue-block-notice {
+      animation: none
+   }
+}
+
+body.dark-mode .issue-chip {
+   background: #20252d;
+   border-color: #333a45;
+   color: #e0e0e0
+}
+
+body.dark-mode .issue-chip:hover {
+   border-color: #4a5262
+}
+
+body.dark-mode .issue-chip-blocked {
+   background: #3a2a10;
+   color: #f0b877;
+   border-color: transparent
+}
+
+body.dark-mode .issue-block-notice {
+   background: #2a2013;
+   border-color: rgba(240, 184, 119, .3)
 }
 
 .bar-row[data-dashboard-filter] {
@@ -7549,6 +7713,11 @@ body.dark-mode .stat-tile.stat-tile-alert .stat-tile-value {
    box-shadow: 0 4px 12px rgba(12, 35, 64, .09)
 }
 
+.chip-v2.is-active {
+   outline: 2px solid var(--primary);
+   outline-offset: 2px
+}
+
 .chip-v2 svg {
    width: 15px;
    height: 15px;
@@ -7928,17 +8097,17 @@ body.dark-mode [data-tooltip-list]:hover::before {
 .category-tab {
    display: inline-flex;
    align-items: center;
-   gap: 6px;
-   border: 1px solid var(--line);
+   gap: 7px;
+   border: 1.5px solid var(--line);
    background: var(--surface);
    color: var(--muted);
-   border-radius: 10px;
-   padding: 9px 13px;
-   font-size: 12px;
+   border-radius: 999px;
+   padding: 9px 16px;
+   font-size: 12.5px;
    font-weight: 700;
    cursor: pointer;
    white-space: nowrap;
-   transition: .14s ease
+   transition: .16s ease
 }
 
 .category-tab svg {
@@ -7948,13 +8117,23 @@ body.dark-mode [data-tooltip-list]:hover::before {
 
 .category-tab:hover {
    border-color: var(--line-strong);
-   color: var(--ink)
+   color: var(--ink);
+   background: var(--surface-soft)
 }
 
 .category-tab.active {
    background: var(--primary) !important;
    border-color: var(--primary) !important;
-   color: #fff !important
+   color: #fff !important;
+   box-shadow: 0 4px 14px rgba(6, 42, 85, .28)
+}
+
+/* CPD/TI ganha a mesma cor roxa usada nos ícones e cartões dessa categoria (violet),
+   em vez do azul genérico das demais abas — reforça de relance qual grupo está ativo. */
+.category-tab.active[data-group-tab="cpdti"] {
+   background: var(--violet) !important;
+   border-color: var(--violet) !important;
+   box-shadow: 0 4px 14px rgba(111, 66, 193, .3)
 }
 
 .category-section {
@@ -8006,7 +8185,15 @@ body.dark-mode .category-tab {
 body.dark-mode .category-tab.active {
    background: #66b3ff !important;
    border-color: #66b3ff !important;
-   color: #0b1220 !important
+   color: #0b1220 !important;
+   box-shadow: 0 4px 14px rgba(102, 179, 255, .25)
+}
+
+body.dark-mode .category-tab.active[data-group-tab="cpdti"] {
+   background: #b794f6 !important;
+   border-color: #b794f6 !important;
+   color: #1a1025 !important;
+   box-shadow: 0 4px 14px rgba(183, 148, 246, .28)
 }
 
 body.dark-mode .category-section-title {
@@ -11825,11 +12012,117 @@ body.dark-mode .dv-now h2 {
 }
 
 /* ===========================================================================
+   ADMINISTRAÇÃO — LOGO DO SISTEMA
+   =========================================================================== */
+
+.logo-admin {
+   display: grid;
+   grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+   gap: 18px;
+   align-items: start
+}
+
+@media(max-width:900px) {
+   .logo-admin {
+      grid-template-columns: 1fr
+   }
+}
+
+/* O xadrez revela logo transparente: sobre branco chapado uma marca clara
+   simplesmente sumiria e o gestor publicaria sem perceber. */
+.logo-preview-box {
+   display: grid;
+   place-items: center;
+   min-height: 190px;
+   margin: 0 18px 14px;
+   padding: 22px;
+   border: 1px solid var(--line);
+   border-radius: 12px;
+   background-color: #fff;
+   background-image:
+      linear-gradient(45deg, #eef1f6 25%, transparent 25%),
+      linear-gradient(-45deg, #eef1f6 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #eef1f6 75%),
+      linear-gradient(-45deg, transparent 75%, #eef1f6 75%);
+   background-size: 16px 16px;
+   background-position: 0 0, 0 8px, 8px -8px, -8px 0
+}
+
+.logo-preview-box img {
+   max-width: 100%;
+   max-height: 150px;
+   object-fit: contain
+}
+
+.logo-preview-src {
+   margin: 0 18px 18px;
+   font-size: 11px;
+   line-height: 1.5;
+   color: var(--muted);
+   word-break: break-all
+}
+
+.logo-drop {
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+   gap: 6px;
+   padding: 26px 18px;
+   border: 1.5px dashed var(--line-strong);
+   border-radius: 12px;
+   background: var(--surface-soft);
+   cursor: pointer;
+   text-align: center;
+   transition: border-color .15s ease, background .15s ease
+}
+
+.logo-drop:hover {
+   border-color: var(--primary);
+   background: var(--blue-soft)
+}
+
+.logo-drop svg {
+   width: 22px;
+   height: 22px;
+   color: var(--primary)
+}
+
+.logo-drop strong {
+   font-size: 13.5px;
+   color: var(--primary-2)
+}
+
+.logo-drop small {
+   font-size: 11.5px;
+   color: var(--muted)
+}
+
+.logo-actions {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 10px;
+   margin-top: 14px
+}
+
+body.dark-mode .logo-preview-box {
+   background-color: #1f2229;
+   background-image:
+      linear-gradient(45deg, #262a32 25%, transparent 25%),
+      linear-gradient(-45deg, #262a32 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #262a32 75%),
+      linear-gradient(-45deg, transparent 75%, #262a32 75%)
+}
+
+body.dark-mode .logo-drop {
+   background: #22252b
+}
+
+/* ===========================================================================
    ASSISTENTE "REGISTRAR ANDAMENTO" (pw-*)
    =========================================================================== */
 
 .modal.drawer:has(.pw) {
-   width: min(780px, calc(100vw - 30px))
+   width: min(1020px, calc(100vw - 30px))
 }
 
 .pw-steps {
@@ -12099,6 +12392,24 @@ body.dark-mode .pw-preview {
    font-size: 11.5px;
    line-height: 1.45;
    color: var(--muted)
+}
+
+/* A dica do Responsavel fica ABAIXO do campo, ao contrario das outras (que
+   entram entre o rotulo e o controle e por isso tem margem negativa no topo).
+   Ela herda o laranja do proprio botao "Precisa comprar" que a revela, para o
+   gestor ligar as duas coisas. */
+.pw-resp-hint {
+   display: flex;
+   align-items: center;
+   gap: 6px;
+   margin: 7px 0 0;
+   color: var(--orange)
+}
+
+.pw-resp-hint svg {
+   width: 13px;
+   height: 13px;
+   flex: 0 0 auto
 }
 
 .pw-field.is-key {
@@ -12421,6 +12732,19 @@ body.dark-mode .modal:has(.pw) .modal-body {
 /* --- cartões de tipo de atualização --------------------------------------- */
 .pw-type-grid {
    gap: 16px
+}
+
+/* Sao sempre seis tipos. Com o drawer mais largo o auto-fit passava a caber
+   quatro colunas e deixava a segunda linha pela metade (4+2); fixar em tres
+   mantem o 3+3 e usa a largura extra para alargar os proprios cartoes. */
+.modal.drawer:has(.pw) .pw-type-grid {
+   grid-template-columns: repeat(3, 1fr)
+}
+
+@media(max-width:860px) {
+   .modal.drawer:has(.pw) .pw-type-grid {
+      grid-template-columns: repeat(auto-fit, minmax(196px, 1fr))
+   }
 }
 
 .pw-type {
@@ -13176,6 +13500,15 @@ body.dark-mode .dv-panel {
       0 18px 36px -22px rgba(13, 60, 117, .5)
 }
 
+/* O cartao tem backdrop-filter, entao ele e um contexto de empilhamento e o
+   z-index do proprio tooltip nao vale para fora dele. Como os discos do trilho
+   de marcos logo acima estao em z-index:1, eles eram pintados por cima da bolha
+   e cobriam o texto. Ao passar o mouse o cartao inteiro sobe acima do trilho,
+   levando o tooltip junto. */
+.dv-fact[data-tooltip]:hover {
+   z-index: 3
+}
+
 /* Cartão "o que fazer agora": aro azul e selo circular */
 .dv-now {
    border-radius: 18px;
@@ -13433,6 +13766,11 @@ body[data-page="demands"] .chip-v2 span {
 body[data-page="demands"] .chip-v2 b {
    background: rgba(255, 255, 255, .22);
    color: #fff
+}
+
+body[data-page="demands"] .chip-v2.is-active {
+   outline: 2px solid #fff;
+   outline-offset: 2px
 }
 
 body[data-page="demands"] .chip-v2:hover {

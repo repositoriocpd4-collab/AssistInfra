@@ -65,6 +65,30 @@ CATEGORY_ICONS = {
     'Segurança': 'shield', 'Saneamento': 'drain', 'Estrutura': 'column', 'Área externa': 'tree', 'Iluminação': 'bulb',
     'Portas e janelas': 'door', 'Reforma': 'hammer', 'Obra': 'crane', 'Aquisição': 'cart', 'Outros': 'dots',
 }
+# Categorias de CPD/TI. Ficam numa lista propria porque, ao contrario de
+# CATEGORIES (semeada so quando a tabela esta vazia), estas precisam entrar
+# tambem em bancos que ja existem — a insercao abaixo em init_db e idempotente
+# e so cria o que faltar, sem tocar no que o administrador ja editou.
+# O icone sai do sprite de templates/index.html; onde nao existe um desenho
+# proprio (impressora, notebook, tablet...) vale o mais proximo, ja que o
+# rotulo fica logo abaixo no cartao.
+CPDTI_CATEGORIES = [
+    ("Impressora", "file", "Impressora, multifuncional, toner ou atolamento de papel."),
+    ("Computador", "monitor", "Desktop da secretaria, da sala de aula ou do laboratório."),
+    ("Notebook", "monitor", "Notebook institucional com defeito ou sem funcionar."),
+    ("Tablet", "clipboard", "Tablet de uso pedagógico ou administrativo."),
+    ("Câmeras", "camera", "Câmera de segurança, gravador ou monitoramento."),
+    ("Alarme", "bell", "Central de alarme, sensor ou sirene."),
+    ("Voip", "message", "Ramal, telefone IP ou central telefônica."),
+    ("Wi-Fi", "globe", "Sinal sem fio, roteador ou ponto de acesso."),
+    ("Rede e Cabeamento", "layers", "Ponto de rede, cabo, switch ou rack."),
+    ("DataShow", "bulb", "Projetor, lâmpada do projetor ou cabo de vídeo."),
+    ("No-Break", "bolt", "No-break, bateria ou estabilizador."),
+    ("Servidor", "kanban", "Servidor local, armazenamento ou backup."),
+    ("Sistema/Software", "settings", "Sistema, programa, acesso ou senha."),
+    ("Sala de Informática", "school", "Laboratório de informática como um todo."),
+]
+
 CATEGORY_HINTS = {
     'Elétrica': 'Fiação, tomada, quadro de força, curto-circuito', 'Hidráulica': 'Vazamento, entupimento, cano estourado',
     'Cobertura/Telhado': 'Goteira, infiltração, telha quebrada', 'Pintura': 'Parede descascando, mofo, pintura antiga',
@@ -295,6 +319,23 @@ def require_admin(user: dict) -> None:
         raise HTTPException(403, "Acesso restrito à administração")
 
 
+def _ip(request: Request) -> Optional[str]:
+    """IP de quem fez a acao. Atras de proxy o socket e do proxy, entao o
+    X-Forwarded-For (primeiro endereco da lista) vem antes."""
+    encaminhado = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    if encaminhado:
+        return encaminhado
+    return request.client.host if request.client else None
+
+
+def registrar(conn: PGConnection, request: Request, user: dict, acao: str,
+              tipo: str = None, ident=None, detalhe: str = None) -> None:
+    """Atalho para log_action: resolve o IP e os dados do usuario logado.
+    E o que as rotas usam — log_action fica como a camada de escrita."""
+    log_action(conn, (user or {}).get("id"), (user or {}).get("name"), acao, tipo,
+               None if ident is None else str(ident), detalhe, _ip(request))
+
+
 def log_action(conn: PGConnection, user_id: int, user_name: str, action: str, entity_type: str = None, entity_id: str = None, details: str = None, ip_address: str = None) -> None:
     """Registra uma ação no log do sistema."""
     try:
@@ -479,6 +520,12 @@ def init_db() -> None:
             is_system INTEGER NOT NULL DEFAULT 0,
             active INTEGER NOT NULL DEFAULT 1,
             created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT,
+            updated_at TEXT
         );
 
         CREATE TABLE IF NOT EXISTS system_logs (
@@ -675,6 +722,20 @@ def init_db() -> None:
                 (slug, label, desc, school_scoped, can_edit_analysis, can_manage_admin, can_view_reports, can_view_planning, now_iso()),
             )
 
+    # CPD/TI entra por fora do seed inicial: bancos ja existentes tambem precisam
+    # receber. Insere apenas o que faltar e nunca sobrescreve uma categoria que o
+    # administrador tenha editado ou desativado.
+    existentes = {r["name"] for r in conn.execute("SELECT name FROM categories").fetchall()}
+    ordem = conn.execute("SELECT COALESCE(MAX(sort_order),-1) m FROM categories").fetchone()["m"]
+    for nome, ic, dica in CPDTI_CATEGORIES:
+        if nome in existentes:
+            continue
+        ordem += 1
+        conn.execute(
+            "INSERT INTO categories(name,icon,color,hint,sort_order,active) VALUES(%s,%s,%s,%s,%s,1)",
+            (nome, ic, "violet", dica, ordem),
+        )
+
     conn.commit()
     seed_school_coordinates(conn)
     conn.close()
@@ -773,10 +834,12 @@ def render(request: Request, template: str, **context):
     category_names = [c["name"] for c in active_categories] or CATEGORIES
     category_meta = {c["name"]: {"icon": c["icon"], "color": c["color"], "hint": c["hint"]} for c in all_categories}
     kanban_stages = get_kanban_stages(conn)
+    logo_url = get_setting(conn, "logo_url") or LOGO_PADRAO
     conn.close()
     base = {
         "request": request,
         "asset_v": asset_version(),
+        "logo_url": logo_url,
         "user": user,
         "priorities": priorities,
         "statuses": STATUSES,
@@ -800,15 +863,26 @@ def login_page(request: Request):
 def login(request: Request, email: str = Form(...), password: str = Form(...)):
     conn = db()
     row = conn.execute("SELECT * FROM users WHERE lower(email)=lower(%s)", (email.strip(),)).fetchone()
-    conn.close()
     if not row or not verify_password(password, row["password_hash"]):
+        # A tentativa que falha e justamente a que a auditoria precisa ver, entao
+        # ela e registrada com o e-mail digitado mesmo quando nao existe usuario.
+        log_action(conn, row["id"] if row else None, row["name"] if row else None,
+                   "Tentativa de acesso recusada", "auth", None, email.strip(), _ip(request))
+        conn.commit(); conn.close()
         return templates.TemplateResponse("login.html", {"request": request, "asset_v": asset_version(), "error": "E-mail ou senha inválidos.", "email": email}, status_code=401)
+    log_action(conn, row["id"], row["name"], "Entrou no sistema", "auth", str(row["id"]), None, _ip(request))
+    conn.commit(); conn.close()
     request.session["user_id"] = row["id"]
     return RedirectResponse("/", status_code=303)
 
 
 @app.get("/logout")
 def logout(request: Request):
+    usuario = current_user(request)
+    if usuario:
+        conn = db()
+        registrar(conn, request, usuario, "Saiu do sistema", "auth", usuario["id"])
+        conn.commit(); conn.close()
     request.session.clear()
     return RedirectResponse("/login", status_code=303)
 
@@ -908,7 +982,13 @@ def demand_scope_sql(user: dict):
 
 @app.get("/api/dashboard")
 def api_dashboard(request: Request):
-    user = require_user(request)
+    return _dashboard_payload(require_user(request))
+
+
+def _dashboard_payload(user: dict) -> dict:
+    """Monta os dados do Painel. Extraido de /api/dashboard para que o PDF do
+    Painel saia exatamente com os mesmos numeros da tela, sem uma segunda
+    consulta que pudesse divergir com o tempo."""
     scope, params = demand_scope_sql(user)
     conn = db()
     rows = conn.execute(f"SELECT d.* FROM demands d WHERE 1=1 {scope}", params).fetchall()
@@ -1043,6 +1123,7 @@ async def create_demand(request: Request):
     code = f"INF-{datetime.now().year}-{did:05d}"
     conn.execute("UPDATE demands SET code=%s WHERE id=%s", (code, did))
     conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(%s,%s,%s,%s,%s)", (did, "Criação", "Demanda registrada no sistema.", user["name"], created))
+    registrar(conn, request, user, "Registrou demanda", "demand", did, f"{code} — {payload['title']}")
     conn.commit(); conn.close()
     return {"ok": True, "id": did, "code": code}
 
@@ -1093,6 +1174,7 @@ async def update_demand(request: Request, demand_id: int):
             return school_names.get(value, value) if key == "school_id" else value
         summary = "; ".join(f"{labels.get(k,k)}: {show(k,a) or '—'} → {show(k,b) or '—'}" for k,a,b in changes[:6])
         conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(%s,%s,%s,%s,%s)", (demand_id, "Alteração", summary, user["name"], now_iso()))
+        registrar(conn, request, user, "Editou demanda", "demand", demand_id, summary)
 
     # Destinar a demanda a um exercicio futuro cria o item correspondente em
     # planning_items: sem isso a demanda so guardava future_year e nao aparecia
@@ -1162,7 +1244,7 @@ async def delete_demand(request: Request, demand_id: int):
     conn.execute("DELETE FROM demands WHERE id=%s", (demand_id,))
 
     # Registrar ação no log
-    log_action(conn, user["id"], user["name"], "Deletou demanda", "demand", str(demand_id), f"{demand['code']} - {demand['title']}")
+    registrar(conn, request, user, "Excluiu demanda", "demand", demand_id, f"{demand['code']} — {demand['title']}")
 
     conn.commit(); conn.close()
     return {"ok": True}
@@ -1185,6 +1267,7 @@ async def add_update(request: Request, demand_id: int):
         conn.close(); raise HTTPException(403)
     conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,visibility,created_at) VALUES(%s,%s,%s,%s,%s,%s)", (demand_id, kind, message, user["name"], visibility, now_iso()))
     conn.execute("UPDATE demands SET updated_at=%s WHERE id=%s", (now_iso(), demand_id))
+    registrar(conn, request, user, "Registrou andamento", "demand", demand_id, f"{kind}: {message[:120]}")
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -1212,6 +1295,7 @@ async def upload_attachment(request: Request, demand_id: int, file: UploadFile =
     conn.execute("INSERT INTO attachments(demand_id,category,filename,stored_name,mime,size,created_at) VALUES(%s,%s,%s,%s,%s,%s,%s)", (demand_id, cat_text, file.filename or "arquivo", stored, file.content_type, len(content), now_iso()))
     msg = f"Foto/Arquivo anexado ({cat_text}): {file.filename}" if cat_text else f"Arquivo anexado: {file.filename}"
     conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(%s,%s,%s,%s,%s)", (demand_id, "Anexo", msg, user["name"], now_iso()))
+    registrar(conn, request, user, "Anexou arquivo", "demand", demand_id, file.filename or "arquivo")
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -1858,6 +1942,7 @@ async def create_planning(request: Request):
     for did in payload.get("demand_ids", []):
         conn.execute("INSERT INTO planning_links(planning_id,demand_id) VALUES(%s,%s) ON CONFLICT DO NOTHING", (pid,int(did)))
         conn.execute("UPDATE demands SET status='Planejamento futuro', future_year=%s, updated_at=%s WHERE id=%s", (int(payload["year"]), now_iso(), int(did)))
+    registrar(conn, request, user, "Criou item de planejamento", "planning", pid, f"{code} — {payload['title']}")
     conn.commit(); conn.close()
     return {"ok":True, "id":pid, "code":code}
 
@@ -1889,8 +1974,8 @@ async def update_planning(request: Request, planning_id: int):
         conn.execute("""UPDATE demands SET future_year=%s, updated_at=%s
                         WHERE id IN (SELECT demand_id FROM planning_links WHERE planning_id=%s)""",
                      (int(payload["year"]), now_iso(), planning_id))
-    log_action(conn, user["id"], user["name"], "Editou item de planejamento", "planning",
-               str(planning_id), item["code"] or str(planning_id))
+    registrar(conn, request, user, "Editou item de planejamento", "planning",
+              planning_id, item["code"] or str(planning_id))
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -1910,8 +1995,8 @@ async def delete_planning(request: Request, planning_id: int):
                  (now_iso(), planning_id))
     conn.execute("DELETE FROM planning_links WHERE planning_id=%s", (planning_id,))
     conn.execute("DELETE FROM planning_items WHERE id=%s", (planning_id,))
-    log_action(conn, user["id"], user["name"], "Excluiu item de planejamento", "planning",
-               str(planning_id), f"{item['code'] or planning_id} - {item['title']}")
+    registrar(conn, request, user, "Excluiu item de planejamento", "planning",
+              planning_id, f"{item['code'] or planning_id} — {item['title']}")
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -1934,7 +2019,144 @@ def admin_summary(request: Request):
     conn.close(); return data
 
 
+# Paleta identica a que o navegador aplica (bloco govbr de static/styles.css):
+# e o mesmo azul e cinza que o gestor ve na tela, para o relatorio impresso nao
+# parecer de outro sistema.
+_PDF_INK = "#333333"
+_PDF_MUTED = "#667085"
+_PDF_LINE = "#e0e0e0"
+_PDF_BLUE = "#005A9C"
+_PDF_BLUE_DARK = "#071d41"
+
+
+# --- Cabecalho institucional compartilhado -----------------------------------
+# Um so cabecalho para todos os PDFs do sistema (Painel, Carteira de Demandas e
+# Planejamento): brasao a esquerda, a hierarquia do orgao ao lado, regua azul, e
+# entao o titulo do documento centralizado com os dados de geracao a direita.
+_PDF_LOGO = "logo-cabecalho-brasao.png"
+_PDF_ORGAO = [
+    "PREFEITURA MUNICIPAL DE ITAGUAÍ",
+    "SECRETARIA MUNICIPAL DE EDUCAÇÃO",
+    "SUBSECRETARIA DE INFRAESTRUTURA",
+]
+
+
+# O Frame padrao do SimpleDocTemplate reserva 6pt de padding em cada lado, entao
+# a largura util e sempre doc.width menos isto. Montar tabelas com doc.width cheio
+# as deixa mais largas que o frame e o reportlab as joga para a pagina seguinte.
+_PDF_FRAME_PAD = 12
+
+
+def _pdf_largura_util(doc) -> float:
+    return doc.width - _PDF_FRAME_PAD
+
+
+def _pdf_marca(altura_cm: float = 1.55):
+    """O brasao como flowable, ou '' quando o arquivo faltar/estiver corrompido.
+    A decodificacao e forcada aqui: o reportlab so leria os pixels na hora de
+    montar o documento, e um arquivo quebrado derrubaria o relatorio inteiro em
+    vez de apenas sair sem a marca."""
+    from reportlab.lib.units import cm
+    from reportlab.lib.utils import ImageReader
+    from reportlab.platypus import Image as RLImage
+
+    caminho = BASE_DIR / "static" / "images" / _PDF_LOGO
+    if not caminho.exists():
+        return ""
+    try:
+        leitor = ImageReader(str(caminho))
+        larg, alt = leitor.getSize()
+        leitor.getRGBData()
+        altura = altura_cm * cm
+        return RLImage(str(caminho), width=altura * larg / alt, height=altura, hAlign="LEFT")
+    except Exception:
+        return ""
+
+
+def _pdf_cabecalho(doc_width: float, titulo: str, meta: list, compacto: bool = False):
+    """Flowables do cabecalho institucional. `meta` sao as linhas do bloco da
+    direita (exercicio, escopo, data de geracao...).
+
+    `compacto` encolhe a marca, o titulo e os respiros e joga a meta para a
+    mesma linha do titulo. E para o Painel, que e denso: com o cabecalho em
+    tamanho normal o bloco "Precisa de atenção / Demandas por categoria" nao
+    cabia mais na primeira pagina e deixava meia folha em branco. A faixa do
+    orgao e a regua azul sao as mesmas em todos os relatorios."""
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
+    from xml.sax.saxutils import escape as _x
+
+    base = getSampleStyleSheet()["Normal"]
+    s_org1 = ParagraphStyle("o1", parent=base, fontName="Helvetica-Bold", fontSize=11.5, leading=14,
+                            textColor=colors.HexColor(_PDF_BLUE_DARK))
+    s_org2 = ParagraphStyle("o2", parent=base, fontName="Helvetica-Bold", fontSize=10.5, leading=13,
+                            textColor=colors.HexColor(_PDF_BLUE))
+    s_org3 = ParagraphStyle("o3", parent=base, fontName="Helvetica-Bold", fontSize=9.5, leading=12,
+                            textColor=colors.HexColor(_PDF_BLUE))
+    s_titulo = ParagraphStyle("tt", parent=base, fontName="Helvetica-Bold",
+                              fontSize=15 if compacto else 17, leading=19 if compacto else 21,
+                              alignment=1, textColor=colors.HexColor(_PDF_BLUE_DARK))
+    s_meta = ParagraphStyle("mt", parent=base, fontSize=8.5, leading=10.5, alignment=2,
+                            textColor=colors.HexColor(_PDF_MUTED))
+
+    marca = _pdf_marca(1.15 if compacto else 1.55)
+    larg_marca = 2.1 * cm if marca != "" else 0
+    faixa = Table([[marca, [Paragraph(_x(_PDF_ORGAO[0]), s_org1),
+                            Paragraph(_x(_PDF_ORGAO[1]), s_org2),
+                            Paragraph(_x(_PDF_ORGAO[2]), s_org3)]]],
+                  colWidths=[larg_marca, doc_width - larg_marca])
+    faixa.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("LINEBELOW", (0, 0), (-1, -1), 1.2, colors.HexColor(_PDF_BLUE)),
+    ]))
+
+    linhas = [l for l in (meta or []) if l]
+    bloco_meta = Paragraph("<br/>".join(_x(l) for l in linhas), s_meta) if linhas else ""
+
+    if compacto and linhas:
+        # Titulo centrado no documento com a meta a direita, na mesma faixa: as
+        # colunas laterais tem a mesma largura para o titulo nao sair do centro.
+        lateral = doc_width * 0.30
+        titulo_row = Table([["", Paragraph(_x(titulo), s_titulo), bloco_meta]],
+                           colWidths=[lateral, doc_width - 2 * lateral, lateral])
+        titulo_row.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        return [faixa, Spacer(1, 0.18 * cm), titulo_row, Spacer(1, 0.16 * cm)]
+
+    saida = [faixa, Spacer(1, 0.45 * cm), Paragraph(_x(titulo), s_titulo)]
+    if linhas:
+        saida += [Spacer(1, 0.18 * cm), bloco_meta]
+    saida.append(Spacer(1, 0.4 * cm))
+    return saida
+
+
+def _pdf_rodape(canvas, documento):
+    """Rodape com a identificacao do sistema e o numero da pagina."""
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+
+    canvas.saveState()
+    canvas.setStrokeColor(colors.HexColor(_PDF_LINE))
+    canvas.line(documento.leftMargin, 0.95 * cm, documento.pagesize[0] - documento.rightMargin, 0.95 * cm)
+    canvas.setFont("Helvetica", 7)
+    canvas.setFillColor(colors.HexColor(_PDF_MUTED))
+    canvas.drawString(documento.leftMargin, 0.62 * cm,
+                      "Agenda Integrada · Secretaria Municipal de Educação · Prefeitura Municipal de Itaguaí")
+    canvas.drawRightString(documento.pagesize[0] - documento.rightMargin, 0.62 * cm,
+                           "Página %d" % canvas.getPageNumber())
+    canvas.restoreState()
+
+
 def _pdf_response(filename: str, title: str, subtitle: str, headers: list, rows: list, col_widths=None, logo: str = None):
+    # `logo` e aceito e ignorado: a marca vem de _pdf_cabecalho, igual para todos
+    # os relatorios. O parametro fica para nao quebrar chamadas existentes.
     """Monta um PDF tabular simples (relatório) e devolve como download.
     Import feito aqui dentro (não no topo do arquivo) para que, se alguém rodar
     `python app.py` direto sem passar pelos .bat (que reinstalam requirements.txt
@@ -1953,35 +2175,13 @@ def _pdf_response(filename: str, title: str, subtitle: str, headers: list, rows:
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=1.2 * cm, rightMargin=1.2 * cm,
-                             topMargin=1.4 * cm, bottomMargin=1.2 * cm, title=title)
+                             topMargin=1.1 * cm, bottomMargin=1.3 * cm, title=title)
     styles = getSampleStyleSheet()
     cell_style = ParagraphStyle("cell", parent=styles["Normal"], fontSize=8, leading=10)
     head_style = ParagraphStyle("head", parent=styles["Normal"], fontSize=8.5, leading=10, textColor=colors.white, fontName="Helvetica-Bold")
 
-    story = []
-    # Logo institucional no cabecalho. O arquivo fica em static/images para o PDF
-    # nao depender de rede na hora de gerar; ausente, o relatorio sai sem ele.
-    if logo:
-        caminho = BASE_DIR / "static" / "images" / logo
-        if caminho.exists():
-            try:
-                leitor = ImageReader(str(caminho))
-                larg, alt = leitor.getSize()
-                # Forca a decodificacao agora: o reportlab so leria os pixels na
-                # hora de montar o documento, e um arquivo corrompido derrubaria
-                # a geracao inteira do relatorio em vez de apenas omitir a logo.
-                leitor.getRGBData()
-                altura = 1.5 * cm
-                story.append(RLImage(str(caminho), width=altura * larg / alt, height=altura, hAlign="LEFT"))
-                story.append(Spacer(1, 0.25 * cm))
-            except Exception:
-                pass
-    story += [
-        Paragraph(_xesc(title), styles["Title"]),
-        Paragraph(_xesc(subtitle), styles["Normal"]),
-        Paragraph(f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles["Normal"]),
-        Spacer(1, 0.5 * cm),
-    ]
+    story = _pdf_cabecalho(_pdf_largura_util(doc), title,
+                           [subtitle, f"Gerado em {datetime.now().strftime('%d/%m/%Y às %H:%M')}"])
     data = [[Paragraph(_xesc(str(h)), head_style) for h in headers]]
     for r in rows:
         data.append([Paragraph(_xesc(str(v)) if v not in (None, "") else "—", cell_style) for v in r])
@@ -1998,7 +2198,7 @@ def _pdf_response(filename: str, title: str, subtitle: str, headers: list, rows:
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
     story.append(table)
-    doc.build(story)
+    doc.build(story, onFirstPage=_pdf_rodape, onLaterPages=_pdf_rodape)
     pdf_bytes = buf.getvalue()
     buf.close()
     resp_headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
@@ -2059,29 +2259,323 @@ def export_demands_pdf(request: Request, status: str = "", priority: str = ""):
     subtitle = "Carteira de demandas"
     if status: subtitle += f" · Status: {status}"
     if priority: subtitle += f" · Prioridade: {priority}"
-    col_widths = [2.7*cm, 5.3*cm, 4.0*cm, 2.6*cm, 2.1*cm, 2.9*cm, 2.0*cm, 2.9*cm, 2.6*cm]
+    col_widths = [2.7*cm, 5.1*cm, 3.9*cm, 2.5*cm, 2.0*cm, 2.9*cm, 2.0*cm, 2.9*cm, 2.6*cm]
     filename = f"demandas_{date.today().isoformat()}.pdf"
     return _pdf_response(filename, "Agenda Integrada — Carteira de Demandas", subtitle,
                           ["Código", "Demanda", "Unidade Escolar", "Categoria", "Prioridade", "Status", "Prazo", "Responsável", "Custo estimado"],
                           table_rows, col_widths)
 
 
+# --- PDF do Painel -----------------------------------------------------------
+_PDF_TONES = {
+    "primary": "#005A9C", "blue": "#005A9C", "teal": "#005A9C",
+    "red": "#b71c1c", "orange": "#c67c00", "green": "#1a7c44", "violet": "#6f42c1",
+}
+# Grupos e cartoes na mesma ordem do Painel (statGroups/cards em static/app.js).
+_PDF_STAT_GROUPS = [
+    ("VISÃO GERAL", [("total", "Total de demandas", "Registro consolidado", "primary", False)]),
+    ("PRIORIDADES", [("urgent", "Urgentes (P1)", "Ação imediata necessária", "red", False),
+                     ("high", "Alta prioridade (P2)", "Já incomoda a rotina", "orange", False)]),
+    ("PRAZOS CRÍTICOS", [("overdue", "Prazo vencido", "Requer atenção da gestão", "red", False),
+                         ("due_soon", "Vence em 7 dias", "Ainda dá tempo de agir", "orange", False)]),
+    ("ANDAMENTO DAS DEMANDAS", [("analysis", "Em análise", "Triagem e avaliação técnica", "orange", False),
+                                ("progress", "Em andamento", "Programados ou em execução", "teal", False),
+                                ("contract", "Aguardando contratação", "Dependência administrativa", "violet", False)]),
+    ("PLANEJAMENTO", [("completed", "Concluídas", "Atendimentos finalizados", "green", False),
+                      ("future", "Planejamento futuro", "Exercícios seguintes", "blue", False)]),
+    ("RESPONSABILIDADE", [("unassigned", "Sem responsável", "Falta indicar quem cuida", "violet", False)]),
+    ("CUSTO EM ABERTO", [("open_cost", "Custo em aberto", "Estimativa do que está aberto", "blue", True)]),
+]
+_PDF_CAT_PALETTE = ["#005A9C", "#0f7b79", "#1a7c44", "#c67c00", "#6f42c1", "#b71c1c"]
+
+
+def _pdf_num_br(v) -> str:
+    try:
+        return f"{int(v):,}".replace(",", ".")
+    except (TypeError, ValueError):
+        return "0"
+
+
+def _dashboard_pdf_story(payload: dict, user: dict, doc_width: float):
+    """Constroi os flowables do PDF do Painel. Separado do endpoint para manter
+    o endpoint legivel e permitir montar o relatorio sem subir o servidor."""
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import Table, TableStyle, Paragraph, Spacer, KeepTogether
+    from xml.sax.saxutils import escape as _x
+
+    st = payload["stats"]
+    base = getSampleStyleSheet()["Normal"]
+
+    def S(nome, **kw):
+        return ParagraphStyle(nome, parent=base, **kw)
+
+    s_group = S("g", fontSize=6.4, leading=8, textColor=colors.HexColor(_PDF_MUTED), fontName="Helvetica-Bold")
+    s_value = S("v", fontSize=15, leading=17, fontName="Helvetica-Bold")
+    s_money = S("vm", fontSize=11, leading=14, fontName="Helvetica-Bold")
+    s_label = S("l", fontSize=7.4, leading=9, textColor=colors.HexColor(_PDF_INK), fontName="Helvetica-Bold")
+    s_note = S("n", fontSize=6.2, leading=7.6, textColor=colors.HexColor(_PDF_MUTED))
+    # keepWithNext gruda o titulo da secao na tabela seguinte: sem isso o
+    # "Atividade recente" ficava sozinho no pe de uma pagina. E preferivel a um
+    # KeepTogether do bloco inteiro, que empurraria a tabela toda e deixaria
+    # meia pagina em branco -- assim a tabela quebra normalmente, repetindo o
+    # cabecalho na pagina seguinte.
+    s_sec = S("s", fontSize=10.5, leading=13, textColor=colors.HexColor(_PDF_BLUE_DARK),
+              fontName="Helvetica-Bold", keepWithNext=1)
+    s_sub = S("ss", fontSize=7, leading=9, textColor=colors.HexColor(_PDF_MUTED),
+              spaceAfter=4.5, keepWithNext=1)
+    # Dentro de uma celula de tabela o cabecalho ja esta preso ao seu conteudo, e
+    # o keepWithNext vaza para a tabela inteira: o bloco "Precisa de atenção /
+    # Demandas por categoria" passava a se colar em "Atividade recente" e os dois
+    # desciam juntos de pagina, deixando meia folha vazia. Aqui, sem keepWithNext.
+    s_sec_cel = S("sc", fontSize=10.5, leading=13, textColor=colors.HexColor(_PDF_BLUE_DARK),
+                  fontName="Helvetica-Bold")
+    s_sub_cel = S("ssc", fontSize=7, leading=9, textColor=colors.HexColor(_PDF_MUTED), spaceAfter=4.5)
+    s_th = S("th", fontSize=6.8, leading=8.5, textColor=colors.white, fontName="Helvetica-Bold")
+    s_td = S("td", fontSize=7.2, leading=9)
+    s_td_b = S("tdb", fontSize=7.2, leading=9, fontName="Helvetica-Bold")
+
+    def secao(titulo, sub):
+        return [Paragraph(_x(titulo), s_sec), Paragraph(_x(sub), s_sub)]
+
+    def tabela(headers, linhas, larguras, vazio):
+        if not linhas:
+            t = Table([[Paragraph(_x(vazio), s_note)]], colWidths=[sum(larguras)])
+            t.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor(_PDF_LINE)),
+                                   ("TOPPADDING", (0, 0), (-1, -1), 10),
+                                   ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                                   ("LEFTPADDING", (0, 0), (-1, -1), 8)]))
+            return t
+        dados = [[Paragraph(_x(h), s_th) for h in headers]] + linhas
+        t = Table(dados, colWidths=larguras, repeatRows=1)
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(_PDF_BLUE)),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f8fc")]),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.HexColor(_PDF_LINE)),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor(_PDF_LINE)),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 3.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
+        ]))
+        return t
+
+    story = []
+
+    # --- indicadores -------------------------------------------------------
+    # Cada grupo do Painel vira uma coluna; a faixa colorida no topo do cartao
+    # repete o tom que aquele indicador tem na tela.
+    grupos = []
+    for rotulo, itens in _PDF_STAT_GROUPS:
+        cartoes = []
+        for chave, titulo, nota, tom, e_moeda in itens:
+            valor = st.get(chave, 0)
+            texto = _money_br(valor) if e_moeda else _pdf_num_br(valor)
+            celula = Table([[Paragraph(_x(texto), s_money if e_moeda else s_value)],
+                            [Paragraph(_x(titulo), s_label)],
+                            [Paragraph(_x(nota), s_note)]])
+            celula.setStyle(TableStyle([
+                ("LINEABOVE", (0, 0), (-1, 0), 2.2, colors.HexColor(_PDF_TONES[tom])),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor(_PDF_LINE)),
+                ("TEXTCOLOR", (0, 0), (0, 0), colors.HexColor(_PDF_TONES[tom])),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (0, 0), 5), ("BOTTOMPADDING", (0, 2), (-1, 2), 5),
+                ("TOPPADDING", (0, 1), (-1, 2), 1), ("BOTTOMPADDING", (0, 0), (-1, 1), 1),
+            ]))
+            cartoes.append([celula])
+        pilha = Table(cartoes)
+        pilha.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                   ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                                   ("TOPPADDING", (0, 0), (-1, -1), 0),
+                                   ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
+        grupos.append((rotulo, pilha))
+
+    larg_grupo = [doc_width * p for p in (0.12, 0.15, 0.15, 0.185, 0.15, 0.125, 0.12)]
+    grade = Table([[Paragraph(_x(r), s_group) for r, _ in grupos],
+                   [pilha for _, pilha in grupos]], colWidths=larg_grupo)
+    grade.setStyle(TableStyle([
+        ("VALIGN", (0, 1), (-1, 1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, 0), 0), ("BOTTOMPADDING", (0, 0), (-1, 0), 3),
+    ]))
+    story += secao("Indicadores do Painel", "Os mesmos números exibidos na tela inicial, no momento da geração.")
+    story.append(grade)
+    story.append(Spacer(1, 0.15 * cm))
+
+    # --- indicador de execução ---------------------------------------------
+    # Fica logo abaixo da grade porque resume exatamente aqueles numeros.
+    pct = float(st.get("execution") or 0)
+    cheio = max(0.005, min(1.0, pct / 100))
+    s_pct = ParagraphStyle("pc", parent=base, fontSize=15, leading=17, fontName="Helvetica-Bold",
+                           textColor=colors.HexColor(_PDF_BLUE), alignment=2)
+    # Titulo, barra e percentual na mesma faixa: e um indicador de uma linha so, e
+    # empilhar cabecalho + barra custava ~22pt de altura que fazem falta para o
+    # bloco seguinte caber na primeira pagina.
+    rotulo_exec = [Paragraph("Indicador de execução", s_sec_cel),
+                   Paragraph("Percentual das demandas registradas que já foram concluídas.", s_sub_cel)]
+    larg_rotulo = 8.2 * cm
+    barra_exec = Table([["", ""]],
+                       colWidths=[(doc_width - larg_rotulo - 3.2 * cm) * cheio,
+                                  (doc_width - larg_rotulo - 3.2 * cm) * (1 - cheio)], rowHeights=[11])
+    barra_exec.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, 0), colors.HexColor(_PDF_BLUE)),
+        ("BACKGROUND", (1, 0), (1, 0), colors.HexColor("#eef2f7")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    linha_exec = Table([[rotulo_exec, barra_exec, Paragraph("%.1f%%" % pct, s_pct)]],
+                       colWidths=[larg_rotulo, doc_width - larg_rotulo - 3.2 * cm, 3.2 * cm])
+    linha_exec.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (0, 0), 0), ("RIGHTPADDING", (-1, 0), (-1, 0), 0),
+        ("LEFTPADDING", (1, 0), (1, 0), 10), ("RIGHTPADDING", (1, 0), (1, 0), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    story.append(linha_exec)
+    story.append(Spacer(1, 0.18 * cm))
+
+    # --- atenção + categorias, lado a lado ---------------------------------
+    meia = doc_width * 0.5
+    at_l = [meia * p for p in (0.09, 0.40, 0.29, 0.22)]
+    at_linhas = [[Paragraph(_x(d["priority"] or "—"), s_td_b),
+                  Paragraph(_x(d["title"] or "—"), s_td),
+                  Paragraph(_x(d["school_name"] or "—"), s_td),
+                  Paragraph(_x(_date_br(d["due_date"])), s_td)] for d in payload["attention"]]
+    bloco_at = [Paragraph("Precisa de atenção", s_sec_cel),
+                Paragraph("Priorizado por criticidade e prazo.", s_sub_cel),
+                tabela(["Prio.", "Demanda", "Unidade Escolar", "Prazo"], at_linhas, at_l,
+                       "Tudo em dia — não há demandas críticas neste momento.")]
+
+    cats = payload["categories"]
+    total_cat = sum(c["qty"] for c in cats) or 1
+    cat_l = [meia * p for p in (0.44, 0.34, 0.22)]
+    cat_linhas = []
+    for i, c in enumerate(cats):
+        fatia = c["qty"] / total_cat
+        # Barra proporcional como uma tabela de duas celulas: dispensa um Flowable
+        # customizado e imprime igual em qualquer visualizador.
+        cheio = max(0.04, fatia)
+        barra = Table([["", ""]], colWidths=[cat_l[1] * cheio, cat_l[1] * (1 - cheio)], rowHeights=[7])
+        barra.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (0, 0), colors.HexColor(_PDF_CAT_PALETTE[i % len(_PDF_CAT_PALETTE)])),
+            ("BACKGROUND", (1, 0), (1, 0), colors.HexColor("#eef2f7")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        cat_linhas.append([Paragraph(_x(c["category"] or "—"), s_td), barra,
+                           Paragraph("%s · %d%%" % (_pdf_num_br(c["qty"]), round(fatia * 100)), s_td_b)])
+    bloco_cat = [Paragraph("Demandas por categoria", s_sec_cel),
+                 Paragraph(_x("Concentração atual da carteira · %s demandas categorizadas."
+                              % _pdf_num_br(sum(c["qty"] for c in cats))), s_sub_cel),
+                 tabela(["Categoria", "Participação", "Qtd."], cat_linhas, cat_l,
+                        "Ainda não há demandas categorizadas.")]
+
+    duas = Table([[bloco_at, bloco_cat]], colWidths=[meia, meia])
+    duas.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"),
+                              ("LEFTPADDING", (0, 0), (0, 0), 0), ("RIGHTPADDING", (0, 0), (0, 0), 10),
+                              ("LEFTPADDING", (1, 0), (1, 0), 10), ("RIGHTPADDING", (1, 0), (1, 0), 0)]))
+    story.append(duas)
+    story.append(Spacer(1, 0.36 * cm))
+
+    # --- atividade recente -------------------------------------------------
+    rec_l = [doc_width * p for p in (0.10, 0.26, 0.19, 0.13, 0.07, 0.15, 0.10)]
+    rec_linhas = [[Paragraph(_x(d["code"] or "—"), s_td_b),
+                   Paragraph(_x(d["title"] or "—"), s_td),
+                   Paragraph(_x(d["school_name"] or "—"), s_td),
+                   Paragraph(_x(d["category"] or "—"), s_td),
+                   Paragraph(_x(d["priority"] or "—"), s_td),
+                   Paragraph(_x(d["status"] or "—"), s_td),
+                   Paragraph(_x(_date_br(d["due_date"])), s_td)] for d in payload["recent"]]
+    story += secao("Atividade recente", "Últimas demandas atualizadas.")
+    story.append(tabela(["Código", "Demanda", "Unidade Escolar", "Categoria", "Prio.", "Status", "Prazo"],
+                        rec_linhas, rec_l, "Nenhuma demanda registrada."))
+    story.append(Spacer(1, 0.36 * cm))
+
+    return story
+
+
+@app.get("/api/export/dashboard.pdf")
+def export_dashboard_pdf(request: Request):
+    """PDF do Painel em A4 paisagem, com os mesmos indicadores e listas da tela."""
+    user = require_user(request)
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.platypus import SimpleDocTemplate
+    except ImportError:
+        raise HTTPException(500, "Geração de PDF indisponível: instale as dependências com 'pip install -r requirements.txt' (pacote reportlab) e reinicie o sistema.")
+
+    payload = _dashboard_payload(user)
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=1.1 * cm, rightMargin=1.1 * cm,
+                            topMargin=0.9 * cm, bottomMargin=1.15 * cm,
+                            title="Painel — Agenda Integrada")
+    escopo = (user.get("school_name") or "Unidade escolar") if user["perm"]["school_scoped"] \
+        else "Rede municipal — todas as unidades"
+    largura = _pdf_largura_util(doc)
+    story = _pdf_cabecalho(largura, "Painel da Agenda Integrada", [
+        escopo,
+        "Gerado em %s" % datetime.now().strftime("%d/%m/%Y às %H:%M"),
+        user.get("name") or "—",
+    ], compacto=True)
+
+    story += _dashboard_pdf_story(payload, user, largura)
+    doc.build(story, onFirstPage=_pdf_rodape, onLaterPages=_pdf_rodape)
+    pdf_bytes = buf.getvalue()
+    buf.close()
+    nome = "painel_%s.pdf" % date.today().isoformat()
+    return Response(content=pdf_bytes, media_type="application/pdf",
+                    headers={"Content-Disposition": 'attachment; filename="%s"' % nome})
+
+
+def _planning_unidades(nomes: list, total: int) -> str:
+    """Texto da coluna de unidades. Um item de planejamento pode consolidar
+    varias escolas; acima de duas o nome de todas nao caberia, entao entram as
+    duas primeiras e a contagem do resto. Itens sem demanda vinculada nao tem
+    como saber a unidade — nesses o texto fica vazio e a coluna "Escolas" segue
+    informando o alcance previsto."""
+    nomes = sorted({n for n in nomes if n})
+    if not nomes:
+        return "—"
+    if len(nomes) <= 2:
+        return " · ".join(nomes)
+    restantes = (total or len(nomes)) - 2
+    return "%s · e mais %d unidade%s" % (" · ".join(nomes[:2]), restantes, "" if restantes == 1 else "s")
+
+
 @app.get("/api/export/planning.pdf")
 def export_planning_pdf(request: Request, year: Optional[int] = None):
     require_user(request)
     where=["1=1"]; params=[]
-    if year: where.append("year=%s"); params.append(year)
+    if year: where.append("p.year=%s"); params.append(year)
     conn=db()
-    rows = conn.execute(f"SELECT * FROM planning_items WHERE {' AND '.join(where)} ORDER BY year, id DESC", params).fetchall()
+    rows = conn.execute(f"""SELECT p.* FROM planning_items p
+                            WHERE {' AND '.join(where)} ORDER BY p.year, p.id DESC""", params).fetchall()
+    # As unidades vem das demandas vinculadas ao item (planning_links). Consulta
+    # separada e agrupada em memoria: um GROUP BY com string_agg devolveria os
+    # nomes repetidos por demanda e ainda dependeria do dialeto.
+    vinculos = conn.execute("""SELECT l.planning_id, s.name FROM planning_links l
+                               JOIN demands d ON d.id=l.demand_id
+                               JOIN schools s ON s.id=d.school_id""").fetchall()
     conn.close()
+    por_item = {}
+    for v in vinculos:
+        por_item.setdefault(v["planning_id"], []).append(v["name"])
+
     from reportlab.lib.units import cm
-    table_rows = [[r["code"] or "—", r["title"], r["kind"], r["schools_count"] or 0, _money_br(r["estimated_cost"]), r["status"]] for r in rows]
+    table_rows = [[r["code"] or "—", _date_br(r["created_at"]), r["title"],
+                   _planning_unidades(por_item.get(r["id"], []), r["schools_count"] or 0),
+                   r["kind"], r["schools_count"] or 0, _money_br(r["estimated_cost"]), r["status"]]
+                  for r in rows]
     subtitle = f"Planejamento {year}" if year else "Planejamento — todos os exercícios"
-    col_widths = [2.6*cm, 9.5*cm, 3.2*cm, 2.2*cm, 3.4*cm, 3.4*cm]
+    col_widths = [2.9*cm, 2.2*cm, 6.8*cm, 5.4*cm, 2.7*cm, 1.5*cm, 2.6*cm, 2.5*cm]
     filename = f"planejamento_{year or 'todos'}_{date.today().isoformat()}.pdf"
     return _pdf_response(filename, "Agenda Integrada — Planejamento Futuro", subtitle,
-                          ["Código", "Objeto consolidado", "Tipo", "Escolas", "Estimativa", "Status"],
-                          table_rows, col_widths, logo="logo-cabecalho.png")
+                          ["Código", "Solicitado em", "Objeto consolidado", "Unidade(s) Escolar(es)",
+                           "Tipo", "Escolas", "Estimativa", "Status"],
+                          table_rows, col_widths)
 
 
 
@@ -2112,6 +2606,7 @@ async def admin_create_category(request: Request):
     max_order = conn.execute("SELECT COALESCE(MAX(sort_order),-1) m FROM categories").fetchone()["m"]
     cur = conn.execute("INSERT INTO categories(name,icon,color,hint,sort_order,active) VALUES(%s,%s,%s,%s,%s,1) RETURNING id",
                         (name, payload.get("icon") or "wrench", payload.get("color") or "blue", payload.get("hint") or "", max_order + 1))
+    registrar(conn, request, user, "Criou categoria", "category", cur.lastrowid, name)
     conn.commit(); conn.close()
     return {"ok": True, "id": cur.lastrowid}
 
@@ -2136,6 +2631,7 @@ async def admin_update_category(request: Request, cat_id: int):
                   payload.get("hint", row["hint"]), int(bool(payload.get("active", row["active"]))), new_sort_order, cat_id))
     if new_name != old_name:
         conn.execute("UPDATE demands SET category=%s WHERE category=%s", (new_name, old_name))
+    registrar(conn, request, user, "Editou categoria", "category", cat_id, new_name)
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -2151,6 +2647,7 @@ def admin_delete_category(request: Request, cat_id: int):
     if in_use:
         conn.close(); raise HTTPException(409, f"Categoria usada em {in_use} demanda(s). Desative em vez de excluir.")
     conn.execute("DELETE FROM categories WHERE id=%s", (cat_id,))
+    registrar(conn, request, user, "Excluiu categoria", "category", cat_id, row["name"])
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -2172,6 +2669,7 @@ async def admin_update_priority(request: Request, code: str):
         conn.close(); raise HTTPException(404)
     conn.execute("UPDATE priority_levels SET label=%s, hint=%s, color=%s WHERE code=%s",
                  (payload.get("label") or row["label"], payload.get("hint", row["hint"]), payload.get("color") or row["color"], code))
+    registrar(conn, request, user, "Editou prioridade", "priority", code, payload.get("label") or row["label"])
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -2218,6 +2716,7 @@ async def admin_create_stage(request: Request):
     max_order = conn.execute("SELECT COALESCE(MAX(sort_order),0) m FROM kanban_stages").fetchone()["m"]
     cur = conn.execute("INSERT INTO kanban_stages(stage_key,label,hint,accent,statuses,target_status,sort_order) VALUES(%s,%s,%s,%s,%s,%s,%s) RETURNING id",
                         (key, label, payload.get("hint") or "", payload.get("accent") or "blue", json.dumps(statuses, ensure_ascii=False), target, max_order + 1))
+    registrar(conn, request, user, "Criou coluna do Kanban", "kanban", cur.lastrowid, label)
     conn.commit(); conn.close()
     return {"ok": True, "id": cur.lastrowid}
 
@@ -2240,6 +2739,7 @@ async def admin_update_stage(request: Request, stage_id: int):
     conn.execute("UPDATE kanban_stages SET label=%s, hint=%s, accent=%s, statuses=%s, target_status=%s, sort_order=%s WHERE id=%s",
                  (payload.get("label") or row["label"], payload.get("hint", row["hint"]), payload.get("accent") or row["accent"],
                   json.dumps(statuses, ensure_ascii=False), target, payload.get("sort_order", row["sort_order"]), stage_id))
+    registrar(conn, request, user, "Editou coluna do Kanban", "kanban", stage_id, payload.get("label") or row["label"])
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -2254,6 +2754,7 @@ def admin_delete_stage(request: Request, stage_id: int):
     if json.loads(row["statuses"]):
         conn.close(); raise HTTPException(409, "Mova os status desta coluna para outra antes de excluí-la")
     conn.execute("DELETE FROM kanban_stages WHERE id=%s", (stage_id,))
+    registrar(conn, request, user, "Excluiu coluna do Kanban", "kanban", stage_id, row["label"])
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -2327,6 +2828,7 @@ async def admin_create_school(request: Request):
         payload.get("maps_link") or "", payload.get("modality") or "",
         payload.get("school_type") or "Escola"
     ))
+    registrar(conn, request, user, "Cadastrou unidade escolar", "school", cur.lastrowid, name)
     conn.commit(); conn.close()
     return {"ok": True, "id": cur.lastrowid}
 
@@ -2409,6 +2911,7 @@ async def admin_update_school(request: Request, school_id: int):
         payload.get("school_type", row["school_type"] or "Escola"),
         school_id
     ))
+    registrar(conn, request, user, "Editou unidade escolar", "school", school_id, payload.get("name") or row["name"])
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -2422,6 +2925,7 @@ def admin_toggle_school(request: Request, school_id: int):
         conn.close(); raise HTTPException(404)
     new_active = 0 if row["active"] else 1
     conn.execute("UPDATE schools SET active=%s WHERE id=%s", (new_active, school_id))
+    registrar(conn, request, user, "Ativou unidade escolar" if new_active else "Desativou unidade escolar", "school", school_id, row["name"])
     conn.commit(); conn.close()
     return {"ok": True, "active": bool(new_active)}
 
@@ -2435,6 +2939,7 @@ def admin_delete_school(request: Request, school_id: int):
     if demands_c or users_c:
         conn.close(); raise HTTPException(409, "Unidade com demandas ou usuários vinculados. Desative em vez de excluir.")
     conn.execute("DELETE FROM schools WHERE id=%s", (school_id,))
+    registrar(conn, request, user, "Excluiu unidade escolar", "school", school_id, row["name"])
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -2464,6 +2969,7 @@ async def admin_create_profile(request: Request):
            VALUES(%s,%s,%s,%s,%s,%s,%s,%s,0,%s) RETURNING id""",
         (slug, label, payload.get("description") or "", int(bool(payload.get("school_scoped"))), int(bool(payload.get("can_edit_analysis"))),
          int(bool(payload.get("can_manage_admin"))), int(bool(payload.get("can_view_reports"))), int(bool(payload.get("can_view_planning"))), now_iso()))
+    registrar(conn, request, user, "Criou perfil de acesso", "profile", cur.lastrowid, label)
     conn.commit(); conn.close()
     return {"ok": True, "id": cur.lastrowid, "slug": slug}
 
@@ -2483,6 +2989,7 @@ async def admin_update_profile(request: Request, profile_id: int):
          int(bool(payload.get("school_scoped", row["school_scoped"]))), int(bool(payload.get("can_edit_analysis", row["can_edit_analysis"]))),
          int(bool(payload.get("can_manage_admin", row["can_manage_admin"]))), int(bool(payload.get("can_view_reports", row["can_view_reports"]))),
          int(bool(payload.get("can_view_planning", row["can_view_planning"]))), int(bool(payload.get("active", row["active"]))), profile_id))
+    registrar(conn, request, user, "Editou perfil de acesso", "profile", profile_id, payload.get("label") or row["label"])
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -2500,6 +3007,7 @@ def admin_delete_profile(request: Request, profile_id: int):
     if in_use:
         conn.close(); raise HTTPException(409, f"Perfil em uso por {in_use} usuário(s). Reatribua-os antes de excluir.")
     conn.execute("DELETE FROM access_profiles WHERE id=%s", (profile_id,))
+    registrar(conn, request, user, "Excluiu perfil de acesso", "profile", profile_id, row["label"])
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -2535,6 +3043,7 @@ async def admin_create_user(request: Request):
         conn.close(); raise HTTPException(400, "Este perfil exige a seleção de uma unidade escolar")
     cur = conn.execute("INSERT INTO users(name,email,password_hash,role,school_id,active) VALUES(%s,%s,%s,%s,%s,1) RETURNING id",
                         (name, email, hash_password(password), role, school_id or None))
+    registrar(conn, request, user, "Criou usuário", "user", cur.lastrowid, f"{name} <{email}>")
     conn.commit(); conn.close()
     return {"ok": True, "id": cur.lastrowid}
 
@@ -2563,8 +3072,133 @@ async def admin_update_user(request: Request, user_id: int):
                   int(bool(payload.get("active", row["active"]))), user_id))
     if payload.get("password"):
         conn.execute("UPDATE users SET password_hash=%s WHERE id=%s", (hash_password(payload["password"]), user_id))
+    registrar(conn, request, user, "Editou usuário", "user", user_id, payload.get("email") or row["email"])
     conn.commit(); conn.close()
     return {"ok": True}
+
+
+# --- Identidade visual: logo do sistema --------------------------------------
+# A logo do cabecalho era um endereco fixo no template, apontando para o portal
+# da Prefeitura. Agora ela e uma configuracao: o arquivo vai para o Storage do
+# Supabase (bucket publico) e o endereco fica em app_settings, de onde o
+# template le. Sem nada configurado, volta a valer o endereco do portal.
+LOGO_PADRAO = "https://novoportal.itaguai.rj.gov.br/@@obter_logo_portal/logo25.png"
+LOGO_BUCKET = os.environ.get("SUPABASE_LOGO_BUCKET", "site-assets")
+LOGO_PASTA = "logo"
+LOGO_MIMES = {
+    "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp",
+    "image/gif": ".gif", "image/svg+xml": ".svg", "image/x-icon": ".ico",
+    "image/vnd.microsoft.icon": ".ico", "image/avif": ".avif",
+}
+LOGO_MAX_BYTES = 3 * 1024 * 1024
+
+
+def get_setting(conn: PGConnection, chave: str, padrao=None):
+    row = conn.execute("SELECT value FROM app_settings WHERE key=%s", (chave,)).fetchone()
+    return row["value"] if row and row["value"] is not None else padrao
+
+
+def set_setting(conn: PGConnection, chave: str, valor) -> None:
+    conn.execute(
+        """INSERT INTO app_settings(key, value, updated_at) VALUES(%s,%s,%s)
+           ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=EXCLUDED.updated_at""",
+        (chave, valor, now_iso()),
+    )
+
+
+def _storage_cfg():
+    """Endereco e chave do Supabase. Ausentes, o recurso fica indisponivel com um
+    aviso claro em vez de estourar um erro generico no meio do upload."""
+    base = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
+    chave = os.environ.get("SUPABASE_SECRET_KEY") or ""
+    if not base or not chave:
+        raise HTTPException(503, "Armazenamento não configurado: defina SUPABASE_URL e SUPABASE_SECRET_KEY no .env e reinicie o sistema.")
+    return base, {"Authorization": f"Bearer {chave}", "apikey": chave}
+
+
+def storage_upload(caminho: str, conteudo: bytes, mime: str) -> str:
+    """Envia o arquivo ao bucket e devolve o endereco publico."""
+    base, headers = _storage_cfg()
+    r = httpx.post(f"{base}/storage/v1/object/{LOGO_BUCKET}/{caminho}",
+                   headers={**headers, "content-type": mime, "x-upsert": "true"},
+                   content=conteudo, timeout=60)
+    if r.status_code >= 300:
+        raise HTTPException(502, f"O Supabase recusou o envio ({r.status_code}). Verifique se o bucket '{LOGO_BUCKET}' existe e é público.")
+    return f"{base}/storage/v1/object/public/{LOGO_BUCKET}/{caminho}"
+
+
+def storage_delete(caminho: str) -> None:
+    """Remove um objeto do bucket. Falha aqui nao interrompe a troca da logo —
+    sobra um arquivo orfao, o que e bem menos grave do que travar a operacao."""
+    try:
+        base, headers = _storage_cfg()
+        httpx.request("DELETE", f"{base}/storage/v1/object/{LOGO_BUCKET}/{caminho}", headers=headers, timeout=30)
+    except Exception:
+        pass
+
+
+def logo_atual(conn: PGConnection) -> dict:
+    url = get_setting(conn, "logo_url")
+    row = conn.execute("SELECT updated_at FROM app_settings WHERE key='logo_url'").fetchone()
+    return {
+        "url": url or LOGO_PADRAO,
+        "is_default": not url,
+        "updated_at": row["updated_at"] if row else None,
+        "bucket": LOGO_BUCKET,
+        "max_mb": round(LOGO_MAX_BYTES / (1024 * 1024), 1),
+        "formatos": sorted({e.lstrip(".") for e in LOGO_MIMES.values()}),
+    }
+
+
+@app.get("/api/admin/logo")
+def admin_get_logo(request: Request):
+    user = require_user(request); require_admin(user)
+    conn = db(); dados = logo_atual(conn); conn.close()
+    return dados
+
+
+@app.post("/api/admin/logo")
+async def admin_upload_logo(request: Request, file: UploadFile = File(...)):
+    user = require_user(request); require_admin(user)
+    mime = (file.content_type or "").lower().split(";")[0].strip()
+    if mime not in LOGO_MIMES:
+        raise HTTPException(415, "Formato não aceito. Envie PNG, JPG, WEBP, GIF, SVG, ICO ou AVIF.")
+    conteudo = await file.read()
+    if not conteudo:
+        raise HTTPException(400, "O arquivo enviado está vazio.")
+    if len(conteudo) > LOGO_MAX_BYTES:
+        raise HTTPException(413, f"Arquivo acima de {LOGO_MAX_BYTES // (1024 * 1024)} MB.")
+
+    # Nome novo a cada envio: o endereco publico e cacheado com folga pelo CDN,
+    # entao reaproveitar o mesmo nome deixaria a logo antiga aparecendo.
+    caminho = f"{LOGO_PASTA}/logo-{datetime.now().strftime('%Y%m%d%H%M%S')}-{secrets.token_hex(4)}{LOGO_MIMES[mime]}"
+    url = storage_upload(caminho, conteudo, mime)
+
+    conn = db()
+    anterior = get_setting(conn, "logo_path")
+    set_setting(conn, "logo_url", url)
+    set_setting(conn, "logo_path", caminho)
+    registrar(conn, request, user, "Alterou a logo do sistema", "setting", "logo_url",
+              f"{file.filename or 'arquivo'} ({len(conteudo) // 1024} KB)")
+    conn.commit(); conn.close()
+
+    # So apaga o arquivo anterior depois que o novo ja esta gravado.
+    if anterior and anterior != caminho:
+        storage_delete(anterior)
+    return {"ok": True, "url": url}
+
+
+@app.delete("/api/admin/logo")
+def admin_reset_logo(request: Request):
+    user = require_user(request); require_admin(user)
+    conn = db()
+    anterior = get_setting(conn, "logo_path")
+    conn.execute("DELETE FROM app_settings WHERE key IN ('logo_url','logo_path')")
+    registrar(conn, request, user, "Restaurou a logo padrão do sistema", "setting", "logo_url")
+    conn.commit(); conn.close()
+    if anterior:
+        storage_delete(anterior)
+    return {"ok": True, "url": LOGO_PADRAO}
 
 
 @app.get("/api/admin/logs")
