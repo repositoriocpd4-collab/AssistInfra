@@ -2276,7 +2276,12 @@
       </div>
       ${pageHeader(`Planejamento ${selected}`, 'Itens previstos, consolidados e em preparação para contratação.', `<a class="btn btn-secondary" href="/api/export/planning.pdf?year=${selected}" data-tooltip="Baixar os itens deste exercício em PDF">${icon('file')}Gerar um PDF</a><button class="btn btn-secondary" id="planningHelp">${icon('info')}Como funciona</button><button class="btn btn-secondary" id="newFutureDemand">${icon('plus')}Nova Demanda Futura</button>${ctx.user.perm.can_edit_analysis ? `<button class="btn btn-primary" id="newPlanning">${icon('plus')}Consolidar Item</button>` : ''}`)}
       <section class="panel"><div class="panel-header"><div><h2>Demandas de aquisição e contratação</h2><p>Itens consolidados para o exercício selecionado.</p></div><div class="search-field" style="width:260px">${icon('search')}<input class="input" id="planningQ" placeholder="Pesquisar planejamento..."></div></div><div id="planningTable"></div></section>`;
-    const load = async () => { const q = $('#planningQ')?.value || ''; const res = await api(`/api/planning?year=${selected}&q=${encodeURIComponent(q)}`); $('#planningTable').innerHTML = renderPlanningTable(res.items) };
+    const load = async () => {
+      const q = $('#planningQ')?.value || '';
+      const res = await api(`/api/planning?year=${selected}&q=${encodeURIComponent(q)}`);
+      $('#planningTable').innerHTML = renderPlanningTable(res.items);
+      wirePlanningActions(res.items, load);
+    };
     $('#planningYear').addEventListener('change', e => location.href = `/planejamento?year=${e.target.value}`); $('#newFutureDemand')?.addEventListener('click', openFutureDemandForm); $('#newPlanning')?.addEventListener('click', openPlanningForm); let t; $('#planningQ').addEventListener('input', () => { clearTimeout(t); t = setTimeout(load, 200) }); $('#planningHelp').addEventListener('click', () => modal({ title: 'Fluxo do Planejamento', mode: 'center', body: `<div class="info-card accent"><h3>${icon('trend')}Do registro à execução</h3><p><strong>Demanda da escola</strong> → Análise técnica → Planejamento futuro → Consolidação → Processo administrativo → Licitação/Contratação → Contrato → Execução.</p></div><div class="alert info">A consolidação permite agrupar necessidades semelhantes de várias unidades sem perder o vínculo com cada escola de origem.</div>` }));
     $$('[data-planning-insight]', $('#planningStatsGrid')).forEach(card => card.addEventListener('click', () => openPlanningInsights(selected)));
     await load();
@@ -2305,9 +2310,82 @@
       </div>`).join('') : empty('Nenhum item neste exercício', '')}</div></div>`;
     $('#modalRoot .modal-body').innerHTML = body;
   }
+  // Ações da carteira de planejamento. Ver está aberto a todos; editar e
+  // excluir só ao perfil com administração, e o backend repete a checagem.
+  function wirePlanningActions(items, reload) {
+    const achar = id => items.find(x => String(x.id) === String(id));
+    $$('[data-plan-view]').forEach(b => b.addEventListener('click', () => openPlanningItem(achar(b.dataset.planView))));
+    $$('[data-plan-edit]').forEach(b => b.addEventListener('click', () => openPlanningEdit(achar(b.dataset.planEdit), reload)));
+    $$('[data-plan-del]').forEach(b => b.addEventListener('click', async () => {
+      const it = achar(b.dataset.planDel);
+      if (!it) return;
+      const ok = await confirmAction('Excluir item de planejamento',
+        `Excluir "${it.title}" (${it.code})? As demandas vinculadas voltam a ficar sem exercício futuro. Esta ação não pode ser desfeita.`,
+        { confirmLabel: 'Excluir' });
+      if (!ok) return;
+      try {
+        await api(`/api/planning/${it.id}`, { method: 'DELETE' });
+        toast('Item excluído', `${it.code} saiu do planejamento.`);
+        await reload();
+      } catch (e) { toast('Não foi possível excluir', e.message, 'error'); }
+    }));
+  }
+
+  function openPlanningItem(it) {
+    if (!it) return;
+    modal({
+      title: it.title, subtitle: `${it.code || ''} · Exercício ${it.year}`, mode: 'drawer',
+      body: `<section class="info-card"><h3>${icon('calendar')}Item consolidado</h3><div class="key-value">
+        <div class="kv"><span>Tipo</span><strong>${esc(it.kind)}</strong></div>
+        <div class="kv"><span>Categoria</span><strong>${esc(it.category)}</strong></div>
+        <div class="kv"><span>Status</span><strong>${esc(it.status)}</strong></div>
+        <div class="kv"><span>Quantidade</span><strong>${num(it.quantity || 0)} ${esc(it.unit || '')}</strong></div>
+        <div class="kv"><span>Estimativa</span><strong>${money(it.estimated_cost)}</strong></div>
+        <div class="kv"><span>Escolas impactadas</span><strong>${num(it.schools_count || 0)}</strong></div>
+      </div></section>
+      ${it.justification ? `<section class="info-card mt-16"><h3>${icon('clipboard')}Justificativa</h3><p style="margin:0;font-size:13px;line-height:1.6">${esc(it.justification)}</p></section>` : ''}`,
+      footer: `<button class="btn btn-secondary" data-close>Fechar</button>`
+    });
+  }
+
+  const PLANNING_STATUSES = ['Identificada', 'Em análise', 'Em levantamento', 'Consolidada',
+    'Aprovada para planejamento', 'Aguardando estimativa', 'Aguardando orçamento'];
+
+  function openPlanningEdit(it, reload) {
+    if (!it) return;
+    modal({
+      title: 'Editar item de planejamento', subtitle: `${it.code || ''} · Exercício ${it.year}`, mode: 'drawer',
+      body: `<form id="planningEditForm"><div class="form-grid">
+        <div class="field span-2"><label>Objeto consolidado *</label><input class="input" name="title" required value="${esc(it.title)}"></div>
+        <div class="field"><label>Exercício *</label><input class="input" type="number" min="2026" max="2035" name="year" required value="${esc(String(it.year))}"></div>
+        <div class="field"><label>Tipo</label><select class="select" name="kind">${PLANNING_KINDS.map(k => `<option ${k === it.kind ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select></div>
+        <div class="field"><label>Categoria</label><select class="select" name="category" data-search data-search-placeholder="Buscar categoria...">${ctx.categories.map(c => `<option ${c === it.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
+        <div class="field"><label>Status</label><select class="select" name="status">${PLANNING_STATUSES.map(x => `<option ${x === it.status ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>
+        <div class="field"><label>Quantidade</label><input class="input" type="number" min="0" step="0.01" name="quantity" value="${esc(String(it.quantity || 0))}"></div>
+        <div class="field"><label>Unidade de medida</label><select class="select" name="unit" data-search data-search-placeholder="Buscar unidade...">${unitOptionsHTML(it.unit || '')}</select></div>
+        <div class="field"><label>Estimativa de custo (R$)</label><input class="input" type="number" min="0" step="0.01" name="estimated_cost" value="${esc(String(it.estimated_cost || 0))}"></div>
+        <div class="field"><label>Escolas impactadas</label><input class="input" type="number" min="0" name="schools_count" value="${esc(String(it.schools_count || 0))}"></div>
+        <div class="field span-2"><label>Justificativa</label><textarea class="textarea" name="justification">${esc(it.justification || '')}</textarea></div>
+      </div><p class="wizard-hint mt-12">Mudar o exercício move também as demandas vinculadas a este item.</p></form>`,
+      footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="savePlanningItem">Salvar alterações</button>`,
+      onOpen(root) {
+        $('#savePlanningItem', root).addEventListener('click', async () => {
+          const f = $('#planningEditForm', root);
+          if (!f.reportValidity()) return;
+          try {
+            await api(`/api/planning/${it.id}`, { method: 'PUT', body: Object.fromEntries(new FormData(f).entries()) });
+            closeModal();
+            toast('Item atualizado', `${it.code || ''} foi salvo.`);
+            await reload();
+          } catch (e) { toast('Não foi possível salvar', e.message, 'error'); }
+        });
+      }
+    });
+  }
+
   function renderPlanningTable(items) {
     if (!items.length) return empty('Nenhum item neste exercício', 'Cadastre uma necessidade futura ou altere o exercício.');
-    return `<div class="table-wrap"><table class="data-table"><thead><tr><th>Código</th><th>Objeto consolidado</th><th>Tipo</th><th>Escolas</th><th>Estimativa</th><th>Status</th><th>Ações</th></tr></thead><tbody>${items.map(p => `<tr><td class="mono" data-label="Código"><strong>${esc(p.code)}</strong></td><td class="cell-title" data-label="Objeto consolidado"><strong>${esc(p.title)}</strong><small>${esc(p.category)} · ${p.year}</small></td><td data-label="Tipo">${esc(p.kind)}</td><td data-label="Escolas">${num(p.schools_count)}</td><td data-label="Estimativa">${money(p.estimated_cost)}</td><td data-label="Status"><span class="status-badge future">${esc(p.status)}</span></td><td data-label="Ações"><button class="icon-btn" data-tooltip="Detalhes do planejamento" aria-label="Detalhes do planejamento">${icon('eye')}</button></td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="table-wrap"><table class="data-table"><thead><tr><th>Código</th><th>Objeto consolidado</th><th>Tipo</th><th>Escolas</th><th>Estimativa</th><th>Status</th><th>Ações</th></tr></thead><tbody>${items.map(p => `<tr><td class="mono" data-label="Código"><strong>${esc(p.code)}</strong></td><td class="cell-title" data-label="Objeto consolidado"><strong>${esc(p.title)}</strong><small>${esc(p.category)} · ${p.year}</small></td><td data-label="Tipo">${esc(p.kind)}</td><td data-label="Escolas">${num(p.schools_count)}</td><td data-label="Estimativa">${money(p.estimated_cost)}</td><td data-label="Status"><span class="status-badge future">${esc(p.status)}</span></td><td data-label="Ações" class="row-actions"><button type="button" class="icon-btn" data-plan-view="${p.id}" data-tooltip="Detalhes do planejamento" aria-label="Detalhes do planejamento">${icon('eye')}</button>${ctx.user.perm.can_manage_admin ? `<button type="button" class="icon-btn" data-plan-edit="${p.id}" data-tooltip="Editar item" aria-label="Editar item">${icon('edit')}</button><button type="button" class="icon-btn" data-plan-del="${p.id}" data-tooltip="Excluir item" aria-label="Excluir item" style="color:var(--red)">${icon('trash')}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
   }
 
   async function renderSchools() {
@@ -2332,6 +2410,7 @@
       <div class="quick-filters">
         <div class="chip-group">
           <button class="chip-v2 chip-red" data-chip-priority="P1">${icon('warning')}<span>P1 Urgentes</span><b>${num(ds.urgent)}</b></button>
+          <button class="chip-v2 chip-orange" data-chip-priority="P2">${icon('warning')}<span>P2 · Alta</span><b>${num(ds.high)}</b></button>
           <button class="chip-v2 chip-orange" data-chip-status="Aguardando contratação">${icon('clock')}<span>Aguardando contratação</span><b>${num(ds.contract)}</b></button>
           <button class="chip-v2 chip-blue" data-chip-status="Em execução">${icon('trend')}<span>Em execução</span><b>${num(ds.progress)}</b></button>
           <button class="chip-v2 chip-violet" data-chip-status="Planejamento futuro">${icon('calendar')}<span>Planejamento futuro</span><b>${num(ds.future)}</b></button>

@@ -1862,6 +1862,60 @@ async def create_planning(request: Request):
     return {"ok":True, "id":pid, "code":code}
 
 
+@app.put("/api/planning/{planning_id}")
+async def update_planning(request: Request, planning_id: int):
+    """Edicao de item de planejamento — restrita ao perfil com administracao."""
+    user = require_user(request); require_admin(user)
+    payload = await request.json()
+    conn = db()
+    item = conn.execute("SELECT * FROM planning_items WHERE id=%s", (planning_id,)).fetchone()
+    if not item:
+        conn.close(); raise HTTPException(404, "Item de planejamento não encontrado")
+    inteiros = ("year", "schools_count")
+    reais = ("estimated_cost", "quantity")
+    for campo in ("year", "title", "category", "kind", "status", "estimated_cost",
+                  "quantity", "unit", "justification", "schools_count"):
+        if campo not in payload:
+            continue
+        valor = payload[campo]
+        if campo in inteiros:
+            valor = int(valor or 0)
+        elif campo in reais:
+            valor = float(valor or 0)
+        conn.execute(f"UPDATE planning_items SET {campo}=%s WHERE id=%s", (valor, planning_id))
+    conn.execute("UPDATE planning_items SET updated_at=%s WHERE id=%s", (now_iso(), planning_id))
+    # O ano do item manda nas demandas vinculadas, senao as duas telas divergem.
+    if payload.get("year") and int(payload["year"]) != item["year"]:
+        conn.execute("""UPDATE demands SET future_year=%s, updated_at=%s
+                        WHERE id IN (SELECT demand_id FROM planning_links WHERE planning_id=%s)""",
+                     (int(payload["year"]), now_iso(), planning_id))
+    log_action(conn, user["id"], user["name"], "Editou item de planejamento", "planning",
+               str(planning_id), item["code"] or str(planning_id))
+    conn.commit(); conn.close()
+    return {"ok": True}
+
+
+@app.delete("/api/planning/{planning_id}")
+async def delete_planning(request: Request, planning_id: int):
+    """Exclusao de item de planejamento — restrita ao perfil com administracao.
+    As demandas vinculadas voltam a ficar sem exercicio futuro, em vez de
+    apontarem para um item que deixou de existir."""
+    user = require_user(request); require_admin(user)
+    conn = db()
+    item = conn.execute("SELECT id, code, title FROM planning_items WHERE id=%s", (planning_id,)).fetchone()
+    if not item:
+        conn.close(); raise HTTPException(404, "Item de planejamento não encontrado")
+    conn.execute("""UPDATE demands SET future_year=NULL, updated_at=%s
+                    WHERE id IN (SELECT demand_id FROM planning_links WHERE planning_id=%s)""",
+                 (now_iso(), planning_id))
+    conn.execute("DELETE FROM planning_links WHERE planning_id=%s", (planning_id,))
+    conn.execute("DELETE FROM planning_items WHERE id=%s", (planning_id,))
+    log_action(conn, user["id"], user["name"], "Excluiu item de planejamento", "planning",
+               str(planning_id), f"{item['code'] or planning_id} - {item['title']}")
+    conn.commit(); conn.close()
+    return {"ok": True}
+
+
 @app.get("/api/admin/summary")
 def admin_summary(request: Request):
     user = require_user(request)
