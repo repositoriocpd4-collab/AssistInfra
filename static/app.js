@@ -1511,9 +1511,9 @@
         <button class="btn btn-secondary" data-dv-action="devolutiva" data-tooltip="Escrever uma devolutiva para a escola">${icon('message')}Devolutiva</button>
         <button class="dv-menu-btn" id="dvMenuBtn" aria-haspopup="true" aria-expanded="false" aria-label="Mais ações" data-tooltip="Mais ações">${icon('dots')}</button>
         <div class="dv-menu-pop" id="dvMenuPop" role="menu" hidden>
-          <button type="button" role="menuitem" data-dv-action="attachments">${icon('paperclip')}Anexos (${payload.attachments.length})</button>
+          ${travado ? '' : `<button type="button" role="menuitem" data-dv-action="attachments">${icon('paperclip')}Anexos (${payload.attachments.length})</button>`}
           <button type="button" role="menuitem" data-dv-action="history">${icon('clock')}Histórico completo</button>
-          <button type="button" role="menuitem" data-dv-action="technical">${icon('settings')}Análise técnica</button>
+          ${travado ? '' : `<button type="button" role="menuitem" data-dv-action="technical">${icon('settings')}Análise técnica</button>`}
           <button type="button" role="menuitem" data-dv-action="planning">${icon('calendar')}Planejamento</button>
           <button type="button" role="menuitem" data-dv-action="school">${icon('school')}Dados da unidade escolar</button>
           ${canEdit ? `<hr>
