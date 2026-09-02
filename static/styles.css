@@ -13202,7 +13202,7 @@ body.dark-mode .dv-panel {
    stroke-width: 2.2
 }
 
-.dv-now .btn {
+.dv-now .btn-primary {
    background: linear-gradient(160deg, #14477f 0%, var(--primary-2) 100%) !important;
    color: #fff;
    border-radius: 8px !important;
@@ -13612,4 +13612,22 @@ body.dark-mode .dv-now-notice {
 .dv-now .dv-now-actions .btn-secondary:hover {
    border-color: var(--primary-2);
    background: #fff
+}
+
+.dv-now .dv-now-actions .btn-secondary {
+   background: rgba(255, 255, 255, .85) !important;
+   color: var(--primary-2) !important
+}
+
+body.dark-mode .dv-now .dv-now-actions .btn-secondary {
+   background: rgba(255, 255, 255, .08) !important;
+   color: var(--ink) !important;
+   border-color: rgba(255, 255, 255, .2)
+}
+
+/* O bloco de texto do cartão precisa crescer: como item flex ele estava sendo
+   dimensionado pelo conteúdo, espremendo o aviso numa coluna estreita. */
+.dv-now>div {
+   flex: 1 1 auto;
+   min-width: 0
 }
