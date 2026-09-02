@@ -79,6 +79,7 @@ CPDTI_CATEGORIES = [
     ("Tablet", "clipboard", "Tablet de uso pedagógico ou administrativo."),
     ("Câmeras", "camera", "Câmera de segurança, gravador ou monitoramento."),
     ("Alarme", "bell", "Central de alarme, sensor ou sirene."),
+    ("Câmeras & Alarmes", "camera", "Câmera de segurança, central de alarme, sensor ou sirene."),
     ("Voip", "message", "Ramal, telefone IP ou central telefônica."),
     ("Wi-Fi", "globe", "Sinal sem fio, roteador ou ponto de acesso."),
     ("Rede e Cabeamento", "layers", "Ponto de rede, cabo, switch ou rack."),
@@ -87,6 +88,7 @@ CPDTI_CATEGORIES = [
     ("Servidor", "kanban", "Servidor local, armazenamento ou backup."),
     ("Sistema/Software", "settings", "Sistema, programa, acesso ou senha."),
     ("Sala de Informática", "school", "Laboratório de informática como um todo."),
+    ("Sala de Recursos", "door", "Sala de recursos multifuncionais como um todo."),
 ]
 
 CATEGORY_HINTS = {

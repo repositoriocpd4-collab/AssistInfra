@@ -273,9 +273,9 @@
     'Declaração': 'administrativo', 'Informação': 'administrativo', 'Relatório': 'administrativo',
     'Resposta': 'administrativo', 'Solicitação': 'administrativo',
     'Impressora': 'cpdti', 'Computador': 'cpdti', 'Notebook': 'cpdti', 'Tablet': 'cpdti',
-    'Câmeras': 'cpdti', 'Alarme': 'cpdti', 'Voip': 'cpdti', 'Wi-Fi': 'cpdti',
+    'Câmeras': 'cpdti', 'Alarme': 'cpdti', 'Câmeras & Alarmes': 'cpdti', 'Voip': 'cpdti', 'Wi-Fi': 'cpdti',
     'Rede e Cabeamento': 'cpdti', 'DataShow': 'cpdti', 'No-Break': 'cpdti', 'Servidor': 'cpdti',
-    'Sistema/Software': 'cpdti', 'Sala de Informática': 'cpdti'
+    'Sistema/Software': 'cpdti', 'Sala de Informática': 'cpdti', 'Sala de Recursos': 'cpdti'
   };
   const CATEGORY_TABS = [
     { key: 'usadas', label: 'Mais usadas', icon: 'star' },
@@ -313,6 +313,7 @@
     ],
     'Câmeras': CAMERA_ALARM_ISSUES,
     'Alarme': CAMERA_ALARM_ISSUES,
+    'Câmeras & Alarmes': CAMERA_ALARM_ISSUES,
     'Wi-Fi': [
       { value: 'wifi_7lan', label: 'Wi-Fi 7LAN' },
       { value: 'wifi_escola', label: 'Wi-Fi da Escola' },
