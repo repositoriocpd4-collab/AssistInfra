@@ -1696,13 +1696,13 @@
     const pk = overrides.planning_kind ?? d.planning_kind;
     modal({
       title: 'Planejamento Futuro', subtitle: `${d.code} · ${d.title}`, mode: 'drawer', body: `<form id="planningLinkForm"><div class="form-grid">
-      <div class="field"><label>Exercício futuro</label><input class="input" type="number" min="2026" max="2035" name="future_year" value="${esc(d.future_year || '')}" placeholder="Ex.: 2027"></div>
+      <div class="field"><label>Exercício futuro <span class="pw-req">*</span></label><input class="input" type="number" min="2026" max="2035" name="future_year" value="${esc(d.future_year || (new Date().getFullYear() + 1))}" placeholder="Ex.: 2027"></div>
       <div class="field"><label>Tipo de necessidade</label><select class="select" name="planning_kind"><option value="">Não definido</option>${PLANNING_KINDS.map(k => `<option ${k === pk ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select></div>
       <div class="field"><label>Quantidade</label><input class="input" type="number" min="0" step="0.01" name="planned_quantity" value="${esc(pq || '')}"></div>
       <div class="field"><label>Unidade de medida</label><select class="select" name="planned_unit" data-search data-search-placeholder="Buscar unidade...">${unitOptionsHTML(pu || '', (CATEGORIA_UNIDADES[d.category] || CATEGORIA_UNIDADES_DEFAULT).permitidas || [], `Sugeridas para ${d.category}`)}</select></div>
       <div class="field"><label>Estimativa de custo (R$)</label><input class="input" type="number" min="0" step="0.01" name="cost_estimate" id="planCost" value="${esc(d.cost_estimate || 0)}"></div>
       <div class="field"><label for="planTotal">Total</label><input class="input" id="planTotal" readonly tabindex="-1" aria-readonly="true" value=""></div>
-    </div><p class="wizard-hint mt-12">Deixe o exercício em branco para remover o vínculo desta demanda com o planejamento futuro.</p></form>`,
+    </div><p class="wizard-hint mt-12">${d.future_year ? 'Apague o exercício para remover o vínculo desta demanda com o planejamento futuro.' : 'Ao salvar, a demanda passa a constar na tabela do exercício escolhido, em Planejamento Futuro.'}</p></form>`,
       footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="savePlanningLink">Salvar planejamento</button>`, onOpen(root) {
         // Total e apenas o produto exibido: quantidade x estimativa de custo.
         const qtd = $('[name="planned_quantity"]', root), custo = $('#planCost', root), total = $('#planTotal', root);
@@ -1712,10 +1712,17 @@
         $('#savePlanningLink').addEventListener('click', async () => {
           const f = $('#planningLinkForm');
           const payload = Object.fromEntries(new FormData(f).entries());
+          // Sem exercicio nao ha o que destinar: salvar em silencio criava a
+          // impressao de que a demanda tinha ido para o planejamento.
+          if (!String(payload.future_year || '').trim() && !d.future_year) {
+            toast('Falta o exercício', 'Informe o ano para destinar a demanda ao planejamento futuro.', 'error');
+            $('[name="future_year"]', root)?.focus();
+            return;
+          }
           try {
             await api(`/api/demands/${d.id}`, { method: 'PUT', body: payload });
             closeModal();
-            toast('Planejamento atualizado', payload.future_year ? `Demanda destinada ao exercício ${payload.future_year}.` : 'Vínculo com exercício futuro removido.');
+            toast('Planejamento atualizado', payload.future_year ? `Demanda incluída na tabela do Planejamento ${payload.future_year}.` : 'Vínculo com exercício futuro removido.');
             await reload();
           } catch (e) { toast('Não foi possível salvar', e.message, 'error'); }
         });
@@ -2366,10 +2373,20 @@
         if (narrowing && !(bySchool.get(s.id) || []).length) return false;
         return true;
       });
-      list = [...list].sort((a, b) => {
-        if (!critical) return a.name.localeCompare(b.name);
-        const ua = (bySchool.get(a.id) || []).filter(d => d.priority === 'P1').length, ub = (bySchool.get(b.id) || []).filter(d => d.priority === 'P1').length;
-        return ub - ua || (bySchool.get(b.id) || []).length - (bySchool.get(a.id) || []).length;
+      // Sao 65 unidades e poucas com demanda: em ordem alfabetica pura, as que
+      // interessam ficavam soterradas entre dezenas de cards zerados. Quem tem
+      // demanda vem primeiro; o resto segue alfabetico, sem esconder ninguem.
+      list = [...list].sort((x, y) => {
+        const dx = bySchool.get(x.id) || [], dy = bySchool.get(y.id) || [];
+        if (critical) {
+          const px = dx.filter(d => d.priority === 'P1').length, py = dy.filter(d => d.priority === 'P1').length;
+          if (px !== py) return py - px;
+          const ax = dx.filter(d => d.status !== 'Concluída').length, ay = dy.filter(d => d.status !== 'Concluída').length;
+          if (ax !== ay) return ay - ax;
+        }
+        if (!dx.length !== !dy.length) return dx.length ? -1 : 1;
+        if (dx.length !== dy.length) return dy.length - dx.length;
+        return x.name.localeCompare(y.name);
       });
       $('#schoolGrid').innerHTML = list.length ? list.map(s => renderSchoolCard(s, bySchool.get(s.id) || [])).join('') : empty('Nenhuma unidade encontrada', 'Ajuste os filtros ou o termo de busca.');
       bindSchools();
