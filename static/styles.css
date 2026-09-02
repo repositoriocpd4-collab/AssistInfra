@@ -13558,3 +13558,58 @@ body[data-page="demands"] #demandTable .data-table td[data-label="Ações"] {
 body[data-page="demands"] #demandTable .data-table td[data-label="Ações"] .icon-btn+.icon-btn {
    margin-left: 6px
 }
+
+/* Aviso e ações do estado concluído */
+.dv-now-notice {
+   display: flex;
+   align-items: flex-start;
+   gap: 9px;
+   margin: 12px 0 0;
+   padding: 11px 13px;
+   border-radius: 11px;
+   background: rgba(255, 255, 255, .72);
+   border: 1px solid rgba(0, 90, 156, .2);
+   font-size: 12.8px;
+   line-height: 1.55;
+   color: var(--primary-2);
+   max-width: 62ch
+}
+
+body.dark-mode .dv-now-notice {
+   background: rgba(255, 255, 255, .06);
+   border-color: rgba(255, 255, 255, .12);
+   color: var(--ink)
+}
+
+.dv-now-notice svg {
+   width: 17px;
+   height: 17px;
+   flex: none;
+   margin-top: 1px;
+   color: var(--govbr-blue)
+}
+
+.dv-now-actions {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 10px;
+   margin-top: 16px
+}
+
+.dv-now .dv-now-actions .btn {
+   margin-top: 0
+}
+
+.dv-now .dv-now-actions .btn-secondary {
+   background: rgba(255, 255, 255, .8);
+   border: 1.5px solid rgba(13, 60, 117, .3);
+   color: var(--primary-2);
+   border-radius: 8px !important;
+   padding: 13px 20px;
+   font-size: 14px
+}
+
+.dv-now .dv-now-actions .btn-secondary:hover {
+   border-color: var(--primary-2);
+   background: #fff
+}

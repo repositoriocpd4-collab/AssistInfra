@@ -1425,10 +1425,16 @@
 
   function dvGuidance(d, stage) {
     const resp = dvResponsible(d);
+    // Demanda concluída não recebe andamento comum: o que resta é destiná-la a
+    // um exercício futuro ou consultar o que já foi registrado.
     if (stage === 4) return {
       title: 'Demanda concluída',
-      text: `Serviço encerrado em ${fmtDateTime(d.updated_at)}. Se o local precisar de retorno da equipe, registre um novo andamento para reabrir a demanda.`,
-      cta: 'Registrar novo andamento'
+      text: `Serviço encerrado em ${fmtDateTime(d.updated_at)}.`,
+      notice: 'Com a demanda concluída, o andamento possível é destiná-la a um exercício futuro, em Planejamento, ou consultar o histórico completo.',
+      actions: [
+        { label: 'Destinar a um exercício futuro', act: 'planning', kind: 'primary', ic: 'calendar', needsEdit: true },
+        { label: 'Ver histórico completo', act: 'history', kind: 'secondary', ic: 'clock', needsEdit: false }
+      ]
     };
     if (stage === 3) return {
       title: 'O que fazer agora',
@@ -1520,9 +1526,14 @@
       <div>
         <h2>${esc(guide.title)}</h2>
         <p>${esc(guide.text)}</p>
-        ${canEdit
-        ? `<button class="btn btn-primary" data-dv-action="wizard">${esc(guide.cta)}${icon('chevron')}</button>`
-        : `<button class="btn btn-primary" data-dv-action="devolutiva">${icon('message')}Enviar devolutiva</button>`}
+        ${guide.notice ? `<p class="dv-now-notice">${icon('info')}<span>${esc(guide.notice)}</span></p>` : ''}
+        <div class="dv-now-actions">
+        ${guide.actions
+        ? guide.actions.filter(x => canEdit || !x.needsEdit).map(x => `<button class="btn btn-${x.kind}" data-dv-action="${x.act}">${icon(x.ic)}${esc(x.label)}</button>`).join('')
+        : (canEdit
+          ? `<button class="btn btn-primary" data-dv-action="wizard">${esc(guide.cta)}${icon('chevron')}</button>`
+          : `<button class="btn btn-primary" data-dv-action="devolutiva">${icon('message')}Enviar devolutiva</button>`)}
+        </div>
       </div>
     </section>
 
