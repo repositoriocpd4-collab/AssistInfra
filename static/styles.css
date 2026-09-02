@@ -13367,3 +13367,185 @@ body[data-page="demand-detail"] {
 .dv-head-actions {
    flex: none
 }
+
+/* ===========================================================================
+   DEMANDAS ESCOLARES — mesma linguagem de vidro
+   =========================================================================== */
+
+body[data-page="demands"] {
+   min-height: 100vh;
+   background:
+      radial-gradient(720px 420px at 4% -4%, rgba(0, 90, 156, .16), transparent 62%),
+      radial-gradient(640px 380px at 100% 6%, rgba(36, 95, 202, .13), transparent 60%),
+      radial-gradient(900px 520px at 76% 98%, rgba(13, 60, 117, .12), transparent 66%),
+      linear-gradient(180deg, #eef3fa 0%, #e2e9f4 100%)
+}
+
+body.dark-mode[data-page="demands"] {
+   background:
+      radial-gradient(720px 420px at 4% -4%, rgba(0, 90, 156, .22), transparent 62%),
+      linear-gradient(180deg, #181c22 0%, #131619 100%)
+}
+
+body[data-page="demands"] .filters-card,
+body[data-page="demands"] .panel {
+   background: rgba(255, 255, 255, .68);
+   -webkit-backdrop-filter: blur(16px) saturate(1.5);
+   backdrop-filter: blur(16px) saturate(1.5);
+   border: 1px solid rgba(255, 255, 255, .9);
+   border-radius: 16px;
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .95),
+      0 0 0 1px rgba(13, 60, 117, .07),
+      0 12px 30px -20px rgba(13, 60, 117, .4)
+}
+
+body.dark-mode[data-page="demands"] .filters-card,
+body.dark-mode[data-page="demands"] .panel {
+   background: rgba(36, 40, 46, .68);
+   border-color: rgba(255, 255, 255, .07)
+}
+
+body[data-page="demands"] .page-header h1,
+body[data-page="demands"] .panel-header h2 {
+   color: var(--primary-2)
+}
+
+body.dark-mode[data-page="demands"] .page-header h1,
+body.dark-mode[data-page="demands"] .panel-header h2 {
+   color: var(--ink)
+}
+
+/* Chips de filtro preenchidos, com o tom da própria coluna */
+body[data-page="demands"] .chip-v2 {
+   color: #fff;
+   border: 1px solid rgba(255, 255, 255, .35);
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .3),
+      0 6px 16px -8px rgba(13, 60, 117, .6)
+}
+
+body[data-page="demands"] .chip-v2 svg,
+body[data-page="demands"] .chip-v2 span {
+   color: #fff
+}
+
+body[data-page="demands"] .chip-v2 b {
+   background: rgba(255, 255, 255, .22);
+   color: #fff
+}
+
+body[data-page="demands"] .chip-v2:hover {
+   transform: translateY(-1px);
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .35),
+      0 10px 22px -8px rgba(13, 60, 117, .7)
+}
+
+body[data-page="demands"] .chip-v2.chip-red {
+   background: linear-gradient(160deg, #d33049 0%, #a4102a 100%)
+}
+
+body[data-page="demands"] .chip-v2.chip-orange {
+   background: linear-gradient(160deg, #e0821b 0%, #b45905 100%)
+}
+
+body[data-page="demands"] .chip-v2.chip-blue {
+   background: linear-gradient(160deg, #2a6fd6 0%, #14479a 100%)
+}
+
+body[data-page="demands"] .chip-v2.chip-violet {
+   background: linear-gradient(160deg, #7c58e0 0%, #5330b4 100%)
+}
+
+body[data-page="demands"] .chip-v2.chip-green {
+   background: linear-gradient(160deg, #16915b 0%, #0c6039 100%)
+}
+
+/* Linhas da carteira como cartões separados */
+body[data-page="demands"] #demandTable .data-table {
+   border-spacing: 0 10px;
+   border-collapse: separate
+}
+
+body[data-page="demands"] #demandTable .data-table th {
+   background: transparent;
+   border-bottom: 0;
+   color: var(--primary-2);
+   font-size: 10.5px;
+   font-weight: 700
+}
+
+body[data-page="demands"] #demandTable .data-table tbody tr {
+   background: rgba(255, 255, 255, .74);
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .95),
+      0 0 0 1px rgba(13, 60, 117, .07),
+      0 8px 22px -16px rgba(13, 60, 117, .45);
+   transition: transform .16s ease, box-shadow .16s ease
+}
+
+body.dark-mode[data-page="demands"] #demandTable .data-table tbody tr {
+   background: rgba(36, 40, 46, .7)
+}
+
+body[data-page="demands"] #demandTable .data-table tbody tr:hover {
+   transform: translateY(-1px);
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .95),
+      0 0 0 1px rgba(13, 60, 117, .13),
+      0 14px 30px -16px rgba(13, 60, 117, .55)
+}
+
+body[data-page="demands"] #demandTable .data-table td {
+   border-bottom: 0;
+   padding: 16px 14px
+}
+
+body[data-page="demands"] #demandTable .data-table td:first-child {
+   border-radius: 14px 0 0 14px
+}
+
+body[data-page="demands"] #demandTable .data-table td:last-child {
+   border-radius: 0 14px 14px 0
+}
+
+body[data-page="demands"] #demandTable .cell-title strong {
+   color: var(--primary-2)
+}
+
+body.dark-mode[data-page="demands"] #demandTable .cell-title strong {
+   color: var(--ink)
+}
+
+/* Botões de ação como quadrados arredondados */
+body[data-page="demands"] #demandTable .icon-btn {
+   width: 34px;
+   height: 34px;
+   border-radius: 10px;
+   border: 1px solid rgba(13, 60, 117, .14);
+   background: rgba(255, 255, 255, .85);
+   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9)
+}
+
+body[data-page="demands"] #demandTable .icon-btn:hover {
+   border-color: var(--govbr-blue);
+   background: #fff
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+
+   body[data-page="demands"] .filters-card,
+   body[data-page="demands"] .panel,
+   body[data-page="demands"] #demandTable .data-table tbody tr {
+      background: #fff
+   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+   body[data-page="demands"] .chip-v2:hover,
+   body[data-page="demands"] #demandTable .data-table tbody tr:hover {
+      transform: none
+   }
+}
