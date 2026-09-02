@@ -1700,9 +1700,15 @@
       <div class="field"><label>Tipo de necessidade</label><select class="select" name="planning_kind"><option value="">Não definido</option>${PLANNING_KINDS.map(k => `<option ${k === pk ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select></div>
       <div class="field"><label>Quantidade</label><input class="input" type="number" min="0" step="0.01" name="planned_quantity" value="${esc(pq || '')}"></div>
       <div class="field"><label>Unidade de medida</label><select class="select" name="planned_unit" data-search data-search-placeholder="Buscar unidade...">${unitOptionsHTML(pu || '', (CATEGORIA_UNIDADES[d.category] || CATEGORIA_UNIDADES_DEFAULT).permitidas || [], `Sugeridas para ${d.category}`)}</select></div>
-      <div class="field span-2"><label>Estimativa de custo (R$)</label><input class="input" type="number" min="0" step="0.01" name="cost_estimate" value="${esc(d.cost_estimate || 0)}"></div>
+      <div class="field"><label>Estimativa de custo (R$)</label><input class="input" type="number" min="0" step="0.01" name="cost_estimate" id="planCost" value="${esc(d.cost_estimate || 0)}"></div>
+      <div class="field"><label for="planTotal">Total</label><input class="input" id="planTotal" readonly tabindex="-1" aria-readonly="true" value=""></div>
     </div><p class="wizard-hint mt-12">Deixe o exercício em branco para remover o vínculo desta demanda com o planejamento futuro.</p></form>`,
-      footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="savePlanningLink">Salvar planejamento</button>`, onOpen() {
+      footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="savePlanningLink">Salvar planejamento</button>`, onOpen(root) {
+        // Total e apenas o produto exibido: quantidade x estimativa de custo.
+        const qtd = $('[name="planned_quantity"]', root), custo = $('#planCost', root), total = $('#planTotal', root);
+        const recalcular = () => { total.value = money((Number(qtd.value) || 0) * (Number(custo.value) || 0)); };
+        [qtd, custo].forEach(el => el.addEventListener('input', recalcular));
+        recalcular();
         $('#savePlanningLink').addEventListener('click', async () => {
           const f = $('#planningLinkForm');
           const payload = Object.fromEntries(new FormData(f).entries());
