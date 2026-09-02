@@ -13549,3 +13549,12 @@ body[data-page="demands"] #demandTable .icon-btn:hover {
       transform: none
    }
 }
+
+/* Ações lado a lado: empilhadas, três ícones dobram a altura de cada linha */
+body[data-page="demands"] #demandTable .data-table td[data-label="Ações"] {
+   white-space: nowrap
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Ações"] .icon-btn+.icon-btn {
+   margin-left: 6px
+}
