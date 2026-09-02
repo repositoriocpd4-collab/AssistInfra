@@ -13631,3 +13631,147 @@ body.dark-mode .dv-now .dv-now-actions .btn-secondary {
    flex: 1 1 auto;
    min-width: 0
 }
+
+/* Ação indisponível num painel travado */
+.dv-panel-locked {
+   display: flex;
+   align-items: flex-start;
+   gap: 8px;
+   margin: 14px 0 0;
+   font-size: 12.2px;
+   line-height: 1.45;
+   color: var(--muted)
+}
+
+.dv-panel-locked svg {
+   width: 15px;
+   height: 15px;
+   flex: none;
+   margin-top: 1px;
+   color: #94a3b8
+}
+
+/* ===========================================================================
+   PAINEL — mesma linguagem de vidro
+   =========================================================================== */
+
+body[data-page="dashboard"] {
+   min-height: 100vh;
+   background:
+      radial-gradient(720px 420px at 4% -4%, rgba(0, 90, 156, .16), transparent 62%),
+      radial-gradient(640px 380px at 100% 6%, rgba(36, 95, 202, .13), transparent 60%),
+      radial-gradient(900px 520px at 76% 98%, rgba(13, 60, 117, .12), transparent 66%),
+      linear-gradient(180deg, #eef3fa 0%, #e2e9f4 100%)
+}
+
+body.dark-mode[data-page="dashboard"] {
+   background:
+      radial-gradient(720px 420px at 4% -4%, rgba(0, 90, 156, .22), transparent 62%),
+      linear-gradient(180deg, #181c22 0%, #131619 100%)
+}
+
+body[data-page="dashboard"] .stat-card,
+body[data-page="dashboard"] .panel,
+body[data-page="dashboard"] .chart-card,
+body[data-page="dashboard"] .attention-card,
+body[data-page="dashboard"] .report-card {
+   background: rgba(255, 255, 255, .68);
+   -webkit-backdrop-filter: blur(16px) saturate(1.5);
+   backdrop-filter: blur(16px) saturate(1.5);
+   border: 1px solid rgba(255, 255, 255, .9);
+   border-radius: 16px;
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .95),
+      0 0 0 1px rgba(13, 60, 117, .07),
+      0 12px 30px -20px rgba(13, 60, 117, .4);
+   transition: transform .18s ease, box-shadow .18s ease
+}
+
+body.dark-mode[data-page="dashboard"] .stat-card,
+body.dark-mode[data-page="dashboard"] .panel,
+body.dark-mode[data-page="dashboard"] .chart-card,
+body.dark-mode[data-page="dashboard"] .attention-card,
+body.dark-mode[data-page="dashboard"] .report-card {
+   background: rgba(36, 40, 46, .68);
+   border-color: rgba(255, 255, 255, .07)
+}
+
+body[data-page="dashboard"] .stat-card:hover,
+body[data-page="dashboard"] .chart-card:hover {
+   transform: translateY(-1px);
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .95),
+      0 0 0 1px rgba(13, 60, 117, .11),
+      0 18px 36px -22px rgba(13, 60, 117, .5)
+}
+
+body[data-page="dashboard"] .page-header h1,
+body[data-page="dashboard"] .panel-header h2,
+body[data-page="dashboard"] .stat-card strong {
+   color: var(--primary-2)
+}
+
+body.dark-mode[data-page="dashboard"] .page-header h1,
+body.dark-mode[data-page="dashboard"] .panel-header h2,
+body.dark-mode[data-page="dashboard"] .stat-card strong {
+   color: var(--ink)
+}
+
+/* Linhas da atividade recente como cartões, igual à carteira */
+body[data-page="dashboard"] .data-table {
+   border-spacing: 0 10px;
+   border-collapse: separate
+}
+
+body[data-page="dashboard"] .data-table th {
+   background: transparent;
+   border-bottom: 0;
+   color: var(--primary-2);
+   font-size: 10.5px;
+   font-weight: 700
+}
+
+body[data-page="dashboard"] .data-table tbody tr {
+   background: rgba(255, 255, 255, .74);
+   box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, .95),
+      0 0 0 1px rgba(13, 60, 117, .07),
+      0 8px 22px -16px rgba(13, 60, 117, .45)
+}
+
+body.dark-mode[data-page="dashboard"] .data-table tbody tr {
+   background: rgba(36, 40, 46, .7)
+}
+
+body[data-page="dashboard"] .data-table td {
+   border-bottom: 0;
+   padding: 16px 14px
+}
+
+body[data-page="dashboard"] .data-table td:first-child {
+   border-radius: 14px 0 0 14px
+}
+
+body[data-page="dashboard"] .data-table td:last-child {
+   border-radius: 0 14px 14px 0
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+
+   body[data-page="dashboard"] .stat-card,
+   body[data-page="dashboard"] .panel,
+   body[data-page="dashboard"] .chart-card,
+   body[data-page="dashboard"] .attention-card,
+   body[data-page="dashboard"] .report-card,
+   body[data-page="dashboard"] .data-table tbody tr {
+      background: #fff
+   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+   body[data-page="dashboard"] .stat-card:hover,
+   body[data-page="dashboard"] .chart-card:hover {
+      transform: none
+   }
+}

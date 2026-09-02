@@ -6,8 +6,8 @@ rem ---------------------------------------------------------------------------
 rem  Publica a branch de trabalho no GitHub.
 rem  Para trocar de destino, altere as tres linhas abaixo.
 rem ---------------------------------------------------------------------------
-set "REPO_URL=https://github.com/2026Ficai/Assistencia.git"
-set "REMOTE=deploy"
+set "REPO_URL=https://github.com/repositoriocpd4-collab/AssistInfra.git"
+set "REMOTE=origin"
 set "BRANCH=DevAssis"
 
 echo ======================================================
@@ -145,6 +145,6 @@ if errorlevel 1 (
 echo.
 echo ======================================================
 echo Concluido.
-echo https://github.com/2026Ficai/Assistencia/tree/%BRANCH%
+echo https://github.com/repositoriocpd4-collab/AssistInfra/tree/%BRANCH%
 echo ======================================================
 pause

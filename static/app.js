@@ -1490,6 +1490,10 @@
       { label: 'Encerrar e arquivar a demanda', at: 4 }
     ];
     const isDone = stage === 4;
+    // Demanda concluida tranca os painies que registrariam andamento: sobram
+    // o planejamento e a consulta ao historico, como diz o aviso do topo.
+    const travado = isDone;
+    const semAcao = 'Indisponível com a demanda concluída.';
 
     return `<div class="breadcrumb"><a href="/">Painel</a><span>›</span><a href="/demandas">Demandas</a><span>›</span><span>${esc(d.code)}</span></div>
 
@@ -1514,9 +1518,7 @@
           <button type="button" role="menuitem" data-dv-action="school">${icon('school')}Dados da unidade escolar</button>
           ${canEdit ? `<hr>
           <button type="button" role="menuitem" data-dv-action="edit-demand">${icon('edit')}Editar dados da demanda</button>
-          ${isDone
-            ? `<button type="button" role="menuitem" data-dv-action="wizard" data-dv-type="reabrir">${icon('refresh')}Reabrir demanda</button>`
-            : `<button type="button" role="menuitem" data-dv-action="wizard" data-dv-type="executado">${icon('check-circle')}Informar conclusão</button>`}` : ''}
+          ${travado ? '' : `<button type="button" role="menuitem" data-dv-action="wizard" data-dv-type="executado">${icon('check-circle')}Informar conclusão</button>`}` : ''}
         </div>
       </div>
     </header>
@@ -1559,13 +1561,13 @@
       icon: 'user', label: 'Responsável atual',
       value: resp ? esc(resp) : '<span class="dv-muted">Não definido</span>',
       sub: d.sector ? esc(d.sector) : (provType ? esc(provType.label) : ''),
-      action: canEdit ? 'wizard' : '', actionType: 'responsavel', actionLabel: resp ? 'Alterar responsável' : 'Designar responsável'
+      action: canEdit && !travado ? 'wizard' : '', actionType: 'responsavel', actionLabel: resp ? 'Alterar responsável' : 'Designar responsável'
     })}
       ${dvFact({
       icon: 'calendar', label: 'Prazo previsto',
       value: esc(fmtDate(d.prov_due_date || d.due_date)),
       sub: due.cls ? `<span class="deadline ${due.cls}">${esc(due.text)}</span>` : '',
-      action: canEdit ? 'wizard' : '', actionType: 'prazo', actionLabel: 'Reprogramar prazo'
+      action: canEdit && !travado ? 'wizard' : '', actionType: 'prazo', actionLabel: 'Reprogramar prazo'
     })}
       ${dvFact({
       icon: CATEGORY_ICONS[d.category] || 'clipboard', label: 'Categoria',
@@ -1614,7 +1616,8 @@
             </li>`;
     }).join('')}
         </ul>
-        ${canEdit ? `<button type="button" class="dv-panel-foot" data-dv-action="wizard">Registrar andamento${icon('chevron')}</button>` : ''}
+        ${travado ? `<p class="dv-panel-locked">${icon('info')}<span>${esc(semAcao)}</span></p>`
+        : (canEdit ? `<button type="button" class="dv-panel-foot" data-dv-action="wizard">Registrar andamento${icon('chevron')}</button>` : '')}
       </section>
     </div>
 
@@ -1624,7 +1627,8 @@
         <p class="${d.technical_opinion ? '' : 'dv-muted'}">${esc(d.technical_opinion || 'Parecer técnico ainda não registrado.')}</p>
         <div class="dv-kv"><span>Ação definida</span><strong>${esc(d.action_defined || '—')}</strong></div>
         <div class="dv-kv"><span>Dependências</span><strong>${esc(d.dependencies || 'Nenhuma')}</strong></div>
-        ${canEdit ? `<button type="button" class="dv-panel-foot" data-dv-action="technical">Atualizar análise técnica${icon('chevron')}</button>` : ''}
+        ${travado ? `<p class="dv-panel-locked">${icon('info')}<span>${esc(semAcao)}</span></p>`
+        : (canEdit ? `<button type="button" class="dv-panel-foot" data-dv-action="technical">Atualizar análise técnica${icon('chevron')}</button>` : '')}
       </section>
 
       <section class="dv-panel">
@@ -1646,7 +1650,8 @@
         ? `<p>${num(payload.attachments.length)} arquivo${payload.attachments.length === 1 ? '' : 's'} anexado${payload.attachments.length === 1 ? '' : 's'} a esta demanda.</p>
              ${payload.attachments.slice(0, 3).map(f => `<div class="dv-kv"><span>${esc(f.filename)}</span><strong>${Math.max(1, Math.round(f.size / 1024))} KB</strong></div>`).join('')}`
         : `<p class="dv-muted">Nenhum arquivo anexado. Fotos do local e orçamentos ajudam a equipe a decidir mais rápido.</p>`}
-        <button type="button" class="dv-panel-foot" data-dv-action="attachments">${payload.attachments.length ? 'Abrir anexos' : 'Anexar arquivo'}${icon('chevron')}</button>
+        ${travado ? `<p class="dv-panel-locked">${icon('info')}<span>${esc(semAcao)}</span></p>`
+        : `<button type="button" class="dv-panel-foot" data-dv-action="attachments">${payload.attachments.length ? 'Abrir anexos' : 'Anexar arquivo'}${icon('chevron')}</button>`}
       </section>
     </div>`;
   }
