@@ -13941,3 +13941,10 @@ body.dark-mode[data-page="dashboard"] .stat-tile-value {
       transform: none
    }
 }
+
+/* "Aguardando contratação" em marrom claro. O tom de partida (#9c6b43) é o
+   marrom mais claro que ainda mantém o texto branco em 4,57:1, acima do
+   mínimo de 4,5 exigido para texto normal. */
+body[data-page="demands"] .chip-v2[data-chip-status="Aguardando contratação"] {
+   background: linear-gradient(160deg, #9c6b43 0%, #7a5230 100%)
+}

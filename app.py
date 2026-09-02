@@ -745,6 +745,22 @@ def require_user(request: Request):
     return user
 
 
+def asset_version() -> str:
+    """Versao dos estaticos derivada da data de modificacao dos arquivos.
+
+    Os templates traziam o numero da versao escrito a mao (?v=govbr-58). Como
+    ninguem lembrava de incrementar, o navegador continuava servindo o CSS e o
+    JS antigos de cache mesmo depois de o arquivo mudar no servidor.
+    """
+    marca = 0
+    for nome in ("styles.css", "app.js"):
+        try:
+            marca = max(marca, int((BASE_DIR / "static" / nome).stat().st_mtime))
+        except OSError:
+            pass
+    return str(marca) if marca else "dev"
+
+
 def render(request: Request, template: str, **context):
     user = current_user(request)
     if not user:
@@ -760,6 +776,7 @@ def render(request: Request, template: str, **context):
     conn.close()
     base = {
         "request": request,
+        "asset_v": asset_version(),
         "user": user,
         "priorities": priorities,
         "statuses": STATUSES,
@@ -776,7 +793,7 @@ def render(request: Request, template: str, **context):
 def login_page(request: Request):
     if current_user(request):
         return RedirectResponse("/", status_code=303)
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse("login.html", {"request": request, "asset_v": asset_version()})
 
 
 @app.post("/login")
@@ -785,7 +802,7 @@ def login(request: Request, email: str = Form(...), password: str = Form(...)):
     row = conn.execute("SELECT * FROM users WHERE lower(email)=lower(%s)", (email.strip(),)).fetchone()
     conn.close()
     if not row or not verify_password(password, row["password_hash"]):
-        return templates.TemplateResponse("login.html", {"request": request, "error": "E-mail ou senha inválidos.", "email": email}, status_code=401)
+        return templates.TemplateResponse("login.html", {"request": request, "asset_v": asset_version(), "error": "E-mail ou senha inválidos.", "email": email}, status_code=401)
     request.session["user_id"] = row["id"]
     return RedirectResponse("/", status_code=303)
 
