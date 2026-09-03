@@ -8,9 +8,18 @@ uploads/*
 venv/
 .venv/
 *.log
+server.log
 .idea/
 .vscode/
+Thumbs.db
 
 # Harness temporario de inspecao visual (gerado durante o desenvolvimento)
 static/__preview.html
 static/__sprite.html
+
+# Cache local de fotos de escolas (não versionar — gerado em runtime)
+static/school_cache/
+
+# Arquivos pesados de dados de importação (não precisam ir para produção)
+supabase_unidades_escolares.json
+supabase_unidades_escolares.sql

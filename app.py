@@ -1223,6 +1223,160 @@ def api_demand_detail(request: Request, demand_id: int):
     return {"demand": dict(row), "updates": [dict(x) for x in updates], "attachments": [dict(x) for x in attachments], "planning": [dict(x) for x in planning]}
 
 
+@app.get("/api/demands/{demand_id}/pdf")
+def api_demand_pdf(request: Request, demand_id: int):
+    user = require_user(request)
+    conn = db()
+    row = conn.execute("SELECT d.*, s.name school_name FROM demands d JOIN schools s ON s.id=d.school_id WHERE d.id=%s", (demand_id,)).fetchone()
+    if not row:
+        conn.close(); raise HTTPException(404, "Demanda não encontrada")
+    if user["perm"]["school_scoped"] and row["school_id"] != user.get("school_id"):
+        conn.close(); raise HTTPException(403)
+    updates = conn.execute("SELECT * FROM demand_updates WHERE demand_id=%s ORDER BY created_at ASC", (demand_id,)).fetchall()
+    conn.close()
+
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib import colors
+    except ImportError:
+        raise HTTPException(500, "Geração de PDF indisponível: instale as dependências com 'pip install -r requirements.txt' (pacote reportlab) e reinicie o sistema.")
+    from xml.sax.saxutils import escape as _xesc
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=1.5*cm, rightMargin=1.5*cm,
+        topMargin=1.3*cm, bottomMargin=1.5*cm,
+        title=f"Demanda {row['code']} — {row['title']}"
+    )
+    largura = _pdf_largura_util(doc)
+    styles = getSampleStyleSheet()
+    base = styles["Normal"]
+
+    s_sec = ParagraphStyle("dsec", parent=base, fontName="Helvetica-Bold", fontSize=11,
+                           leading=14, textColor=colors.HexColor(_PDF_BLUE_DARK),
+                           spaceBefore=14, spaceAfter=4)
+    s_label = ParagraphStyle("dlabel", parent=base, fontName="Helvetica-Bold", fontSize=9,
+                             leading=11, textColor=colors.HexColor(_PDF_MUTED))
+    s_value = ParagraphStyle("dvalue", parent=base, fontSize=10, leading=13,
+                             textColor=colors.HexColor(_PDF_BLUE_DARK))
+    s_desc = ParagraphStyle("ddesc", parent=base, fontSize=10, leading=14,
+                            textColor=colors.black, spaceAfter=6)
+    s_hist_date = ParagraphStyle("dhd", parent=base, fontName="Helvetica-Bold", fontSize=8.5,
+                                 leading=11, textColor=colors.HexColor(_PDF_BLUE))
+    s_hist_msg = ParagraphStyle("dhm", parent=base, fontSize=9.5, leading=13,
+                                textColor=colors.black, leftIndent=6, spaceAfter=3)
+    s_divider_lbl = ParagraphStyle("ddl", parent=base, fontSize=8, leading=10,
+                                   textColor=colors.HexColor(_PDF_MUTED))
+
+    def campo(label, valor):
+        return [Paragraph(_xesc(label), s_label), Paragraph(_xesc(str(valor or "—")), s_value)]
+
+    def linha_divisora():
+        t = Table([[""]], colWidths=[largura])
+        t.setStyle(TableStyle([
+            ("LINEBELOW", (0, 0), (-1, -1), 0.5, colors.HexColor(_PDF_LINE)),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        return t
+
+    def _fdt(iso):
+        if not iso:
+            return "—"
+        try:
+            return str(iso)[:16].replace("T", " às ")
+        except Exception:
+            return str(iso)
+
+    # --- Cabeçalho institucional padrão ---
+    meta = [
+        row["school_name"],
+        f"Gerado em {datetime.now().strftime('%d/%m/%Y às %H:%M')}",
+        user.get("name", ""),
+    ]
+    story = _pdf_cabecalho(largura, "Demanda Concluída", meta, compacto=True)
+
+    # --- Dados da demanda ---
+    story.append(Paragraph("Dados da demanda", s_sec))
+    story.append(linha_divisora())
+
+    col = largura / 2 - 0.2*cm
+    grid_dados = [
+        [campo("Código", row["code"]),                         campo("Status", row["status"])],
+        [campo("Unidade Escolar", row["school_name"]),         campo("Categoria", row.get("category", ""))],
+        [campo("Prioridade", row.get("priority", "")),         campo("Responsável", row.get("responsible", ""))],
+        [campo("Prazo", _fdt(row.get("due_date", ""))),        campo("Setor", row.get("sector", ""))],
+    ]
+    if row.get("cost_estimate"):
+        try:
+            custo = f"{float(row['cost_estimate']):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        except Exception:
+            custo = str(row["cost_estimate"])
+        grid_dados.append([campo("Custo estimado (R$)", custo),
+                           campo("Tipo de providência", row.get("prov_action_type", ""))])
+    if row.get("archived_at"):
+        grid_dados.append([campo("Arquivada em", _fdt(row["archived_at"])), [""]])
+
+    tbl_dados = Table([[c1, c2] for c1, c2 in grid_dados], colWidths=[col, col])
+    tbl_dados.setStyle(TableStyle([
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 2),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
+        ("TOPPADDING",    (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+    ]))
+    story.append(tbl_dados)
+    story.append(Spacer(1, 0.3*cm))
+
+    story.append(Paragraph("Título", s_label))
+    story.append(Paragraph(_xesc(row["title"]), s_value))
+    story.append(Spacer(1, 0.25*cm))
+
+    if row.get("description"):
+        story.append(Paragraph("Descrição / objeto da demanda", s_label))
+        story.append(Paragraph(_xesc(row["description"]).replace("\n", "<br/>"), s_desc))
+
+    if row.get("impact"):
+        story.append(Paragraph("Impacto relatado", s_label))
+        story.append(Paragraph(_xesc(row["impact"]).replace("\n", "<br/>"), s_desc))
+
+    if row.get("technical_opinion"):
+        story.append(Paragraph("Parecer técnico", s_label))
+        story.append(Paragraph(_xesc(row["technical_opinion"]).replace("\n", "<br/>"), s_desc))
+
+    # --- Histórico de andamentos ---
+    story.append(Spacer(1, 0.2*cm))
+    story.append(Paragraph("Histórico de andamentos", s_sec))
+    story.append(linha_divisora())
+
+    if updates:
+        for u in updates:
+            date_str = _fdt(u["created_at"])
+            kind = str(u["kind"] or "")
+            author = str(u["author"] or "")
+            msg = _xesc(str(u["message"] or "")).replace("\n", "<br/>")
+            story.append(Paragraph(
+                f"{_xesc(date_str)}  ·  <b>{_xesc(kind)}</b>  ·  {_xesc(author)}",
+                s_hist_date))
+            story.append(Paragraph(msg, s_hist_msg))
+            story.append(linha_divisora())
+    else:
+        story.append(Paragraph("Nenhum andamento registrado.", s_divider_lbl))
+
+    doc.build(story, onFirstPage=_pdf_rodape, onLaterPages=_pdf_rodape)
+    buf.seek(0)
+    filename = f"demanda_{row['code']}.pdf"
+    return Response(
+        content=buf.read(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )
+
+
 @app.post("/api/demands")
 async def create_demand(request: Request):
     user = require_user(request)
@@ -3425,4 +3579,8 @@ def health():
 
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="127.0.0.1", port=int(os.environ.get("AGENDA_PORT", os.environ.get("PORT", "8017"))), reload=False)
+    # Em produção (Render, Railway, etc.) a variável PORT é injetada
+    # pela plataforma; localmente usa AGENDA_PORT ou 8017.
+    port = int(os.environ.get("PORT", os.environ.get("AGENDA_PORT", "8017")))
+    host = "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1"
+    uvicorn.run("app:app", host=host, port=port, reload=False)
