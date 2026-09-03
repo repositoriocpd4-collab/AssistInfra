@@ -3,13 +3,22 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#005A9C">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Agenda Integrada">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <title>Entrar · Agenda Integrada</title>
   <link rel="stylesheet" href="/static/styles.css?v={{ asset_v }}">
 </head>
 <body class="login-body">
   <main class="login-layout">
     <section class="login-hero">
-      <div class="login-brand"><div class="login-mark">AI</div><div><strong>Agenda Integrada</strong><span>Infraestrutura e Gestão Escolar em Ação</span></div></div>
+      <div class="login-brand"><img class="login-mark" src="/static/brasao.png" alt="Brasão do Município de Itaguaí"><div><strong>Agenda Integrada</strong><span>Infraestrutura e Gestão Escolar em Ação</span></div></div>
       <div class="hero-copy">
         <span class="eyebrow">GESTÃO PÚBLICA · EDUCAÇÃO</span>
         <h1>Demandas claras.<br>Decisões rastreáveis.<br><em>Execução visível.</em></h1>
@@ -40,5 +49,6 @@
   <script>
   document.querySelectorAll('[data-demo]').forEach(btn=>btn.addEventListener('click',()=>{const [e,p]=btn.dataset.demo.split('|');document.querySelector('[name=email]').value=e;document.querySelector('[name=password]').value=p;}));
   </script>
+  <script src="/static/pwa.js?v={{ asset_v }}"></script>
 </body>
 </html>

@@ -1381,16 +1381,36 @@
     }));
   }
 
-  function renderDemandTable(rows, compact = false, filterable = false, filters = null) {
+  function renderDemandTable(rows, compact = false, filterable = false, filters = null, withArchiveAction = false) {
     if (!rows?.length) return empty();
     const th = (label, field) => {
       if (!filterable || !field) return `<th>${label}</th>`;
       const active = filters && filters[field];
       return `<th class="th-filter${active ? ' active' : ''}" data-th-filter="${field}">${label}${icon('chevron')}</th>`;
     };
+    const canArchive = withArchiveAction && ctx.user.perm.can_edit_analysis;
     return `<div class="table-wrap"><table class="data-table"><thead><tr><th>ID</th><th>Demanda</th>${compact ? '' : th('Categoria', 'category')}<th>Unidade Escolar</th>${th('Prioridade', 'priority')}${th('Status', 'status')}<th>Prazo</th><th>Ações</th></tr></thead><tbody>${rows.map(d => {
-      const due = dueInfo(d); const canDelete = ctx.user.perm.can_manage_admin; return `<tr data-href="/demandas/${d.id}" class="${d.status === 'Concluída' ? 'row-done' : ''}"><td class="mono" data-label="ID"><strong>${esc(d.code)}</strong></td><td class="cell-title" data-label="Demanda"><strong>${esc(d.title)}</strong><small>Atualizado ${fmtDateTime(d.updated_at)}</small></td>${compact ? '' : `<td data-label="Categoria">${esc(d.category)}</td>`}<td data-label="Unidade Escolar">${esc(d.school_name || '—')}</td><td data-label="Prioridade"><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span></td><td data-label="Status"><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span></td><td data-label="Prazo"><span class="deadline ${due.cls}">${esc(due.text)}</span></td><td data-label="Ações"><a class="icon-btn" href="/demandas/${d.id}" aria-label="Ver detalhes" data-tooltip="Ver detalhes">${icon('eye')}</a><button type="button" class="icon-btn" data-edit-demand="${d.id}" aria-label="Editar demanda" data-tooltip="Editar demanda">${icon('edit')}</button>${canDelete ? `<button type="button" class="icon-btn" data-delete-demand="${d.id}" aria-label="Deletar demanda" data-tooltip="Deletar demanda" style="color:var(--red)">${icon('trash')}</button>` : ''}</td></tr>`
+      const due = dueInfo(d); const canDelete = ctx.user.perm.can_manage_admin;
+      const rowClass = [d.status === 'Concluída' ? 'row-done' : '', d.archived_at ? 'row-archived' : ''].filter(Boolean).join(' ');
+      const archiveBtn = !canArchive ? '' : d.archived_at
+        ? `<button type="button" class="icon-btn" data-unarchive-demand="${d.id}" aria-label="Restaurar demanda" data-tooltip="Restaurar demanda do arquivo">${icon('refresh')}</button>`
+        : (d.status === 'Concluída' ? `<button type="button" class="icon-btn" data-archive-demand="${d.id}" aria-label="Arquivar demanda" data-tooltip="Arquivar demanda">${icon('archive')}</button>` : '');
+      return `<tr data-href="/demandas/${d.id}" class="${rowClass}"><td class="mono" data-label="ID"><strong>${esc(d.code)}</strong></td><td class="cell-title" data-label="Demanda"><strong>${esc(d.title)}</strong><small>Atualizado ${fmtDateTime(d.updated_at)}</small></td>${compact ? '' : `<td data-label="Categoria">${esc(d.category)}</td>`}<td data-label="Unidade Escolar">${esc(d.school_name || '—')}</td><td data-label="Prioridade"><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span></td><td data-label="Status"><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span>${d.archived_at ? `<span class="archived-tag" data-tooltip="Arquivada em ${esc(fmtDateTime(d.archived_at))}">${icon('archive')}Arquivada</span>` : ''}</td><td data-label="Prazo"><span class="deadline ${due.cls}">${esc(due.text)}</span></td><td data-label="Ações"><a class="icon-btn" href="/demandas/${d.id}" aria-label="Ver detalhes" data-tooltip="Ver detalhes">${icon('eye')}</a><button type="button" class="icon-btn" data-edit-demand="${d.id}" aria-label="Editar demanda" data-tooltip="Editar demanda">${icon('edit')}</button>${archiveBtn}${canDelete ? `<button type="button" class="icon-btn" data-delete-demand="${d.id}" aria-label="Deletar demanda" data-tooltip="Deletar demanda" style="color:var(--red)">${icon('trash')}</button>` : ''}</td></tr>`
     }).join('')}</tbody></table></div>`;
+  }
+
+  // Chips de filtro rápido por status/prioridade, compartilhados entre Demandas
+  // e Unidades Escolares. Cada rótulo tem uma versão completa (desktop) e uma
+  // resumida (smartphone, ligada via CSS) — texto de verdade encurtado, não
+  // "..." cortando no meio da palavra.
+  const chipLabel = (full, short) => `<span class="chip-text"><span class="chip-full">${full}</span><span class="chip-short">${short}</span></span>`;
+  function statusChipsHTML(ds) {
+    return `<button class="chip-v2 chip-red" data-chip-priority="P1">${icon('warning')}${chipLabel('P1 Urgentes', 'P1')}<b>${num(ds.urgent)}</b></button>`
+      + `<button class="chip-v2 chip-orange" data-chip-priority="P2">${icon('warning')}${chipLabel('P2 · Alta', 'P2')}<b>${num(ds.high)}</b></button>`
+      + `<button class="chip-v2 chip-orange" data-chip-status="Aguardando contratação">${icon('clock')}${chipLabel('Aguardando contratação', 'Contratação')}<b>${num(ds.contract)}</b></button>`
+      + `<button class="chip-v2 chip-blue" data-chip-status="Em execução">${icon('trend')}${chipLabel('Em execução', 'Execução')}<b>${num(ds.progress)}</b></button>`
+      + `<button class="chip-v2 chip-violet" data-chip-status="Planejamento futuro">${icon('calendar')}${chipLabel('Planejamento futuro', 'Planejamento')}<b>${num(ds.future)}</b></button>`
+      + `<button class="chip-v2 chip-green" data-chip-status="Concluída" id="completedChip">${icon('check-circle')}${chipLabel('Concluídas', 'Concluídas')}<b>${num(ds.completed)}</b></button>`;
   }
 
   async function renderDemands() {
@@ -1406,7 +1426,7 @@
         <div class="field"><label>Ano</label><select class="select" id="fYear"><option value="">Todos</option>${[2026, 2025, 2024].map(y => `<option ${String(y) === filters.year ? 'selected' : ''}>${y}</option>`).join('')}</select></div>
         <div class="field"><label>Status</label><select class="select" id="fStatus"><option value="">Todos</option>${ctx.statuses.map(x => `<option ${x === filters.status ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>
         <div class="field"><label>Prioridade</label><select class="select" id="fPriority"><option value="">Todas</option>${Object.keys(ctx.priorities).map(x => `<option value="${x}" ${x === filters.priority ? 'selected' : ''}>${x} · ${priorityLabel(x)}</option>`).join('')}</select></div>
-        <div class="field"><label>Categoria</label><select class="select" id="fCategory"><option value="">Todas</option>${ctx.categories.map(x => `<option value="${esc(x)}" ${x === filters.category ? 'selected' : ''}>${esc(x)} (${num(counts[x] || 0)})</option>`).join('')}</select></div>
+        <div class="field"><label>Categoria</label><select class="select" id="fCategory"><option value="">Todas</option>${ctx.categories.map(x => `<option value="${esc(x)}" ${x === filters.category ? 'selected' : ''}${counts[x] ? ' class="opt-has-count"' : ''}>${esc(x)} (${num(counts[x] || 0)})</option>`).join('')}</select></div>
         <button class="btn btn-secondary" id="clearFilters">${icon('filter')}Limpar</button>
       </section>
       <div class="quick-filters">
@@ -1414,14 +1434,18 @@
         filters.overdue ? ['overdueChip', 'Prazo vencido'] : null,
         filters.due_soon ? ['dueSoonChip', 'Vence em 7 dias'] : null,
         filters.unassigned ? ['unassignedChip', 'Sem responsável'] : null,
-      ].filter(Boolean).map(([id, label]) => `<button class="chip active" id="${id}">${esc(label)} ×</button>`).join('')}<button class="chip-v2 chip-red" data-chip-priority="P1">${icon('warning')}<span>P1 Urgentes</span><b>${num(ds.urgent)}</b></button><button class="chip-v2 chip-orange" data-chip-priority="P2">${icon('warning')}<span>P2 · Alta</span><b>${num(ds.high)}</b></button><button class="chip-v2 chip-orange" data-chip-status="Aguardando contratação">${icon('clock')}<span>Aguardando contratação</span><b>${num(ds.contract)}</b></button><button class="chip-v2 chip-blue" data-chip-status="Em execução">${icon('trend')}<span>Em execução</span><b>${num(ds.progress)}</b></button><button class="chip-v2 chip-violet" data-chip-status="Planejamento futuro">${icon('calendar')}<span>Planejamento futuro</span><b>${num(ds.future)}</b></button><button class="chip-v2 chip-green" data-chip-status="Concluída" id="completedChip">${icon('check-circle')}<span>Concluídas</span><b>${num(ds.completed)}</b></button></div>
+      ].filter(Boolean).map(([id, label]) => `<button class="chip active" id="${id}">${esc(label)} ×</button>`).join('')}${statusChipsHTML(ds)}</div>
         <div class="quick-filters-divider"></div>
         <label class="toggle-field" data-tooltip="Mostra ou oculta demandas concluídas na tabela abaixo">
           <div class="toggle-field-copy">${icon('eye')}<div><strong>Exibir concluídas</strong><small>Mostra ou oculta demandas concluídas.</small></div></div>
           <span class="switch"><input type="checkbox" id="toggleCompleted" checked><span class="switch-track"></span></span>
         </label>
+        <label class="toggle-field" data-tooltip="Inclui na lista as demandas já arquivadas">
+          <div class="toggle-field-copy">${icon('archive')}<div><strong>Exibir arquivadas</strong><small>Mostra as demandas já arquivadas.</small></div></div>
+          <span class="switch"><input type="checkbox" id="toggleArchived"><span class="switch-track"></span></span>
+        </label>
       </div>
-      <section class="panel" id="demandsPanel"><div class="panel-header"><div><h2>Carteira de demandas</h2><p id="demandCount">Carregando...</p></div></div><div id="demandTable"></div></section>`;
+      <section class="panel" id="demandsPanel"><div class="panel-header"><div><h2>Carteira de demandas</h2><p id="demandCount">Carregando...</p></div>${ctx.user.perm.can_edit_analysis ? `<button type="button" class="btn btn-secondary" id="archiveCompletedBtn" data-tooltip="Move as demandas concluídas para o arquivo — nada é apagado e a consulta continua disponível">${icon('archive')}Arquivar concluídas</button>` : ''}</div><div id="demandTable"></div></section>`;
     $('[data-open-demand]', content).addEventListener('click', openDemandForm);
     // Os chips sao atalhos de um clique, nao filtros que se somam. Antes cada um
     // apenas acrescentava a sua condicao: com "P1 Urgentes" ligado, clicar em
@@ -1438,6 +1462,10 @@
       if (filters.overdue) params.set('overdue', '1');
       if (filters.due_soon) params.set('due_soon', '1');
       if (filters.unassigned) params.set('unassigned', '1');
+      // "Exibir arquivadas" ligado busca tudo (arquivadas inclusas); desligado, o
+      // backend já devolve só as ativas — a menos que haja busca por texto, que
+      // sempre inclui arquivadas para que a demanda continue localizável.
+      if ($('#toggleArchived')?.checked) params.set('archived', 'all');
       syncChips();
       $('#demandTable').innerHTML = `<div class="empty-state"><p>Atualizando lista...</p></div>`;
       const rows = await api('/api/demands?' + params.toString());
@@ -1446,7 +1474,7 @@
       const showCompleted = $('#toggleCompleted')?.checked !== false;
       const visibleRows = showCompleted ? rows : rows.filter(d => d.status !== 'Concluída');
       $('#demandCount').textContent = `${visibleRows.length} registro${visibleRows.length === 1 ? '' : 's'} encontrado${visibleRows.length === 1 ? '' : 's'}`;
-      $('#demandTable').innerHTML = renderDemandTable(visibleRows, false, true, { category: $('#fCategory').value, priority: $('#fPriority').value, status: $('#fStatus').value });
+      $('#demandTable').innerHTML = renderDemandTable(visibleRows, false, true, { category: $('#fCategory').value, priority: $('#fPriority').value, status: $('#fStatus').value }, true);
     };
     const THFILTER_OPTIONS = {
       category: () => ctx.categories.map(x => ({ value: x, label: x })),
@@ -1486,15 +1514,59 @@
       const jaAtivo = b.classList.contains('is-active');
       $('#fStatus').value = jaAtivo ? '' : status;
       $('#fPriority').value = jaAtivo ? '' : priority;
-      // Ao clicar em "Concluídas", garante que o toggle "Exibir concluídas" esteja
-      // ligado — senão o filtro de exibição esconderia o próprio resultado pedido.
-      if (!jaAtivo && status === 'Concluída' && $('#toggleCompleted')) $('#toggleCompleted').checked = true;
+      // Ao clicar em "Concluídas", garante que "Exibir concluídas" e "Exibir
+      // arquivadas" estejam ligados — senão o número do chip (que conta todas as
+      // concluídas, arquivadas inclusive) não bateria com o que aparece na tabela.
+      if (!jaAtivo && status === 'Concluída') {
+        if ($('#toggleCompleted')) $('#toggleCompleted').checked = true;
+        if ($('#toggleArchived')) $('#toggleArchived').checked = true;
+      }
       load();
     }));
     $('#toggleCompleted')?.addEventListener('change', load);
+    // Arquivadas so aparecem entre as concluidas: ligar o toggle de arquivadas
+    // sem "Exibir concluidas" ligado esconderia justamente o que foi pedido.
+    $('#toggleArchived')?.addEventListener('change', () => {
+      if ($('#toggleArchived').checked && $('#toggleCompleted')) $('#toggleCompleted').checked = true;
+      load();
+    });
     $('#overdueChip')?.addEventListener('click', () => { filters.overdue = false; $('#overdueChip').remove(); load() });
     $('#dueSoonChip')?.addEventListener('click', () => { filters.due_soon = false; $('#dueSoonChip').remove(); load() });
     $('#unassignedChip')?.addEventListener('click', () => { filters.unassigned = false; $('#unassignedChip').remove(); load() });
+    $('#demandsPanel').addEventListener('click', async e => {
+      const archiveBtn = e.target.closest('[data-archive-demand]');
+      const unarchiveBtn = e.target.closest('[data-unarchive-demand]');
+      if (archiveBtn) {
+        e.preventDefault();
+        try {
+          await api(`/api/demands/${archiveBtn.dataset.archiveDemand}/archive`, { method: 'POST' });
+          toast('Demanda arquivada', 'Ela saiu da lista principal, mas continua disponível para consulta.');
+          load();
+        } catch (err) { toast('Não foi possível arquivar a demanda', err.message, 'error'); }
+      } else if (unarchiveBtn) {
+        e.preventDefault();
+        try {
+          await api(`/api/demands/${unarchiveBtn.dataset.unarchiveDemand}/unarchive`, { method: 'POST' });
+          toast('Demanda restaurada', 'Ela voltou a aparecer na lista principal.');
+          load();
+        } catch (err) { toast('Não foi possível restaurar a demanda', err.message, 'error'); }
+      }
+    });
+    $('#archiveCompletedBtn')?.addEventListener('click', () => {
+      modal({
+        title: 'Arquivar demandas concluídas', mode: 'center',
+        body: `<div class="info-card accent"><h3>${icon('archive')}O que vai acontecer</h3><p>Todas as demandas com status <strong>Concluída</strong> que ainda não estão arquivadas saem da lista principal de demandas. Nada é apagado: elas continuam com todo o histórico, podem ser encontradas pela busca ou pelo toggle "Exibir arquivadas", e dá para restaurar qualquer uma a qualquer momento.</p></div>`,
+        footer: `<button type="button" class="btn btn-secondary" data-close>Cancelar</button><button type="button" class="btn btn-primary" id="confirmArchiveCompleted">${icon('archive')}Arquivar concluídas</button>`
+      });
+      $('#confirmArchiveCompleted').addEventListener('click', async () => {
+        try {
+          const res = await api('/api/demands/archive-completed', { method: 'POST' });
+          closeModal();
+          toast(res.count ? `${res.count} demanda${res.count === 1 ? '' : 's'} arquivada${res.count === 1 ? '' : 's'}` : 'Nada para arquivar', res.count ? 'Elas continuam disponíveis para consulta a qualquer momento.' : 'Não havia demandas concluídas fora do arquivo.');
+          load();
+        } catch (err) { toast('Não foi possível arquivar as demandas', err.message, 'error'); }
+      });
+    });
     await load();
   }
 
@@ -1526,16 +1598,28 @@
   function dvGuidance(d, stage) {
     const resp = dvResponsible(d);
     // Demanda concluída não recebe andamento comum: o que resta é destiná-la a
-    // um exercício futuro ou consultar o que já foi registrado.
-    if (stage === 4) return {
-      title: 'Demanda concluída',
-      text: `Serviço encerrado em ${fmtDateTime(d.updated_at)}.`,
-      notice: 'Com a demanda concluída, o andamento possível é destiná-la a um exercício futuro, em Planejamento, ou consultar o histórico completo.',
-      actions: [
-        { label: 'Destinar a um exercício futuro', act: 'planning', kind: 'primary', ic: 'calendar', needsEdit: true },
-        { label: 'Ver histórico completo', act: 'history', kind: 'secondary', ic: 'clock', needsEdit: false }
-      ]
-    };
+    // um exercício futuro, arquivá-la ou consultar o que já foi registrado.
+    if (stage === 4) {
+      if (d.archived_at) return {
+        title: 'Demanda concluída e arquivada',
+        text: `Serviço encerrado em ${fmtDateTime(d.updated_at)}. Arquivada em ${fmtDateTime(d.archived_at)}.`,
+        notice: 'Esta demanda está arquivada: ela não aparece na Carteira de demandas, mas continua disponível para consulta e pode ser restaurada a qualquer momento.',
+        actions: [
+          { label: 'Restaurar do arquivo', act: 'unarchive', kind: 'primary', ic: 'refresh', needsEdit: true },
+          { label: 'Ver histórico completo', act: 'history', kind: 'secondary', ic: 'clock', needsEdit: false }
+        ]
+      };
+      return {
+        title: 'Demanda concluída',
+        text: `Serviço encerrado em ${fmtDateTime(d.updated_at)}.`,
+        notice: 'Com a demanda concluída, o andamento possível é destiná-la a um exercício futuro, em Planejamento, arquivá-la ou consultar o histórico completo.',
+        actions: [
+          { label: 'Arquivar demanda', act: 'archive', kind: 'primary', ic: 'archive', needsEdit: true },
+          { label: 'Destinar a um exercício futuro', act: 'planning', kind: 'secondary', ic: 'calendar', needsEdit: true },
+          { label: 'Ver histórico completo', act: 'history', kind: 'secondary', ic: 'clock', needsEdit: false }
+        ]
+      };
+    }
     if (stage === 3) return {
       title: 'O que fazer agora',
       text: 'O serviço está em execução. Registre o andamento para atualizar o prazo, sinalizar falta de material ou informar a conclusão.',
@@ -1608,6 +1692,7 @@
           <span class="dv-code">${esc(d.code)}</span>
           <span class="badge ${d.priority}">${esc(d.priority)} · ${esc(priorityLabel(d.priority))}</span>
           <span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span>
+          ${d.archived_at ? `<span class="archived-tag" data-tooltip="Arquivada em ${esc(fmtDateTime(d.archived_at))}">${icon('archive')}Arquivada</span>` : ''}
           ${due.cls ? `<span class="deadline ${due.cls}">${esc(due.text)}</span>` : ''}
         </div>
       </div>
@@ -1665,7 +1750,7 @@
       ${dvFact({
       icon: 'user', label: 'Responsável atual',
       tip: 'Quem responde pelo atendimento hoje. Enquanto ninguém for designado, a demanda entra em "Sem responsável" no Painel.',
-      value: resp ? esc(resp) : '<span class="dv-muted">Não definido</span>',
+      value: resp ? esc(resp) : '<span class="dv-undefined">Não definido</span>',
       sub: d.sector ? esc(d.sector) : (provType ? esc(provType.label) : ''),
       action: canEdit && !travado ? 'wizard' : '', actionType: 'responsavel', actionLabel: resp ? 'Alterar responsável' : 'Designar responsável'
     })}
@@ -2353,6 +2438,16 @@
         else if (what === 'technical') openEditTechnical(d, reload);
         else if (what === 'planning') openEditPlanning(d, reload);
         else if (what === 'edit-demand') openEditDemand(d, reload);
+        else if (what === 'archive') {
+          api(`/api/demands/${d.id}/archive`, { method: 'POST' })
+            .then(() => { toast('Demanda arquivada', 'Ela saiu da Carteira de demandas, mas continua disponível para consulta.'); reload(); })
+            .catch(err => toast('Não foi possível arquivar a demanda', err.message, 'error'));
+        }
+        else if (what === 'unarchive') {
+          api(`/api/demands/${d.id}/unarchive`, { method: 'POST' })
+            .then(() => { toast('Demanda restaurada', 'Ela voltou a aparecer na Carteira de demandas.'); reload(); })
+            .catch(err => toast('Não foi possível restaurar a demanda', err.message, 'error'));
+        }
       }));
     };
 
@@ -2543,18 +2638,11 @@
         <div class="field"><label>Ano</label><select class="select" id="fYear"><option value="">Todos</option>${[2026, 2025, 2024].map(y => `<option ${String(y) === filters.year ? 'selected' : ''}>${y}</option>`).join('')}</select></div>
         <div class="field"><label>Status</label><select class="select" id="fStatus"><option value="">Todos</option>${ctx.statuses.map(x => `<option ${x === filters.status ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>
         <div class="field"><label>Prioridade</label><select class="select" id="fPriority"><option value="">Todas</option>${Object.keys(ctx.priorities).map(x => `<option value="${x}" ${x === filters.priority ? 'selected' : ''}>${x} · ${priorityLabel(x)}</option>`).join('')}</select></div>
-        <div class="field"><label>Categoria</label><select class="select" id="fCategory"><option value="">Todas</option>${ctx.categories.map(x => `<option value="${esc(x)}" ${x === filters.category ? 'selected' : ''}>${esc(x)} (${num(counts[x] || 0)})</option>`).join('')}</select></div>
+        <div class="field"><label>Categoria</label><select class="select" id="fCategory"><option value="">Todas</option>${ctx.categories.map(x => `<option value="${esc(x)}" ${x === filters.category ? 'selected' : ''}${counts[x] ? ' class="opt-has-count"' : ''}>${esc(x)} (${num(counts[x] || 0)})</option>`).join('')}</select></div>
         <button class="btn btn-secondary" id="clearFilters">${icon('filter')}Limpar</button>
       </section>
       <div class="quick-filters">
-        <div class="chip-group">
-          <button class="chip-v2 chip-red" data-chip-priority="P1">${icon('warning')}<span>P1 Urgentes</span><b>${num(ds.urgent)}</b></button>
-          <button class="chip-v2 chip-orange" data-chip-priority="P2">${icon('warning')}<span>P2 · Alta</span><b>${num(ds.high)}</b></button>
-          <button class="chip-v2 chip-orange" data-chip-status="Aguardando contratação">${icon('clock')}<span>Aguardando contratação</span><b>${num(ds.contract)}</b></button>
-          <button class="chip-v2 chip-blue" data-chip-status="Em execução">${icon('trend')}<span>Em execução</span><b>${num(ds.progress)}</b></button>
-          <button class="chip-v2 chip-violet" data-chip-status="Planejamento futuro">${icon('calendar')}<span>Planejamento futuro</span><b>${num(ds.future)}</b></button>
-          <button class="chip-v2 chip-green" data-chip-status="Concluída" id="completedChip">${icon('check-circle')}<span>Concluídas</span><b>${num(ds.completed)}</b></button>
-        </div>
+        <div class="chip-group">${statusChipsHTML(ds)}</div>
         <div class="quick-filters-divider"></div>
         <label class="toggle-field" data-tooltip="Mostra ou oculta demandas concluídas nos cartões e nos filtros acima">
           <div class="toggle-field-copy">${icon('eye')}<div><strong>Exibir concluídas</strong><small>Mostra ou oculta demandas concluídas.</small></div></div>
@@ -4503,7 +4591,7 @@
       <section class="filters-card">
         <div class="field"><label>Buscar</label><div class="search-field">${icon('search')}<input class="input" id="fQ" placeholder="Código, demanda ou escola..."></div></div>
         ${schoolField}
-        <div class="field"><label>Categoria</label><select class="select" id="fCategory"><option value="">Todas</option>${ctx.categories.map(x => `<option value="${esc(x)}">${esc(x)} (${num(counts[x] || 0)})</option>`).join('')}</select></div>
+        <div class="field"><label>Categoria</label><select class="select" id="fCategory"><option value="">Todas</option>${ctx.categories.map(x => `<option value="${esc(x)}"${counts[x] ? ' class="opt-has-count"' : ''}>${esc(x)} (${num(counts[x] || 0)})</option>`).join('')}</select></div>
         <div class="field"><label>Prioridade</label><select class="select" id="fPriority"><option value="">Todas</option>${Object.keys(ctx.priorities).map(x => `<option value="${x}">${x} · ${priorityLabel(x)}</option>`).join('')}</select></div>
         <div class="field"><label>Agrupar por</label><select class="select" id="fGroupBy"><option value="stage">Etapa do fluxo</option><option value="priority">Prioridade</option></select></div>
         <button class="btn btn-secondary" id="clearKanbanFilters">${icon('filter')}Limpar</button>
@@ -4686,14 +4774,16 @@
   ];
   function openShortcutsHelp() {
     modal({
-      title: 'Central de Ajuda', mode: 'center', body: `<div class="info-card accent"><h3>${icon('help')}Como usar a Agenda Integrada</h3><p><strong>1.</strong> Registre a demanda com clareza e impacto.<br><strong>2.</strong> A Infraestrutura classifica prioridade, ação, responsável e prazo.<br><strong>3.</strong> Toda devolutiva fica registrada na linha do tempo.<br><strong>4.</strong> Necessidades que dependem de projeto, aquisição ou contratação podem seguir para Planejamento Futuro.</p></div>
+      title: 'Central de Ajuda', mode: 'center', body: `<div class="info-card accent"><h3>${icon('help')}Como usar a Agenda Integrada</h3><p><strong>1.</strong> Registre a demanda com clareza e impacto.<br><strong>2.</strong> A Infraestrutura classifica prioridade, ação, responsável e prazo.<br><strong>3.</strong> Toda devolutiva fica registrada na linha do tempo.<br><strong>4.</strong> Necessidades que dependem de projeto, aquisição ou contratação podem seguir para Planejamento Futuro.</p><button type="button" class="btn btn-secondary mt-12" id="restartTourBtn">${icon('star')}Refazer o tour guiado</button></div>
       <section class="info-card mt-16"><h3>${icon('grid')}Atalhos de teclado</h3><div class="shortcut-list">${SHORTCUTS.map(s => `<div class="shortcut-row"><kbd class="key-hint">${esc(s.key)}</kbd><span>${esc(s.label)}</span></div>`).join('')}</div><p class="wizard-hint mt-12">Os atalhos não funcionam enquanto você estiver digitando em um campo.</p></section>`
     });
+    $('#restartTourBtn')?.addEventListener('click', () => { closeModal(); startTour(); });
   }
   document.addEventListener('keydown', e => {
     const tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable) return;
     if (!$('#backdrop').hidden) return;
+    if (document.body.classList.contains('tour-active')) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === '?') { e.preventDefault(); openShortcutsHelp(); return; }
     const match = SHORTCUTS.find(s => s.key.toLowerCase() === e.key.toLowerCase() && s.key !== '?' && s.key !== 'Esc');
@@ -4702,6 +4792,134 @@
     if (match.action) match.action(); else if (match.href) location.href = match.href;
   });
   $('#shortcutsHelp')?.addEventListener('click', openShortcutsHelp);
+
+  // ---- Tour guiado pelo sistema ----
+  // Passeio com espião (spotlight) sobre a própria interface: nada de tela fixa,
+  // aponta para os elementos reais do menu e do cabeçalho, um de cada vez.
+  const TOUR_SEEN_KEY = 'agenda-tour-seen';
+  let tourSteps = [], tourIdx = 0, tourOpenedSidebar = false;
+  function tourStepDefs() {
+    return [
+      { sel: '[data-open-demand]', icon: 'plus', title: 'Registre uma demanda', text: 'Conte o que está acontecendo na escola em poucos cliques. Fotos, urgência e local ajudam a Infraestrutura a agir rápido.' },
+      { sel: '.side-menu a.nav-item[href="/"]', icon: 'grid', title: 'Painel', text: 'Veja alertas, prazos vencidos e um raio-x das demandas das unidades que você acompanha.' },
+      { sel: '.side-menu a.nav-item[href="/demandas"]', icon: 'clipboard', title: 'Demandas', text: 'Filtre, agrupe e acompanhe o andamento de cada chamado até a conclusão.' },
+      { sel: '.side-menu a.nav-item[href="/escolas"]', icon: 'school', title: 'Unidades Escolares', text: 'Histórico completo e visão 360° de cada unidade escolar da rede.' },
+      { sel: '.side-menu a.nav-item[href="/mapa"]', icon: 'map', title: 'Mapa da Rede', text: 'Veja a localização das unidades e a criticidade das demandas diretamente no mapa.' },
+      { sel: '.side-menu a.nav-item[href="/planejamento"]', icon: 'calendar', title: 'Planejamento Futuro', text: 'Organize demandas que dependem de projeto, aquisição ou licitação.' },
+      { sel: '.side-menu a.nav-item[href="/relatorios"]', icon: 'report', title: 'Relatórios', text: 'Gere relatórios operacionais e exporte os dados para acompanhamento.' },
+      { sel: '.side-menu a.nav-item[href="/administracao"]', icon: 'settings', title: 'Administração', text: 'Gerencie cadastros-base e parâmetros do ambiente.' },
+      { sel: '#globalSearch', icon: 'search', title: 'Busca rápida', text: 'Encontre qualquer demanda pelo código, título ou unidade escolar.' },
+      { sel: '#notificationButton', icon: 'bell', title: 'Notificações', text: 'Fique de olho em urgências e prazos vencidos sem precisar procurar.' },
+      { sel: '#shortcutsHelp', icon: 'help', title: 'Central de Ajuda', text: 'Veja os atalhos de teclado e refaça este tour quando quiser.' },
+    ].map(s => ({ ...s, el: $(s.sel) })).filter(s => s.el);
+  }
+  function tourEnsureDom() {
+    if ($('#tourCard')) return;
+    document.body.insertAdjacentHTML('beforeend', `
+      <div class="tour-overlay" id="tourOverlay"></div>
+      <div class="tour-highlight" id="tourHighlight"></div>
+      <div class="tour-arrow" id="tourArrow"></div>
+      <div class="tour-card" id="tourCard" role="dialog" aria-modal="true" aria-label="Tour pelo sistema">
+        <button type="button" class="tour-close" id="tourClose" aria-label="Fechar tour">${icon('x')}</button>
+        <div class="tour-icon" id="tourIcon"></div>
+        <h3 id="tourTitle"></h3>
+        <p id="tourText"></p>
+        <div class="tour-progress"><span class="tour-step-label" id="tourStepLabel"></span><div class="tour-dots" id="tourDots"></div></div>
+        <div class="tour-footer"><button type="button" class="tour-skip" id="tourSkip">Pular tour</button><button type="button" class="tour-next" id="tourNext"></button></div>
+      </div>`);
+    $('#tourClose').addEventListener('click', () => endTour());
+    $('#tourSkip').addEventListener('click', () => endTour());
+    $('#tourNext').addEventListener('click', tourNextStep);
+    window.addEventListener('resize', tourReposition);
+    window.addEventListener('scroll', tourReposition, true);
+  }
+  function tourPosition(target) {
+    const card = $('#tourCard'), hl = $('#tourHighlight'), arrow = $('#tourArrow');
+    if (!card || !target) return;
+    const r = target.getBoundingClientRect();
+    hl.style.top = (r.top - 6) + 'px'; hl.style.left = (r.left - 6) + 'px';
+    hl.style.width = (r.width + 12) + 'px'; hl.style.height = (r.height + 12) + 'px';
+    const margin = 16, gap = 14, vw = window.innerWidth, vh = window.innerHeight;
+    const cw = card.offsetWidth, ch = card.offsetHeight;
+    let placement;
+    if (r.right + gap + cw + margin < vw) placement = 'right';
+    else if (r.left - gap - cw - margin > 0) placement = 'left';
+    else if (r.bottom + gap + ch + margin < vh) placement = 'bottom';
+    else placement = 'top';
+    let top, left;
+    if (placement === 'right' || placement === 'left') {
+      top = Math.min(Math.max(r.top + r.height / 2 - ch / 2, margin), Math.max(margin, vh - ch - margin));
+      left = placement === 'right' ? Math.min(r.right + gap, vw - cw - margin) : Math.max(r.left - gap - cw, margin);
+    } else {
+      left = Math.min(Math.max(r.left + r.width / 2 - cw / 2, margin), Math.max(margin, vw - cw - margin));
+      top = placement === 'bottom' ? Math.min(r.bottom + gap, vh - ch - margin) : Math.max(r.top - gap - ch, margin);
+    }
+    card.style.top = top + 'px'; card.style.left = left + 'px';
+    const arrowDir = { right: 'left', left: 'right', bottom: 'top', top: 'bottom' }[placement];
+    arrow.className = 'tour-arrow tour-arrow-' + arrowDir;
+    if (placement === 'right' || placement === 'left') {
+      arrow.style.top = Math.min(Math.max(r.top + r.height / 2 - 8, top + 10), top + ch - 26) + 'px';
+      arrow.style.left = (placement === 'right' ? left - 8 : left + cw) + 'px';
+    } else {
+      arrow.style.left = Math.min(Math.max(r.left + r.width / 2 - 8, left + 10), left + cw - 26) + 'px';
+      arrow.style.top = (placement === 'bottom' ? top - 8 : top + ch) + 'px';
+    }
+  }
+  function tourReposition() {
+    const step = tourSteps[tourIdx];
+    if (step && document.body.classList.contains('tour-active')) tourPosition(step.el);
+  }
+  function tourRenderStep() {
+    const step = tourSteps[tourIdx];
+    if (!step || !document.body.contains(step.el)) return endTour();
+    const inSideMenu = !!step.el.closest('.side-menu');
+    if (inSideMenu && window.innerWidth <= 900 && !$('#sidebar').classList.contains('open')) {
+      $('#sidebar').classList.add('open');
+      tourOpenedSidebar = true;
+    } else if (!inSideMenu && tourOpenedSidebar) {
+      $('#sidebar').classList.remove('open');
+      tourOpenedSidebar = false;
+    }
+    step.el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    $('#tourIcon').innerHTML = icon(step.icon);
+    $('#tourTitle').textContent = step.title;
+    $('#tourText').textContent = step.text;
+    $('#tourStepLabel').textContent = `Passo ${tourIdx + 1} de ${tourSteps.length}`;
+    $('#tourDots').innerHTML = tourSteps.map((_, i) => `<span class="${i === tourIdx ? 'active' : ''}"></span>`).join('');
+    $('#tourNext').innerHTML = tourIdx === tourSteps.length - 1 ? 'Concluir' : `Próximo${icon('chevron')}`;
+    requestAnimationFrame(() => tourPosition(step.el));
+  }
+  function tourNextStep() {
+    if (tourIdx >= tourSteps.length - 1) return endTour();
+    tourIdx++;
+    tourRenderStep();
+  }
+  function startTour() {
+    tourSteps = tourStepDefs();
+    if (!tourSteps.length) return;
+    tourIdx = 0;
+    closeModal();
+    if ($('#userMenu')) $('#userMenu').hidden = true;
+    if ($('#notificationPanel')) $('#notificationPanel').hidden = true;
+    $('#sidebar')?.classList.remove('open');
+    tourEnsureDom();
+    document.body.classList.add('tour-active');
+    tourRenderStep();
+  }
+  function endTour() {
+    document.body.classList.remove('tour-active');
+    if (tourOpenedSidebar) { $('#sidebar')?.classList.remove('open'); tourOpenedSidebar = false; }
+    $('#tourOverlay')?.remove(); $('#tourHighlight')?.remove(); $('#tourArrow')?.remove(); $('#tourCard')?.remove();
+    window.removeEventListener('resize', tourReposition);
+    window.removeEventListener('scroll', tourReposition, true);
+    localStorage.setItem(TOUR_SEEN_KEY, '1');
+    tourSteps = [];
+  }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.body.classList.contains('tour-active')) endTour(); });
+  $('#systemTourBtn')?.addEventListener('click', startTour);
+  if (ctx.page === 'dashboard' && !localStorage.getItem(TOUR_SEEN_KEY)) {
+    setTimeout(startTour, 900);
+  }
 
   // Global search
   const gs = $('#globalSearch'), gr = $('#globalSearchResults'); let gst;

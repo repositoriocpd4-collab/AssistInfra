@@ -2,9 +2,16 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#005A9C">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Agenda Integrada">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
   <title>{{ title }} · Agenda Integrada</title>
   <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
   <link rel="stylesheet" href="/static/styles.css?v={{ asset_v }}">
@@ -78,6 +85,7 @@
     <symbol id="i-x-circle" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM15 9l-6 6M9 9l6 6"/></symbol>
     <symbol id="i-kanban" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM9 4v16M15 4v16M6.5 8v5M11.5 8v9M17.5 8v3"/></symbol>
     <symbol id="i-textsize" viewBox="0 0 24 24"><path d="M3 17 5.5 8 8 17M3.9 14h3.2M12 17 16.5 3 21 17M13.7 12h5.6"/></symbol>
+    <symbol id="i-archive" viewBox="0 0 24 24"><path d="M3 4h18v4H3zM5 8v12h14V8M10 12h4"/></symbol>
   </svg>
 
   <!-- Menu lateral no padrão visual adotado pela Prefeitura -->
@@ -115,6 +123,7 @@
         <div class="side-divider"></div>
         <a class="nav-item {% if page == 'about' %}active{% endif %}" href="/sobre" data-tooltip="Versão, tecnologia, perfis e roteiro do sistema · tecla S"><svg><use href="#i-info"></use></svg><span>Sobre o Sistema</span><kbd class="key-hint">S</kbd></a>
         <button class="nav-item" id="shortcutsHelp" type="button" data-tooltip="Ver todos os atalhos de teclado · tecla ?"><svg><use href="#i-help"></use></svg><span>Central de Ajuda</span><kbd class="key-hint">?</kbd></button>
+        <button class="nav-item" id="systemTourBtn" type="button" data-tooltip="Um passeio guiado pelas principais áreas do sistema"><svg><use href="#i-star"></use></svg><span>Tour pelo Sistema</span></button>
         <div class="side-divider"></div>
         <a class="nav-item" href="/logout" data-tooltip="Encerrar a sessão atual"><svg><use href="#i-logout"></use></svg><span>Sair</span></a>
       </nav>
@@ -184,6 +193,15 @@
     </div>
   </footer>
 
+  <!-- Barra de navegação inferior — visível só em telas estreitas, com os três
+       destinos comuns a todos os perfis. O menu lateral continua com a lista
+       completa; isto é um atalho, no padrão de app nativo. -->
+  <nav class="mobile-tabbar" aria-label="Navegação rápida">
+    <a class="mobile-tab {% if page == 'dashboard' %}active{% endif %}" href="/"><svg><use href="#i-grid"></use></svg><span>Painel</span></a>
+    <a class="mobile-tab {% if page in ['demands','demand-detail'] %}active{% endif %}" href="/demandas"><svg><use href="#i-clipboard"></use></svg><span>Demandas</span></a>
+    <a class="mobile-tab {% if page == 'about' %}active{% endif %}" href="/sobre"><svg><use href="#i-info"></use></svg><span>Sobre</span></a>
+  </nav>
+
   <div id="modalRoot"></div>
   <div class="popover notification-panel" id="notificationPanel" hidden></div>
   <div class="popover user-menu" id="userMenu" hidden>
@@ -193,9 +211,10 @@
   <div class="toast-stack" id="toastStack" aria-live="assertive"></div>
 
   <script>
-    window.APP_CONTEXT = {{ {'page': page, 'entityId': entity_id if entity_id else None, 'user': user, 'priorities': priorities, 'statuses': statuses, 'categories': categories, 'categoryMeta': category_meta, 'kanbanStages': kanban_stages}|tojson }};
+    window.APP_CONTEXT = {{ {'page': page, 'entityId': entity_id if entity_id else None, 'user': user, 'priorities': priorities, 'statuses': statuses, 'categories': categories, 'categoryMeta': category_meta, 'kanbanStages': kanban_stages, 'appVersion': app_version}|tojson }};
   </script>
   <script src="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.js"></script>
   <script src="/static/app.js?v={{ asset_v }}"></script>
+  <script src="/static/pwa.js?v={{ asset_v }}"></script>
 </body>
 </html>

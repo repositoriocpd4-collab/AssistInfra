@@ -2170,19 +2170,16 @@ svg {
 .login-brand {
    display: flex;
    align-items: center;
-   gap: 12px;
+   gap: 16px;
    position: relative;
    z-index: 1
 }
 
 .login-mark {
-   width: 45px;
-   height: 45px;
-   border-radius: 12px;
-   background: #16a4a0;
-   display: grid;
-   place-items: center;
-   font-weight: 900
+   width: 56px;
+   height: 56px;
+   object-fit: contain;
+   flex-shrink: 0
 }
 
 .login-brand strong,
@@ -3517,12 +3514,6 @@ body.text-large {
    padding: 46px 54px
 }
 
-.login-mark {
-   background: #fff;
-   color: var(--govbr-blue);
-   border-radius: 8px
-}
-
 .login-brand span,
 .hero-copy p,
 .login-foot {
@@ -3550,11 +3541,23 @@ body.text-large {
    border: 1px solid var(--govbr-border);
    border-radius: 12px;
    box-shadow: var(--govbr-shadow);
-   padding: 34px
+   padding: 40px
 }
 
 .login-card h2 {
+   font-size: 32px;
    color: var(--govbr-blue-dark)
+}
+
+.login-card input {
+   background: var(--govbr-light-blue);
+   border-color: transparent
+}
+
+.login-card input:focus {
+   background: #fff;
+   border-color: var(--govbr-blue);
+   box-shadow: 0 0 0 3px rgba(0, 90, 156, .12)
 }
 
 .demo-credentials button:hover {
@@ -6161,11 +6164,11 @@ body.dark-mode .route-map-controls input {
 }
 
 .data-table tbody tr.row-done {
-   background: var(--green-soft)
+   background: rgb(188, 231, 210)
 }
 
 .data-table tbody tr.row-done:hover {
-   background: var(--green-soft);
+   background: rgb(188, 231, 210);
    filter: brightness(.97)
 }
 
@@ -6862,10 +6865,6 @@ body.dark-mode .login-card {
 
 body.dark-mode .login-card h2 {
    color: #f2f4f7 !important
-}
-
-body.dark-mode .login-mark {
-   background: #1a1f27 !important
 }
 
 body.dark-mode .demo-credentials button {
@@ -7738,6 +7737,12 @@ body.dark-mode .stat-tile.stat-tile-alert .stat-tile-value {
    line-height: 1
 }
 
+/* Rótulo completo (desktop) x resumido (smartphone) — troca de verdade o
+   texto por CSS, sem reticências cortando a palavra no meio. */
+.chip-short {
+   display: none
+}
+
 .chip-v2.chip-red {
    border-color: #ffc8cf
 }
@@ -7914,11 +7919,45 @@ body.dark-mode .stat-tile.stat-tile-alert .stat-tile-value {
    }
 
    .quick-filters {
-      align-items: flex-start
+      align-items: center
    }
 
    .toggle-field {
       width: 100%
+   }
+
+   /* Nuvem de chips centralizada, mais compacta e com rótulo resumido — em
+      vez de uma fileira de pílulas largas quebrando torto pela tela. */
+   .chip-group {
+      width: 100%;
+      justify-content: center;
+      gap: 6px
+   }
+
+   .chip-v2 {
+      gap: 5px;
+      padding: 6px 10px 6px 8px;
+      font-size: 11px
+   }
+
+   .chip-v2 svg {
+      width: 13px;
+      height: 13px
+   }
+
+   .chip-v2 b {
+      min-width: 16px;
+      height: 16px;
+      padding: 0 4px;
+      font-size: 9.5px
+   }
+
+   .chip-full {
+      display: none
+   }
+
+   .chip-short {
+      display: inline
    }
 }
 
@@ -11851,6 +11890,10 @@ body.dark-mode .dv-now h2 {
    color: var(--muted)
 }
 
+.dv-fact .dv-undefined {
+   color: var(--red)
+}
+
 .dv-kv {
    display: flex;
    justify-content: space-between;
@@ -13835,6 +13878,15 @@ body[data-page="demands"] #demandTable .data-table tbody tr:hover {
       0 14px 30px -16px rgba(13, 60, 117, .55)
 }
 
+body[data-page="demands"] #demandTable .data-table tbody tr.row-done,
+body[data-page="demands"] #demandTable .data-table tbody tr.row-done:hover {
+   background: rgb(188, 231, 210)
+}
+
+body.dark-mode[data-page="demands"] #demandTable .data-table tbody tr.row-done {
+   background: rgba(26, 124, 68, .28)
+}
+
 body[data-page="demands"] #demandTable .data-table td {
    border-bottom: 0;
    padding: 16px 14px
@@ -14081,6 +14133,14 @@ body.dark-mode[data-page="dashboard"] .data-table tbody tr {
    background: rgba(36, 40, 46, .7)
 }
 
+body[data-page="dashboard"] .data-table tbody tr.row-done {
+   background: rgb(188, 231, 210)
+}
+
+body.dark-mode[data-page="dashboard"] .data-table tbody tr.row-done {
+   background: rgba(26, 124, 68, .28)
+}
+
 body[data-page="dashboard"] .data-table td {
    border-bottom: 0;
    padding: 16px 14px
@@ -14285,4 +14345,442 @@ body.dark-mode[data-page="dashboard"] .stat-tile-value {
    mínimo de 4,5 exigido para texto normal. */
 body[data-page="demands"] .chip-v2[data-chip-status="Aguardando contratação"] {
    background: linear-gradient(160deg, #9c6b43 0%, #7a5230 100%)
+}
+
+/* Destaca no select de Categoria as opcoes que tem alguma demanda no filtro
+   atual, para o usuario nao precisar abrir cada uma para saber onde ha volume. */
+select.select option.opt-has-count {
+   background: var(--red);
+   color: #fff
+}
+
+/* Demandas arquivadas: mesma cor de "concluida" por baixo, mas visualmente
+   recolhidas (opacidade reduzida) e com uma etiqueta explicita ao lado do
+   status, para nao serem confundidas com demandas concluidas "correntes". */
+.data-table tbody tr.row-archived {
+   opacity: .65
+}
+
+.data-table tbody tr.row-archived:hover {
+   opacity: .9
+}
+
+.archived-tag {
+   display: inline-flex;
+   align-items: center;
+   gap: 4px;
+   margin-left: 8px;
+   padding: 2px 8px 2px 6px;
+   border-radius: 999px;
+   background: var(--gray-soft);
+   color: var(--muted);
+   font-size: 10px;
+   font-weight: 700;
+   text-transform: uppercase;
+   letter-spacing: .03em;
+   white-space: nowrap;
+   vertical-align: middle
+}
+
+.archived-tag svg {
+   width: 11px;
+   height: 11px
+}
+
+body.dark-mode .archived-tag {
+   background: #2a2a2a;
+   color: #b4b4b4
+}
+
+/* ==========================================================================
+   TOUR GUIADO PELO SISTEMA
+   Espião (spotlight) sobre a própria interface: destaca um elemento real do
+   menu/cabeçalho por vez, com um cartão de instrução ao lado.
+   ========================================================================== */
+.tour-overlay {
+   position: fixed;
+   inset: 0;
+   z-index: 19999;
+   background: transparent;
+   cursor: default
+}
+
+.tour-highlight {
+   position: fixed;
+   z-index: 20000;
+   border-radius: 10px;
+   box-shadow: 0 0 0 4px rgba(255, 255, 255, .85), 0 0 0 9999px rgba(6, 16, 30, .55);
+   pointer-events: none;
+   transition: top .25s ease, left .25s ease, width .25s ease, height .25s ease
+}
+
+.tour-arrow {
+   position: fixed;
+   z-index: 20000;
+   width: 0;
+   height: 0;
+   pointer-events: none;
+   transition: top .25s ease, left .25s ease
+}
+
+.tour-arrow-left {
+   border-top: 8px solid transparent;
+   border-bottom: 8px solid transparent;
+   border-right: 8px solid var(--surface)
+}
+
+.tour-arrow-right {
+   border-top: 8px solid transparent;
+   border-bottom: 8px solid transparent;
+   border-left: 8px solid var(--surface)
+}
+
+.tour-arrow-top {
+   border-left: 8px solid transparent;
+   border-right: 8px solid transparent;
+   border-bottom: 8px solid var(--surface)
+}
+
+.tour-arrow-bottom {
+   border-left: 8px solid transparent;
+   border-right: 8px solid transparent;
+   border-top: 8px solid var(--surface)
+}
+
+.tour-card {
+   position: fixed;
+   z-index: 20001;
+   width: 320px;
+   max-width: calc(100vw - 24px);
+   background: var(--surface);
+   color: var(--ink);
+   border-radius: var(--radius);
+   box-shadow: var(--shadow-lg);
+   padding: 22px;
+   transition: top .25s ease, left .25s ease
+}
+
+.tour-card .tour-icon {
+   width: 44px;
+   height: 44px;
+   border-radius: 50%;
+   background: var(--teal-soft);
+   color: var(--teal-2);
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   margin-bottom: 14px
+}
+
+.tour-card .tour-icon svg {
+   width: 22px;
+   height: 22px
+}
+
+.tour-card h3 {
+   margin: 0 0 8px;
+   color: var(--teal-2);
+   font-size: 1.05rem;
+   font-weight: 700
+}
+
+.tour-card p {
+   margin: 0 0 18px;
+   color: var(--muted);
+   font-size: .92rem;
+   line-height: 1.5
+}
+
+.tour-progress {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   margin-bottom: 16px
+}
+
+.tour-step-label {
+   font-size: .68rem;
+   letter-spacing: .05em;
+   text-transform: uppercase;
+   color: var(--muted);
+   font-weight: 700
+}
+
+.tour-dots {
+   display: flex;
+   align-items: center;
+   gap: 5px
+}
+
+.tour-dots span {
+   width: 6px;
+   height: 6px;
+   border-radius: 50%;
+   background: var(--line-strong);
+   transition: all .2s ease
+}
+
+.tour-dots span.active {
+   background: var(--primary);
+   width: 16px;
+   border-radius: 4px
+}
+
+.tour-footer {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 12px
+}
+
+.tour-skip {
+   background: none;
+   border: none;
+   color: var(--muted);
+   font-size: .85rem;
+   cursor: pointer;
+   text-decoration: underline;
+   padding: 4px 0
+}
+
+.tour-skip:hover {
+   color: var(--ink)
+}
+
+.tour-next {
+   background: linear-gradient(135deg, var(--primary), var(--teal));
+   color: #fff;
+   border: none;
+   border-radius: 999px;
+   padding: 10px 20px;
+   font-weight: 600;
+   font-size: .9rem;
+   cursor: pointer;
+   display: flex;
+   align-items: center;
+   gap: 6px;
+   white-space: nowrap
+}
+
+.tour-next:hover {
+   filter: brightness(1.08)
+}
+
+.tour-next svg {
+   width: 16px;
+   height: 16px
+}
+
+.tour-close {
+   position: absolute;
+   top: 14px;
+   right: 14px;
+   background: none;
+   border: none;
+   color: var(--muted);
+   cursor: pointer;
+   line-height: 0;
+   padding: 2px
+}
+
+.tour-close:hover {
+   color: var(--ink)
+}
+
+.tour-close svg {
+   width: 16px;
+   height: 16px
+}
+
+@media (max-width:480px) {
+   .tour-card {
+      width: calc(100vw - 24px);
+      padding: 18px
+   }
+}
+
+/* ==========================================================================
+   PWA — instalação (Android/iOS) e aviso de nova versão
+   Mesmo cartão-base para os dois avisos; nunca aparecem ao mesmo tempo (a
+   atualização tem prioridade — ver pwa.js).
+   ========================================================================== */
+.pwa-banner {
+   position: fixed;
+   left: 16px;
+   right: 16px;
+   bottom: 16px;
+   z-index: 130;
+   margin: 0 auto;
+   max-width: 460px;
+   background: var(--surface);
+   color: var(--ink);
+   border-radius: 16px;
+   box-shadow: var(--shadow-lg);
+   padding: 18px;
+   display: flex;
+   align-items: flex-start;
+   gap: 12px;
+   opacity: 0;
+   transform: translateY(16px);
+   transition: opacity .22s ease, transform .22s ease
+}
+
+.pwa-banner.show {
+   opacity: 1;
+   transform: none
+}
+
+.pwa-banner-icon {
+   flex-shrink: 0;
+   width: 40px;
+   height: 40px;
+   border-radius: 11px;
+   overflow: hidden;
+   background: var(--teal-soft);
+   color: var(--teal-2);
+   display: flex;
+   align-items: center;
+   justify-content: center
+}
+
+.pwa-banner-icon img {
+   width: 100%;
+   height: 100%;
+   object-fit: cover
+}
+
+.pwa-update .pwa-banner-icon {
+   background: var(--blue-soft);
+   color: var(--blue)
+}
+
+.pwa-banner-copy {
+   flex: 1;
+   min-width: 0
+}
+
+.pwa-banner-copy strong {
+   display: block;
+   font-size: 14px;
+   margin-bottom: 4px
+}
+
+.pwa-banner-copy p {
+   margin: 0;
+   font-size: 12.5px;
+   line-height: 1.55;
+   color: var(--muted)
+}
+
+.pwa-version-new {
+   color: var(--red)
+}
+
+.pwa-inline-icon {
+   display: inline-flex;
+   vertical-align: -5px
+}
+
+.pwa-inline-icon svg {
+   width: 16px;
+   height: 16px
+}
+
+.pwa-banner-actions {
+   display: flex;
+   flex-direction: column;
+   gap: 6px;
+   flex-shrink: 0
+}
+
+.pwa-banner-actions .btn {
+   padding: 8px 14px;
+   font-size: 12.5px;
+   white-space: nowrap
+}
+
+.pwa-banner-actions .btn svg {
+   width: 15px;
+   height: 15px
+}
+
+.pwa-banner-close {
+   position: absolute;
+   top: 10px;
+   right: 10px;
+   background: none;
+   border: none;
+   color: var(--muted);
+   cursor: pointer;
+   padding: 2px;
+   line-height: 0
+}
+
+.pwa-banner-close svg {
+   width: 15px;
+   height: 15px
+}
+
+@media (max-width:480px) {
+   .pwa-banner {
+      flex-direction: column;
+      align-items: stretch;
+      max-width: none
+   }
+
+   .pwa-banner-actions {
+      flex-direction: row;
+      justify-content: flex-end
+   }
+}
+
+/* ==========================================================================
+   BARRA DE NAVEGAÇÃO INFERIOR (mobile)
+   Atalho de app nativo para os três destinos comuns a todos os perfis; o
+   menu lateral (hamburger) continua com a lista completa de navegação.
+   ========================================================================== */
+.mobile-tabbar {
+   display: none
+}
+
+@media (max-width:900px) {
+   body[data-page] {
+      padding-bottom: calc(58px + env(safe-area-inset-bottom))
+   }
+
+   .mobile-tabbar {
+      display: flex;
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 55;
+      background: var(--surface);
+      border-top: 1px solid var(--line);
+      padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+      box-shadow: 0 -8px 24px rgba(12, 35, 64, .08)
+   }
+
+   .mobile-tab {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 6px 4px;
+      border-radius: 10px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 10.5px;
+      font-weight: 700
+   }
+
+   .mobile-tab svg {
+      width: 21px;
+      height: 21px
+   }
+
+   .mobile-tab.active {
+      color: var(--primary)
+   }
 }
