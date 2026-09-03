@@ -24,3 +24,4 @@ static/school_cache/
 # Arquivos pesados de dados de importação (não precisam ir para produção)
 supabase_unidades_escolares.json
 supabase_unidades_escolares.sql
+node_modules
