@@ -21,6 +21,8 @@ import httpx
 import uvicorn
 import psycopg2
 import psycopg2.extras
+import psycopg2.extensions
+import psycopg2.pool
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -263,17 +265,34 @@ class PGConnection:
         self._conn.rollback()
 
     def close(self):
-        self._conn.close()
+        # Devolve a conexão ao pool em vez de encerrá-la — abrir uma conexão
+        # nova a cada clique custava um handshake TCP+TLS completo contra o
+        # Postgres remoto do Supabase (~150-400ms) em cada chamada de API.
+        try:
+            if self._conn.closed:
+                return
+            # Se alguém esqueceu de commitar/rollback antes do close(), a conexão
+            # não pode voltar ao pool com uma transação aberta.
+            if self._conn.status != psycopg2.extensions.STATUS_READY:
+                self._conn.rollback()
+            _DB_POOL.putconn(self._conn)
+        except Exception:
+            self._conn.close()
+
+
+_DB_POOL: "psycopg2.pool.ThreadedConnectionPool" = psycopg2.pool.ThreadedConnectionPool(
+    minconn=1,
+    maxconn=int(os.environ.get("SUPABASE_DB_POOL_MAX", "10")),
+    host=os.environ["SUPABASE_DB_HOST"],
+    port=int(os.environ.get("SUPABASE_DB_PORT", "6543")),
+    dbname=os.environ.get("SUPABASE_DB_NAME", "postgres"),
+    user=os.environ["SUPABASE_DB_USER"],
+    password=os.environ["SUPABASE_DB_PASSWORD"],
+)
 
 
 def db() -> PGConnection:
-    conn = psycopg2.connect(
-        host=os.environ["SUPABASE_DB_HOST"],
-        port=int(os.environ.get("SUPABASE_DB_PORT", "6543")),
-        dbname=os.environ.get("SUPABASE_DB_NAME", "postgres"),
-        user=os.environ["SUPABASE_DB_USER"],
-        password=os.environ["SUPABASE_DB_PASSWORD"],
-    )
+    conn = _DB_POOL.getconn()
     return PGConnection(conn)
 
 
