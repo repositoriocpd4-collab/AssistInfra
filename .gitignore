@@ -10,3 +10,7 @@ venv/
 *.log
 .idea/
 .vscode/
+
+# Harness temporario de inspecao visual (gerado durante o desenvolvimento)
+static/__preview.html
+static/__sprite.html

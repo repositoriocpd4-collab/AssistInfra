@@ -28,44 +28,156 @@
     { value: 150, title: 'Quase todo mundo', hint: 'A escola inteira é afetada', icon: 'globe' }
   ];
   // --- Unidades de medida por categoria (referência fornecida pelo usuário) ---
+  // Catálogo de unidades de medida. `codigo` é a chave estável (referenciada por
+  // CATEGORIA_UNIDADES); `simbolo` é o que fica gravado em demands.planned_unit e
+  // planning_items.unit. `g` agrupa as opções no <select>.
   const UNIDADES_MEDIDA_LIST = [
-    {codigo:"UN",nome:"Unidade",simbolo:"un"},
-    {codigo:"PC",nome:"Peça",simbolo:"pç"},
-    {codigo:"PAR",nome:"Par",simbolo:"par"},
-    {codigo:"JG",nome:"Jogo",simbolo:"jg"},
-    {codigo:"KIT",nome:"Kit",simbolo:"kit"},
-    {codigo:"CJ",nome:"Conjunto",simbolo:"cj"},
-    {codigo:"CX",nome:"Caixa",simbolo:"cx"},
-    {codigo:"PCT",nome:"Pacote",simbolo:"pct"},
-    {codigo:"RL",nome:"Rolo",simbolo:"rl"},
-    {codigo:"BR",nome:"Barra",simbolo:"barra"},
-    {codigo:"SC",nome:"Saco",simbolo:"sc"},
-    {codigo:"BD",nome:"Balde",simbolo:"bd"},
-    {codigo:"GL",nome:"Galão",simbolo:"gal"},
-    {codigo:"LT",nome:"Lata",simbolo:"lata"},
-    {codigo:"M",nome:"Metro",simbolo:"m"},
-    {codigo:"M2",nome:"Metro quadrado",simbolo:"m²"},
-    {codigo:"M3",nome:"Metro cúbico",simbolo:"m³"},
-    {codigo:"MM",nome:"Milímetro",simbolo:"mm"},
-    {codigo:"CM",nome:"Centímetro",simbolo:"cm"},
-    {codigo:"L",nome:"Litro",simbolo:"L"},
-    {codigo:"ML",nome:"Mililitro",simbolo:"mL"},
-    {codigo:"KG",nome:"Quilograma",simbolo:"kg"},
-    {codigo:"G",nome:"Grama",simbolo:"g"},
-    {codigo:"T",nome:"Tonelada",simbolo:"t"},
-    {codigo:"KWH",nome:"Quilowatt-hora",simbolo:"kWh"},
-    {codigo:"H",nome:"Hora",simbolo:"h"},
-    {codigo:"DIA",nome:"Diária",simbolo:"diária"},
-    {codigo:"SERV",nome:"Serviço",simbolo:"serv."},
-    {codigo:"VIS",nome:"Visita",simbolo:"visita"},
-    {codigo:"APL",nome:"Aplicação",simbolo:"aplic."},
-    {codigo:"DOC",nome:"Documento",simbolo:"doc."},
-    {codigo:"LAU",nome:"Laudo",simbolo:"laudo"},
-    {codigo:"FAT",nome:"Fatura",simbolo:"fatura"},
-    {codigo:"VIAG",nome:"Viagem",simbolo:"viagem"},
-    {codigo:"CARGA",nome:"Carga",simbolo:"carga"},
+    // Contagem e embalagem
+    {codigo:"UN",nome:"Unidade",simbolo:"un",g:"cont"},
+    {codigo:"PC",nome:"Peça",simbolo:"pç",g:"cont"},
+    {codigo:"PAR",nome:"Par",simbolo:"par",g:"cont"},
+    {codigo:"DZ",nome:"Dúzia",simbolo:"dz",g:"cont"},
+    {codigo:"CTO",nome:"Cento",simbolo:"cto",g:"cont"},
+    {codigo:"MIL",nome:"Milheiro",simbolo:"mil",g:"cont"},
+    {codigo:"CJ",nome:"Conjunto",simbolo:"cj",g:"cont"},
+    {codigo:"KIT",nome:"Kit",simbolo:"kit",g:"cont"},
+    {codigo:"JG",nome:"Jogo",simbolo:"jg",g:"cont"},
+    {codigo:"PCT",nome:"Pacote",simbolo:"pct",g:"cont"},
+    {codigo:"CX",nome:"Caixa",simbolo:"cx",g:"cont"},
+    {codigo:"FD",nome:"Fardo",simbolo:"fd",g:"cont"},
+    {codigo:"RL",nome:"Rolo",simbolo:"rl",g:"cont"},
+    {codigo:"BOB",nome:"Bobina",simbolo:"bob",g:"cont"},
+    {codigo:"CART",nome:"Cartela",simbolo:"cart",g:"cont"},
+    {codigo:"BL",nome:"Bloco",simbolo:"bl",g:"cont"},
+    {codigo:"SC",nome:"Saco",simbolo:"sc",g:"cont"},
+    {codigo:"ENV",nome:"Envelope",simbolo:"env",g:"cont"},
+    {codigo:"FR",nome:"Frasco",simbolo:"fr",g:"cont"},
+    {codigo:"GL",nome:"Galão",simbolo:"gal",g:"cont"},
+    {codigo:"LT",nome:"Lata",simbolo:"lt",g:"cont"},
+    {codigo:"TB",nome:"Tubo",simbolo:"tb",g:"cont"},
+    {codigo:"BR",nome:"Barra",simbolo:"br",g:"cont"},
+    // Construção e manutenção
+    {codigo:"BD",nome:"Balde",simbolo:"bd",g:"obra"},
+    {codigo:"CH",nome:"Chapa",simbolo:"ch",g:"obra"},
+    {codigo:"PL",nome:"Placa",simbolo:"pl",g:"obra"},
+    // Comprimento
+    {codigo:"MM",nome:"Milímetro",simbolo:"mm",g:"comp"},
+    {codigo:"CM",nome:"Centímetro",simbolo:"cm",g:"comp"},
+    {codigo:"M",nome:"Metro",simbolo:"m",g:"comp"},
+    {codigo:"KM",nome:"Quilômetro",simbolo:"km",g:"comp"},
+    // Área
+    {codigo:"MM2",nome:"Milímetro quadrado",simbolo:"mm²",g:"area"},
+    {codigo:"CM2",nome:"Centímetro quadrado",simbolo:"cm²",g:"area"},
+    {codigo:"M2",nome:"Metro quadrado",simbolo:"m²",g:"area"},
+    {codigo:"KM2",nome:"Quilômetro quadrado",simbolo:"km²",g:"area"},
+    {codigo:"HA",nome:"Hectare",simbolo:"ha",g:"area"},
+    // Volume
+    {codigo:"MM3",nome:"Milímetro cúbico",simbolo:"mm³",g:"vol"},
+    {codigo:"CM3",nome:"Centímetro cúbico",simbolo:"cm³",g:"vol"},
+    {codigo:"M3",nome:"Metro cúbico",simbolo:"m³",g:"vol"},
+    // Capacidade e líquidos
+    {codigo:"ML",nome:"Mililitro",simbolo:"mL",g:"cap"},
+    {codigo:"CL",nome:"Centilitro",simbolo:"cL",g:"cap"},
+    {codigo:"L",nome:"Litro",simbolo:"L",g:"cap"},
+    {codigo:"KL",nome:"Quilolitro",simbolo:"kL",g:"cap"},
+    // Massa e peso
+    {codigo:"MG",nome:"Miligrama",simbolo:"mg",g:"massa"},
+    {codigo:"G",nome:"Grama",simbolo:"g",g:"massa"},
+    {codigo:"KG",nome:"Quilograma",simbolo:"kg",g:"massa"},
+    {codigo:"T",nome:"Tonelada",simbolo:"t",g:"massa"},
+    // Tempo
+    {codigo:"S",nome:"Segundo",simbolo:"s",g:"tempo"},
+    {codigo:"MIN",nome:"Minuto",simbolo:"min",g:"tempo"},
+    {codigo:"H",nome:"Hora",simbolo:"h",g:"tempo"},
+    {codigo:"DIA",nome:"Dia",simbolo:"dia",g:"tempo"},
+    {codigo:"SEM",nome:"Semana",simbolo:"sem",g:"tempo"},
+    {codigo:"MES",nome:"Mês",simbolo:"mês",g:"tempo"},
+    {codigo:"ANO",nome:"Ano",simbolo:"ano",g:"tempo"},
+    // Serviços
+    {codigo:"SERV",nome:"Serviço",simbolo:"sv",g:"serv"},
+    {codigo:"HTEC",nome:"Hora técnica",simbolo:"h/téc",g:"serv"},
+    {codigo:"DIARIA",nome:"Diária",simbolo:"diária",g:"serv"},
+    {codigo:"EVT",nome:"Evento",simbolo:"evt",g:"serv"},
+    {codigo:"VIS",nome:"Visita",simbolo:"vis",g:"serv"},
+    {codigo:"PTO",nome:"Ponto",simbolo:"pto",g:"serv"},
+    {codigo:"APL",nome:"Aplicação",simbolo:"aplic.",g:"serv"},
+    // Energia e eletricidade
+    {codigo:"W",nome:"Watt",simbolo:"W",g:"energia"},
+    {codigo:"KW",nome:"Quilowatt",simbolo:"kW",g:"energia"},
+    {codigo:"WH",nome:"Watt-hora",simbolo:"Wh",g:"energia"},
+    {codigo:"KWH",nome:"Quilowatt-hora",simbolo:"kWh",g:"energia"},
+    {codigo:"V",nome:"Volt",simbolo:"V",g:"energia"},
+    {codigo:"A",nome:"Ampere",simbolo:"A",g:"energia"},
+    {codigo:"MA",nome:"Miliampere",simbolo:"mA",g:"energia"},
+    {codigo:"OHM",nome:"Ohm",simbolo:"Ω",g:"energia"},
+    {codigo:"HZ",nome:"Hertz",simbolo:"Hz",g:"energia"},
+    // Pressão, temperatura e velocidade
+    {codigo:"PA",nome:"Pascal",simbolo:"Pa",g:"fisica"},
+    {codigo:"KPA",nome:"Quilopascal",simbolo:"kPa",g:"fisica"},
+    {codigo:"BAR",nome:"Bar",simbolo:"bar",g:"fisica"},
+    {codigo:"PSI",nome:"PSI",simbolo:"psi",g:"fisica"},
+    {codigo:"C",nome:"Grau Celsius",simbolo:"°C",g:"fisica"},
+    {codigo:"K",nome:"Kelvin",simbolo:"K",g:"fisica"},
+    {codigo:"MS",nome:"Metro por segundo",simbolo:"m/s",g:"fisica"},
+    {codigo:"KMH",nome:"Quilômetro por hora",simbolo:"km/h",g:"fisica"},
+    // Documentos e logística
+    {codigo:"DOC",nome:"Documento",simbolo:"doc.",g:"doc"},
+    {codigo:"LAU",nome:"Laudo",simbolo:"laudo",g:"doc"},
+    {codigo:"FAT",nome:"Fatura",simbolo:"fatura",g:"doc"},
+    {codigo:"VIAG",nome:"Viagem",simbolo:"viagem",g:"doc"},
+    {codigo:"CARGA",nome:"Carga",simbolo:"carga",g:"doc"},
+    // Índices
+    {codigo:"PCTG",nome:"Porcentagem",simbolo:"%",g:"indice"},
   ];
   const UNIDADES_MEDIDA_BY_CODE = Object.fromEntries(UNIDADES_MEDIDA_LIST.map(u => [u.codigo, u]));
+
+  const UNIDADE_GRUPOS = [
+    ['cont', 'Contagem e embalagem'],
+    ['obra', 'Construção e manutenção'],
+    ['comp', 'Comprimento'],
+    ['area', 'Área'],
+    ['vol', 'Volume'],
+    ['cap', 'Capacidade e líquidos'],
+    ['massa', 'Massa e peso'],
+    ['tempo', 'Tempo'],
+    ['serv', 'Serviços'],
+    ['energia', 'Energia e eletricidade'],
+    ['fisica', 'Pressão, temperatura e velocidade'],
+    ['doc', 'Documentos e logística'],
+    ['indice', 'Índices']
+  ];
+
+  // As unidades que cobrem quase toda demanda de infraestrutura sobem para o topo
+  // da lista; as demais continuam acessíveis nos grupos abaixo.
+  const UNIDADES_MAIS_USADAS = ['UN', 'PC', 'PAR', 'CJ', 'KIT', 'CX', 'PCT', 'SC', 'RL', 'BOB', 'BR', 'CH', 'PL', 'TB', 'FR', 'GL',
+    'M', 'M2', 'M3', 'MM', 'CM', 'KM', 'ML', 'L', 'G', 'KG', 'T', 'H', 'DIA', 'SERV', 'PTO', 'PCTG'];
+
+  // Monta as <option> de unidade de medida. `sugeridas` recebe os códigos que a
+  // categoria da demanda recomenda (CATEGORIA_UNIDADES) e vira o primeiro grupo.
+  // Cada unidade aparece uma única vez, na posição mais alta em que se qualifica.
+  function unitOptionsHTML(selecionada = '', sugeridas = [], rotuloSugeridas = 'Sugeridas para esta demanda') {
+    const usados = new Set();
+    const rotuloGrupo = Object.fromEntries(UNIDADE_GRUPOS);
+    const opt = u => {
+      usados.add(u.codigo);
+      return `<option value="${esc(u.simbolo)}" data-keywords="${esc(rotuloGrupo[u.g] || '')}" ${u.simbolo === selecionada ? 'selected' : ''}>${esc(u.nome)} — ${esc(u.simbolo)}</option>`;
+    };
+    const grupo = (label, lista) => lista.length ? `<optgroup label="${esc(label)}">${lista.map(opt).join('')}</optgroup>` : '';
+    const byCode = c => UNIDADES_MEDIDA_BY_CODE[c];
+    const livre = u => u && !usados.has(u.codigo);
+
+    let html = `<option value="" ${selecionada ? '' : 'selected'}>Selecionar unidade...</option>`;
+    // Valor gravado que não existe no catálogo (dados antigos) não pode sumir.
+    if (selecionada && !UNIDADES_MEDIDA_LIST.some(u => u.simbolo === selecionada)) {
+      html += `<optgroup label="Valor atual"><option value="${esc(selecionada)}" selected>${esc(selecionada)}</option></optgroup>`;
+    }
+    html += grupo(rotuloSugeridas, sugeridas.map(byCode).filter(livre));
+    html += grupo('Mais usadas', UNIDADES_MAIS_USADAS.map(byCode).filter(livre));
+    UNIDADE_GRUPOS.forEach(([key, label]) => {
+      html += grupo(label, UNIDADES_MEDIDA_LIST.filter(u => u.g === key && livre(u)));
+    });
+    return html;
+  }
   const CATEGORIA_UNIDADES = {
     "Elétrica":{usar:true,permitidas:["UN","M","RL","CX","PCT","KIT","JG","PC"],porItem:{"fio/cabo":["M","RL"],"lâmpada":["UN","CX","PCT"],"disjuntor":["UN","CX"],"conector":["UN","PCT","CX"],"interruptor":["UN","CX","PCT"],"tomada":["UN","CX","PCT"],"eletroduto":["M","BR"],"fita isolante":["RL","UN"],"quadro elétrico":["UN","KIT"]}},
     "Hidráulica":{usar:true,permitidas:["UN","M","BR","RL","CX","PCT","KIT","L","KG"],porItem:{"cano/tubo":["M","BR"],"conexão":["UN","PCT","CX"],"torneira":["UN"],"registro":["UN"],"mangueira":["M","RL"],"fita veda rosca":["RL","UN"],"adesivo pvc":["ML","L","UN"]}},
@@ -159,16 +271,58 @@
     'Transporte': 'servicos', 'Visita técnica': 'servicos', 'Vistoria': 'servicos',
     'Aquisição': 'administrativo', 'Boletim de Ocorrência': 'administrativo', 'Conta Luz': 'administrativo',
     'Declaração': 'administrativo', 'Informação': 'administrativo', 'Relatório': 'administrativo',
-    'Resposta': 'administrativo', 'Solicitação': 'administrativo'
+    'Resposta': 'administrativo', 'Solicitação': 'administrativo',
+    'Impressora': 'cpdti', 'Computador': 'cpdti', 'Notebook': 'cpdti', 'Tablet': 'cpdti',
+    'Câmeras': 'cpdti', 'Alarme': 'cpdti', 'Câmeras & Alarmes': 'cpdti', 'Voip': 'cpdti', 'Wi-Fi': 'cpdti',
+    'Rede e Cabeamento': 'cpdti', 'DataShow': 'cpdti', 'No-Break': 'cpdti', 'Servidor': 'cpdti',
+    'Sistema/Software': 'cpdti', 'Sala de Informática': 'cpdti', 'Sala de Recursos': 'cpdti'
   };
   const CATEGORY_TABS = [
     { key: 'usadas', label: 'Mais usadas', icon: 'star' },
+    { key: 'cpdti', label: 'CPD/TI', icon: 'monitor' },
     { key: 'infra', label: 'Infraestrutura', icon: 'building' },
     { key: 'manutencao', label: 'Manutenção', icon: 'wrench' },
     { key: 'servicos', label: 'Serviços', icon: 'clipboard' },
     { key: 'administrativo', label: 'Administrativo', icon: 'user' },
     { key: 'outros', label: 'Outros', icon: 'dots' }
   ];
+
+  // Sub-tipo de problema por categoria (passo 2 do assistente). Em Impressora, toner, mancha,
+  // atolamento e falha no documento exigem um técnico no local — em vez de abrir chamado, a
+  // pessoa liga direto pro ramal do CPD/TI (opção "blocked: true"). Nas demais categorias
+  // listadas aqui, o sub-tipo é só uma etiqueta a mais pra ajudar a triagem; o fluxo de
+  // chamado continua normal. Categoria não listada aqui não ganha esse seletor.
+  const SUPPORT_PHONE_EXT = '9090';
+  const CAMERA_ALARM_ISSUES = [
+    { value: 'problema_tv', label: 'Problema na TV' },
+    { value: 'extracao_imagem', label: 'Extração de imagem' },
+    { value: 'remanejamento', label: 'Remanejamento' },
+    { value: 'remocao', label: 'Remoção' },
+    { value: 'defeito', label: 'Defeito' },
+    { value: 'outros', label: 'Outros' },
+  ];
+  const CATEGORY_ISSUE_OPTIONS = {
+    'Impressora': [
+      { value: 'nao_imprime', label: 'Não imprime' },
+      { value: 'nao_digitaliza', label: 'Não digitaliza' },
+      { value: 'trocar_toner', label: 'Trocar toner', blocked: true },
+      { value: 'falha_documento', label: 'Falha no documento', blocked: true },
+      { value: 'mancha_impressao', label: 'Mancha na impressão', blocked: true },
+      { value: 'atolamento', label: 'Atolamento', blocked: true },
+      { value: 'outros', label: 'Outros' },
+    ],
+    'Câmeras': CAMERA_ALARM_ISSUES,
+    'Alarme': CAMERA_ALARM_ISSUES,
+    'Câmeras & Alarmes': CAMERA_ALARM_ISSUES,
+    'Wi-Fi': [
+      { value: 'wifi_7lan', label: 'Wi-Fi 7LAN' },
+      { value: 'wifi_escola', label: 'Wi-Fi da Escola' },
+      { value: 'wifi_fust', label: 'Wi-Fi FUST' },
+      { value: 'outros', label: 'Outros' },
+    ]
+  };
+  const isItemBlocked = it => !!CATEGORY_ISSUE_OPTIONS[it.category]?.find(o => o.value === it.issue)?.blocked;
+  const needsIssuePick = it => !!CATEGORY_ISSUE_OPTIONS[it.category] && !it.issue;
 
   const icon = name => `<svg aria-hidden="true"><use href="#i-${name}"></use></svg>`;
   const esc = (v = '') => String(v ?? '').replace(/[&<>'"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c]));
@@ -333,6 +487,187 @@
     });
   }
 
+  // ---------------------------------------------------------------------------
+  // Campo de busca sobre um <select> (combobox).
+  // O <select> real continua no DOM e continua sendo a fonte do valor — FormData,
+  // sel.value e todo o código existente seguem funcionando sem saber do combo.
+  // Basta marcar o select com data-search.
+  // ---------------------------------------------------------------------------
+  const normalizeText = v => (v ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  let comboCloseActive = null;
+
+  function enhanceSearchableSelects(root = document) {
+    $$('select[data-search]', root).forEach(sel => {
+      if (sel.dataset.comboWired) return;
+      sel.dataset.comboWired = '1';
+
+      const readItems = () => {
+        const out = [];
+        [...sel.children].forEach(node => {
+          if (node.tagName === 'OPTGROUP') [...node.children].forEach(o => out.push({ value: o.value, label: o.textContent.trim(), group: node.label, keys: o.dataset.keywords || '' }));
+          else out.push({ value: node.value, label: node.textContent.trim(), group: '', keys: node.dataset.keywords || '' });
+        });
+        return out;
+      };
+
+      const host = sel.parentElement;
+      host.classList.add('has-combo');
+      sel.classList.add('combo-hidden');
+      sel.setAttribute('tabindex', '-1');
+      sel.setAttribute('aria-hidden', 'true');
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'input combo-input';
+      input.autocomplete = 'off';
+      input.setAttribute('role', 'combobox');
+      input.setAttribute('aria-expanded', 'false');
+      input.setAttribute('aria-autocomplete', 'list');
+      input.placeholder = sel.dataset.searchPlaceholder || 'Digite para buscar...';
+      // O navegador se recusa a reportar erro em campo obrigatorio invisivel — e
+      // reportValidity() falharia calado. A obrigatoriedade migra para o input.
+      if (sel.required) {
+        sel.required = false;
+        input.required = true;
+        input.setAttribute('aria-required', 'true');
+      }
+
+      const caret = document.createElement('span');
+      caret.className = 'combo-caret';
+      caret.innerHTML = icon('chevron');
+
+      sel.after(caret);
+      sel.after(input);
+
+      let pop = null, active = -1, shown = [];
+
+      const currentLabel = () => (readItems().find(i => i.value === sel.value) || {}).label || '';
+      const syncLabel = () => { input.value = sel.value ? currentLabel() : ''; };
+      syncLabel();
+
+      const close = (revert = true) => {
+        if (pop) { pop.remove(); pop = null; }
+        input.setAttribute('aria-expanded', 'false');
+        active = -1;
+        if (revert) syncLabel();
+        document.removeEventListener('mousedown', onDocDown, true);
+        window.removeEventListener('resize', place);
+        window.removeEventListener('scroll', place, true);
+        if (comboCloseActive === close) comboCloseActive = null;
+      };
+
+      const onDocDown = e => { if (pop && !pop.contains(e.target) && e.target !== input && e.target !== caret && !caret.contains(e.target)) close(); };
+
+      const place = () => {
+        if (!pop) return;
+        if (!input.isConnected) { close(false); return; }
+        const r = input.getBoundingClientRect();
+        const below = window.innerHeight - r.bottom - 10;
+        const above = r.top - 10;
+        const openUp = below < 190 && above > below;
+        pop.style.left = `${r.left}px`;
+        pop.style.width = `${r.width}px`;
+        pop.style.maxHeight = `${Math.max(140, Math.min(300, openUp ? above : below))}px`;
+        if (openUp) { pop.style.top = 'auto'; pop.style.bottom = `${window.innerHeight - r.top + 4}px`; }
+        else { pop.style.bottom = 'auto'; pop.style.top = `${r.bottom + 4}px`; }
+      };
+
+      const pick = item => {
+        sel.value = item.value;
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+        close(false);
+        syncLabel();
+        input.focus();
+      };
+
+      const paintList = query => {
+        const q = normalizeText(query);
+        const all = readItems();
+        // Busca no rótulo e também no grupo: digitar "area" traz as unidades de
+        // área, digitar "escola" não descarta nada numa lista de escolas.
+        shown = q ? all.filter(i => i.value !== '' && [i.label, i.group, i.keys].some(t => normalizeText(t).includes(q))) : all;
+        if (!pop) return;
+        if (!shown.length) {
+          pop.innerHTML = `<p class="combo-empty">Nenhuma opção corresponde a "${esc(query)}".</p>`;
+          return;
+        }
+        let html = '', lastGroup = null;
+        shown.forEach((item, idx) => {
+          if (item.group !== lastGroup) {
+            if (item.group) html += `<div class="combo-group">${esc(item.group)}</div>`;
+            lastGroup = item.group;
+          }
+          const isCurrent = item.value === sel.value && item.value !== '';
+          html += `<div class="combo-option ${idx === active ? 'is-active' : ''} ${isCurrent ? 'is-current' : ''}" role="option" aria-selected="${isCurrent}" data-idx="${idx}">${esc(item.label || 'Selecionar...')}</div>`;
+        });
+        pop.innerHTML = html;
+      };
+
+      const open = () => {
+        if (pop) return;
+        comboCloseActive?.();
+        pop = document.createElement('div');
+        pop.className = 'popover combo-pop';
+        pop.setAttribute('role', 'listbox');
+        document.body.appendChild(pop);
+        input.setAttribute('aria-expanded', 'true');
+        active = Math.max(0, readItems().findIndex(i => i.value === sel.value));
+        paintList('');
+        place();
+        scrollActive();
+        document.addEventListener('mousedown', onDocDown, true);
+        window.addEventListener('resize', place);
+        window.addEventListener('scroll', place, true);
+        comboCloseActive = close;
+
+        pop.addEventListener('mousedown', e => e.preventDefault());
+        pop.addEventListener('click', e => {
+          const el = e.target.closest('[data-idx]');
+          if (el) pick(shown[Number(el.dataset.idx)]);
+        });
+      };
+
+      const scrollActive = () => {
+        const el = pop?.querySelector('.is-active') || pop?.querySelector('.is-current');
+        el?.scrollIntoView({ block: 'nearest' });
+      };
+
+      const move = delta => {
+        if (!pop) { open(); return; }
+        if (!shown.length) return;
+        active = (active + delta + shown.length) % shown.length;
+        paintList(input.dataset.query || '');
+        scrollActive();
+      };
+
+      input.addEventListener('focus', () => { open(); input.select(); });
+      input.addEventListener('click', () => open());
+      caret.addEventListener('mousedown', e => { e.preventDefault(); if (pop) close(); else { input.focus(); open(); } });
+
+      input.addEventListener('input', () => {
+        input.dataset.query = input.value;
+        if (!pop) open();
+        active = 0;
+        paintList(input.value);
+        place();
+      });
+
+      input.addEventListener('keydown', e => {
+        if (e.key === 'ArrowDown') { e.preventDefault(); move(1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
+        else if (e.key === 'Enter') {
+          if (pop && shown[active]) { e.preventDefault(); pick(shown[active]); }
+        } else if (e.key === 'Escape') { if (pop) { e.stopPropagation(); close(); } }
+        else if (e.key === 'Tab') close();
+      });
+
+      input.addEventListener('blur', () => { setTimeout(() => { if (pop && document.activeElement !== input) close(); else if (!pop) syncLabel(); }, 120); });
+
+      // Se outro trecho de código mudar o select por fora, o campo acompanha.
+      sel.addEventListener('change', () => { if (!pop) syncLabel(); });
+    });
+  }
+
   const PRIORITY_FALLBACK = { P1: 'Urgente', P2: 'Alta', P3: 'Programada', P4: 'Planejamento/Projeto' };
   const priorityLabel = p => (ctx.priorities && ctx.priorities[p] && ctx.priorities[p].label) || PRIORITY_FALLBACK[p] || p || '—';
   const statusClass = s => {
@@ -378,7 +713,7 @@
   const empty = (title = 'Nenhum registro encontrado', text = 'Ajuste os filtros ou cadastre um novo item.') => `<div class="empty-state"><div class="empty-icon">${icon('search')}</div><h3>${esc(title)}</h3><p>${esc(text)}</p></div>`;
 
   function showBackdrop(show = true) { $('#backdrop').hidden = !show; }
-  function closeModal() { $('#modalRoot').innerHTML = ''; showBackdrop(false); }
+  function closeModal() { comboCloseActive?.(); $('#modalRoot').innerHTML = ''; showBackdrop(false); }
   function modal({ title, subtitle = '', body = '', footer = '', mode = 'drawer', sidebar = '', onOpen }) {
     showBackdrop(true);
     $('#modalRoot').innerHTML = `<section class="modal ${mode}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
@@ -387,6 +722,7 @@
       <div class="modal-body">${body}</div>${footer ? `<footer class="modal-footer">${footer}</footer>` : ''}
     </section>`;
     $$('[data-close]').forEach(b => b.addEventListener('click', closeModal));
+    enhanceSearchableSelects($('.modal'));
     onOpen?.($('.modal'));
   }
   $('#backdrop')?.addEventListener('click', closeModal);
@@ -495,7 +831,7 @@
       </div>
       <form id="demandForm">
         <section data-step="1" class="form-step">
-          ${!ctx.user.perm.school_scoped ? `<div class="field span-2 mb-16"><label>Unidade Escolar *</label><div class="select-wrap"><span class="select-wrap-icon">${icon('school')}</span><select class="select" name="school_id" required>${schoolOptions}</select></div></div>` : ''}
+          ${!ctx.user.perm.school_scoped ? `<div class="field span-2 mb-16"><label>Unidade Escolar *</label><div class="select-wrap"><span class="select-wrap-icon">${icon('school')}</span><select class="select" name="school_id" required data-search data-search-placeholder="Buscar escola pelo nome...">${schoolOptions}</select></div></div>` : ''}
           <div class="wizard-question-row">
             <p class="wizard-question">Qual é o tipo de problema?</p>
             <span class="dw-pill" id="categoryCountPill">${icon('check-circle')}<span>0 de ${MAX_CATEGORIES} selecionados</span></span>
@@ -559,7 +895,7 @@
 
         const syncNextEnabled = () => {
           if (step === 1) next.disabled = !state.categories.length || (!ctx.user.perm.school_scoped && !form.elements.school_id.value);
-          else if (step === 2) next.disabled = !state.items.length || state.items.some(it => !it.description.trim());
+          else if (step === 2) next.disabled = !state.items.length || state.items.some(it => needsIssuePick(it) || (!isItemBlocked(it) && !it.description.trim()));
           else next.disabled = false;
         };
 
@@ -602,7 +938,7 @@
               return;
             }
             state.categories.push(cat);
-            state.items.push({ category: cat, location: '', description: '', title: '' });
+            state.items.push({ category: cat, location: '', description: '', title: '', titleAuto: true, issue: '' });
             dupCards.forEach(el => { el.classList.add('selected'); el.setAttribute('aria-pressed', 'true'); });
           }
           refreshCategoryOrder();
@@ -663,10 +999,25 @@
           const multi = state.items.length > 1;
           container.innerHTML = (multi ? `<p class="wizard-question">Conte os detalhes e insira fotos de cada problema</p><p class="wizard-hint">Você escolheu ${state.items.length} tipos — cada um vira uma demanda independente com seu próprio registro e foto.</p>` : '') +
             state.items.map((it, i) => {
-              const c = CATEGORY_COLORS[it.category] || 'blue'; return `
-            <div class="detail-block ${multi ? '' : 'detail-block-single'}" ${multi ? `style="border-left:4px solid var(--${c})"` : ''}>
-              <div class="detail-block-head" style="color:var(--${c})"><span class="detail-icon-badge" style="background:var(--${c}-soft);color:var(--${c})">${icon(CATEGORY_ICONS[it.category] || 'clipboard')}</span><strong>${i + 1}. ${esc(it.category)}</strong></div>
-              <p class="wizard-question">Onde isso está acontecendo?</p>
+              const c = CATEGORY_COLORS[it.category] || 'blue';
+              const issueOpts = CATEGORY_ISSUE_OPTIONS[it.category];
+              const blocked = isItemBlocked(it);
+              const issuePicker = issueOpts ? `
+              <p class="wizard-question mt-16">Qual é o problema? *</p>
+              <p class="wizard-hint">Escolha uma opção pra continuar — assim a gente já sabe como te ajudar.</p>
+              <div class="issue-chip-row" role="group" aria-label="Tipo de problema — ${esc(it.category)}">
+                ${issueOpts.map(o => `<button type="button" class="issue-chip${o.blocked ? ' issue-chip-blocked' : ''}${it.issue === o.value ? ' selected' : ''}" data-issue-opt data-idx="${i}" data-issue="${esc(o.value)}" aria-pressed="${it.issue === o.value}">${o.blocked ? icon('phone') : ''}<span>${esc(o.label)}</span></button>`).join('')}
+              </div>` : '';
+              const blockedNotice = blocked ? `
+              <div class="issue-block-notice" role="status">
+                <span class="issue-block-notice-icon">${icon('phone')}</span>
+                <div class="issue-block-notice-body">
+                  <strong>Esse problema a gente resolve por telefone</strong>
+                  <p>Ligue direto pro <strong class="issue-block-phone">Ramal ${SUPPORT_PHONE_EXT}</strong> — o Técnico da Impressora já vai te atender. Essa demanda não será enviada como chamado.</p>
+                </div>
+              </div>` : '';
+              const restOfFields = blocked ? '' : `
+              <p class="wizard-question mt-16">Onde isso está acontecendo?</p>
               <div class="field span-2"><input class="input" data-field="location" data-idx="${i}" placeholder="Ex.: Sala 3, banheiro do pátio, cozinha..." autocomplete="off" value="${esc(it.location)}"></div>
               <p class="wizard-question mt-16">Descreva com suas palavras</p>
               <p class="wizard-hint">O que está acontecendo, desde quando e o que você já percebeu.</p>
@@ -677,19 +1028,37 @@
                 <strong>${it.photo ? 'Foto selecionada' : `Anexar foto para ${esc(it.category)}`}</strong>
                 <small id="photoName_${i}">${it.photo ? `${esc(it.photo.name)} · ${Math.max(1, Math.round(it.photo.size / 1024))} KB` : 'Nenhuma foto selecionada'}</small>
                 <input type="file" class="item-photo-input" data-item-photo="${i}" accept="image/*,.pdf" hidden>
-              </label>
-              ${!multi ? `<div class="field span-2 mt-16"><label>Nome curto para essa demanda</label><input class="input" data-field="title" data-idx="${i}" maxlength="140" placeholder="Preenchemos pra você — pode ajustar se quiser" value="${esc(it.title)}"></div>` : ''}
-            </div>`}).join('');
+              </label>`;
+              const titleField = !multi ? `<div class="field span-2 mt-16"><label>Nome curto para essa demanda</label><input class="input" data-field="title" data-idx="${i}" maxlength="140" placeholder="Preenchemos pra você — pode ajustar se quiser" value="${esc(it.title)}"></div>` : '';
+              return `
+            <div class="detail-block ${multi ? '' : 'detail-block-single'}" ${multi ? `style="border-left:4px solid var(--${c})"` : ''}>
+              <div class="detail-block-head" style="color:var(--${c})"><span class="detail-icon-badge" style="background:var(--${c}-soft);color:var(--${c})">${icon(CATEGORY_ICONS[it.category] || 'clipboard')}</span><strong>${i + 1}. ${esc(it.category)}</strong></div>
+              ${issuePicker}
+              ${blockedNotice}
+              ${restOfFields}
+              ${titleField}
+            </div>`;
+            }).join('');
           const suggestItemTitle = (i) => {
             const it = state.items[i];
-            const suggestion = [it.category, it.location].filter(Boolean).join(' — ') || it.category || '';
+            if (it.titleAuto === false) return;
+            const issueLabel = CATEGORY_ISSUE_OPTIONS[it.category]?.find(o => o.value === it.issue)?.label;
+            const suggestion = [it.category, issueLabel, it.location].filter(Boolean).join(' — ') || it.category || '';
             const titleInput = container.querySelector(`[data-field="title"][data-idx="${i}"]`);
-            if (titleInput && (!titleInput.value || titleInput.dataset.auto === '1')) { titleInput.value = suggestion; titleInput.dataset.auto = '1'; it.title = suggestion; }
+            if (titleInput) titleInput.value = suggestion;
+            it.title = suggestion;
           };
+          $$('[data-issue-opt]', container).forEach(btn => btn.addEventListener('click', () => {
+            const i = Number(btn.dataset.idx), val = btn.dataset.issue;
+            state.items[i].issue = state.items[i].issue === val ? '' : val;
+            renderDetailsFields();
+            syncNextEnabled();
+            container.querySelector(`[data-issue-opt][data-idx="${i}"][data-issue="${val}"]`)?.focus();
+          }));
           $$('[data-field]', container).forEach(el => {
             const i = Number(el.dataset.idx), field = el.dataset.field;
             el.addEventListener('input', () => {
-              if (field === 'title') el.dataset.auto = '0';
+              if (field === 'title') state.items[i].titleAuto = false;
               state.items[i][field] = el.value;
               if (field === 'location') suggestItemTitle(i);
               syncNextEnabled();
@@ -768,6 +1137,13 @@
               reviewPhotoUrls.push(url);
               return `<div class="review-photo-block"><span class="review-label">Foto deste problema</span><img class="review-photo-thumb" src="${url}" alt="Foto anexada"></div>`;
             };
+            const blockedCount = state.items.filter(isItemBlocked).length;
+            const toSendCount = state.items.length - blockedCount;
+            const summaryText = blockedCount
+              ? (toSendCount
+                ? `Serão registradas ${toSendCount} de ${state.items.length} demandas — ${blockedCount > 1 ? `${blockedCount} são resolvidas` : 'uma é resolvida'} por telefone (Ramal ${SUPPORT_PHONE_EXT}) e não geram chamado.`
+                : `${blockedCount > 1 ? 'Esses problemas são' : 'Esse problema é'} resolvido por telefone — ligue pro Ramal ${SUPPORT_PHONE_EXT}. Nenhum chamado será enviado.`)
+              : (state.items.length > 1 ? `Serão registradas ${state.items.length} demandas, uma para cada tipo de problema — cada uma recebe um código único e sua própria foto.` : 'Depois de enviada, a demanda recebe um código único e você poderá acompanhar todo o andamento.');
             $('#demandReview').innerHTML = `<div class="review-summary">
               <div class="review-summary-head">
                 <span class="review-summary-badge">${icon('check-circle')}</span>
@@ -783,27 +1159,29 @@
                 <div class="review-item"><span class="review-item-icon">${icon('shield')}</span><div class="review-item-body"><span class="review-label">Risco de acidente?</span>${boolPill(state.risk, 'Há risco', 'Não há risco')}</div></div>
               </div>
             </div>
-            <div class="alert info review-alert">${icon('info')}<span>${state.items.length > 1 ? `Serão registradas ${state.items.length} demandas, uma para cada tipo de problema — cada uma recebe um código único e sua própria foto.` : 'Depois de enviada, a demanda recebe um código único e você poderá acompanhar todo o andamento.'}</span></div>
-            ${state.items.map((it, i) => `<section class="review-category-card">
-              <div class="review-category-head"><span class="review-category-icon" style="background:var(--${CATEGORY_COLORS[it.category] || 'blue'}-soft);color:var(--${CATEGORY_COLORS[it.category] || 'blue'})">${icon(CATEGORY_ICONS[it.category] || 'clipboard')}</span><h4>${state.items.length > 1 ? `${i + 1}. ` : ''}${esc(it.category)}</h4></div>
+            <div class="alert info review-alert">${icon('info')}<span>${summaryText}</span></div>
+            ${state.items.map((it, i) => { const blocked = isItemBlocked(it); return `<section class="review-category-card">
+              <div class="review-category-head"><span class="review-category-icon" style="background:var(--${CATEGORY_COLORS[it.category] || 'blue'}-soft);color:var(--${CATEGORY_COLORS[it.category] || 'blue'})">${icon(CATEGORY_ICONS[it.category] || 'clipboard')}</span><h4>${state.items.length > 1 ? `${i + 1}. ` : ''}${esc(it.category)}</h4>${blocked ? `<span class="review-pill blue" style="margin-left:auto">${icon('phone')}<span>Não será enviado — Ramal ${SUPPORT_PHONE_EXT}</span></span>` : ''}</div>
+              ${blocked ? `<p class="wizard-hint" style="margin:0">Sem local, descrição ou foto — esse problema é resolvido por telefone, não por chamado.</p>` : `
               <div class="review-fields">
                 <div class="review-item"><span class="review-item-icon">${icon('map')}</span><div class="review-item-body"><span class="review-label">Local</span><strong>${esc(it.location || 'Não informado')}</strong></div></div>
                 <div class="review-item"><span class="review-item-icon">${icon('clipboard')}</span><div class="review-item-body"><span class="review-label">Descrição</span><strong>${esc(it.description)}</strong></div></div>
               </div>
-              ${photoThumb(it.photo || state.photo)}
-            </section>`).join('')}`;
+              ${photoThumb(it.photo || state.photo)}`}
+            </section>`; }).join('')}`;
           }
         };
         prev.addEventListener('click', () => { step--; updateStep(); });
         next.addEventListener('click', async () => {
           if (step === 1 && !state.categories.length) return;
-          if (step === 2 && (!state.items.length || state.items.some(it => !it.description.trim()))) return;
+          if (step === 2 && (!state.items.length || state.items.some(it => needsIssuePick(it) || (!isItemBlocked(it) && !it.description.trim())))) return;
           if (step < totalSteps) { step++; updateStep(); return; }
           const reach = state.customReach ? (Number($('[name=affected_people_custom]', form).value) || 0) : state.reach;
           const schoolId = ctx.user.perm.school_scoped ? ctx.user.school_id : form.elements.school_id.value;
-          const created = [], failed = [];
+          const created = [], failed = [], skipped = [];
           next.disabled = true; setNextLabel('Enviando...');
           for (const it of state.items) {
+            if (isItemBlocked(it)) { skipped.push({ category: it.category }); continue; }
             const title = (it.title || '').trim() || [it.category, it.location].filter(Boolean).join(' — ') || it.category;
             const payload = {
               school_id: schoolId,
@@ -833,8 +1211,13 @@
             closeModal();
             if (created.length > 1) toast('Demandas registradas com sucesso!', `${created.length} códigos gerados: ${created.map(c => c.code).join(', ')}.`);
             else toast('Demanda registrada com sucesso!', `Código ${created[0].code} — acompanhe o andamento a qualquer momento.`);
+            if (skipped.length) toast('Resolvido por telefone', `${skipped.map(s => s.category).join(', ')} não ${skipped.length > 1 ? 'geraram chamado' : 'gerou chamado'} — ligue pro Ramal ${SUPPORT_PHONE_EXT}.`, 'info');
             if (failed.length) toast('Algumas demandas não puderam ser enviadas', failed.map(f => `${f.category}: ${f.message}`).join(' · '), 'error');
-            location.href = created.length > 1 ? '/demandas' : `/demandas/${created[0].id}`;
+            const isInfraManager = ctx.user && ctx.user.role === 'gestor';
+            location.href = (created.length > 1 || isInfraManager) ? '/demandas' : `/demandas/${created[0].id}`;
+          } else if (skipped.length && !failed.length) {
+            closeModal();
+            toast('Resolvido por telefone', `${skipped.length > 1 ? 'Esses problemas são' : 'Esse problema é'} resolvido por telefone — ligue pro Ramal ${SUPPORT_PHONE_EXT}. Nenhum chamado foi enviado.`, 'info');
           } else {
             toast('Não foi possível enviar', failed.map(f => f.message).join(' · ') || 'Tente novamente.', 'error');
             next.disabled = false; setNextLabel(state.items.length > 1 ? 'Enviar demandas' : 'Enviar demanda', 'Finalizar registro');
@@ -923,7 +1306,7 @@
       ? { eyebrow: 'PRECISOU DE ALGO?', title: 'Viu um problema na escola? Conte pra gente.', text: 'Leva menos de 2 minutos. Escolha o tipo de problema, descreva com suas palavras e, se quiser, envie uma foto.' }
       : { eyebrow: 'REGISTRO RÁPIDO', title: 'Uma escola reportou algo? Registre em segundos.', text: 'Use o assistente guiado para abrir uma demanda com categoria, urgência e impacto já organizados.' };
     content.innerHTML =
-      `<section class="report-hero"><a class="report-hero-export" href="/api/export/demands.csv" data-tooltip="Baixar a lista completa em CSV">${icon('download')}<span>Exportar</span></a><div class="report-hero-copy"><span class="eyebrow">${heroCopy.eyebrow}</span><h2>${heroCopy.title}</h2><p>${heroCopy.text}</p></div><button class="btn-report" data-open-demand data-tooltip="Abrir o assistente de registro em 4 passos">${icon('plus')}Registrar Demanda/CI</button></section>` +
+      `<section class="report-hero"><a class="report-hero-export" href="/api/export/dashboard.pdf" data-tooltip="Baixar o Painel completo em PDF (A4 paisagem): indicadores, execução, o que precisa de atenção, categorias e atividade recente">${icon('download')}<span>Exportar Painel</span></a><div class="report-hero-copy"><span class="eyebrow">${heroCopy.eyebrow}</span><h2>${heroCopy.title}</h2><p>${heroCopy.text}</p></div><button class="btn-report" data-open-demand data-tooltip="Abrir o assistente de registro em 4 passos">${icon('plus')}Registrar Demanda/CI</button></section>` +
       statsGroupsHtml +
       `<div class="content-grid">
         <section class="panel"><div class="panel-header"><div><h2>Precisa de atenção</h2><p>Priorizado por criticidade e prazo.</p></div><a class="link-btn" href="/demandas">Ver todas</a></div>
@@ -1006,7 +1389,7 @@
       return `<th class="th-filter${active ? ' active' : ''}" data-th-filter="${field}">${label}${icon('chevron')}</th>`;
     };
     return `<div class="table-wrap"><table class="data-table"><thead><tr><th>ID</th><th>Demanda</th>${compact ? '' : th('Categoria', 'category')}<th>Unidade Escolar</th>${th('Prioridade', 'priority')}${th('Status', 'status')}<th>Prazo</th><th>Ações</th></tr></thead><tbody>${rows.map(d => {
-      const due = dueInfo(d); return `<tr data-href="/demandas/${d.id}" class="${d.status === 'Concluída' ? 'row-done' : ''}"><td class="mono" data-label="ID"><strong>${esc(d.code)}</strong></td><td class="cell-title" data-label="Demanda"><strong>${esc(d.title)}</strong><small>Atualizado ${fmtDateTime(d.updated_at)}</small></td>${compact ? '' : `<td data-label="Categoria">${esc(d.category)}</td>`}<td data-label="Unidade Escolar">${esc(d.school_name || '—')}</td><td data-label="Prioridade"><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span></td><td data-label="Status"><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span></td><td data-label="Prazo"><span class="deadline ${due.cls}">${esc(due.text)}</span></td><td data-label="Ações"><a class="icon-btn" href="/demandas/${d.id}" aria-label="Ver detalhes" data-tooltip="Ver detalhes">${icon('eye')}</a><button type="button" class="icon-btn" data-edit-demand="${d.id}" aria-label="Editar demanda" data-tooltip="Editar demanda">${icon('edit')}</button></td></tr>`
+      const due = dueInfo(d); const canDelete = ctx.user.perm.can_manage_admin; return `<tr data-href="/demandas/${d.id}" class="${d.status === 'Concluída' ? 'row-done' : ''}"><td class="mono" data-label="ID"><strong>${esc(d.code)}</strong></td><td class="cell-title" data-label="Demanda"><strong>${esc(d.title)}</strong><small>Atualizado ${fmtDateTime(d.updated_at)}</small></td>${compact ? '' : `<td data-label="Categoria">${esc(d.category)}</td>`}<td data-label="Unidade Escolar">${esc(d.school_name || '—')}</td><td data-label="Prioridade"><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span></td><td data-label="Status"><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span></td><td data-label="Prazo"><span class="deadline ${due.cls}">${esc(due.text)}</span></td><td data-label="Ações"><a class="icon-btn" href="/demandas/${d.id}" aria-label="Ver detalhes" data-tooltip="Ver detalhes">${icon('eye')}</a><button type="button" class="icon-btn" data-edit-demand="${d.id}" aria-label="Editar demanda" data-tooltip="Editar demanda">${icon('edit')}</button>${canDelete ? `<button type="button" class="icon-btn" data-delete-demand="${d.id}" aria-label="Deletar demanda" data-tooltip="Deletar demanda" style="color:var(--red)">${icon('trash')}</button>` : ''}</td></tr>`
     }).join('')}</tbody></table></div>`;
   }
 
@@ -1031,7 +1414,7 @@
         filters.overdue ? ['overdueChip', 'Prazo vencido'] : null,
         filters.due_soon ? ['dueSoonChip', 'Vence em 7 dias'] : null,
         filters.unassigned ? ['unassignedChip', 'Sem responsável'] : null,
-      ].filter(Boolean).map(([id, label]) => `<button class="chip active" id="${id}">${esc(label)} ×</button>`).join('')}<button class="chip-v2 chip-red" data-chip-priority="P1">${icon('warning')}<span>P1 Urgentes</span><b>${num(ds.urgent)}</b></button><button class="chip-v2 chip-orange" data-chip-status="Aguardando contratação">${icon('clock')}<span>Aguardando contratação</span><b>${num(ds.contract)}</b></button><button class="chip-v2 chip-blue" data-chip-status="Em execução">${icon('trend')}<span>Em execução</span><b>${num(ds.progress)}</b></button><button class="chip-v2 chip-violet" data-chip-status="Planejamento futuro">${icon('calendar')}<span>Planejamento futuro</span><b>${num(ds.future)}</b></button><button class="chip-v2 chip-green" data-chip-status="Concluída" id="completedChip">${icon('check-circle')}<span>Concluídas</span><b>${num(ds.completed)}</b></button></div>
+      ].filter(Boolean).map(([id, label]) => `<button class="chip active" id="${id}">${esc(label)} ×</button>`).join('')}<button class="chip-v2 chip-red" data-chip-priority="P1">${icon('warning')}<span>P1 Urgentes</span><b>${num(ds.urgent)}</b></button><button class="chip-v2 chip-orange" data-chip-priority="P2">${icon('warning')}<span>P2 · Alta</span><b>${num(ds.high)}</b></button><button class="chip-v2 chip-orange" data-chip-status="Aguardando contratação">${icon('clock')}<span>Aguardando contratação</span><b>${num(ds.contract)}</b></button><button class="chip-v2 chip-blue" data-chip-status="Em execução">${icon('trend')}<span>Em execução</span><b>${num(ds.progress)}</b></button><button class="chip-v2 chip-violet" data-chip-status="Planejamento futuro">${icon('calendar')}<span>Planejamento futuro</span><b>${num(ds.future)}</b></button><button class="chip-v2 chip-green" data-chip-status="Concluída" id="completedChip">${icon('check-circle')}<span>Concluídas</span><b>${num(ds.completed)}</b></button></div>
         <div class="quick-filters-divider"></div>
         <label class="toggle-field" data-tooltip="Mostra ou oculta demandas concluídas na tabela abaixo">
           <div class="toggle-field-copy">${icon('eye')}<div><strong>Exibir concluídas</strong><small>Mostra ou oculta demandas concluídas.</small></div></div>
@@ -1040,6 +1423,14 @@
       </div>
       <section class="panel" id="demandsPanel"><div class="panel-header"><div><h2>Carteira de demandas</h2><p id="demandCount">Carregando...</p></div></div><div id="demandTable"></div></section>`;
     $('[data-open-demand]', content).addEventListener('click', openDemandForm);
+    // Os chips sao atalhos de um clique, nao filtros que se somam. Antes cada um
+    // apenas acrescentava a sua condicao: com "P1 Urgentes" ligado, clicar em
+    // "Concluidas" mantinha os dois e a lista continuava igual (quase sempre
+    // vazia) — parecia que o botao nao filtrava. Agora cada chip aplica so o seu
+    // recorte, limpa o dos outros e se desliga no segundo clique.
+    const quickChips = $$('[data-chip-status], [data-chip-priority]', content);
+    const syncChips = () => quickChips.forEach(b => b.classList.toggle('is-active',
+      (b.dataset.chipStatus || '') === $('#fStatus').value && (b.dataset.chipPriority || '') === $('#fPriority').value));
     const load = async () => {
       const params = new URLSearchParams();
       const map = { q: $('#fQ').value, status: $('#fStatus').value, priority: $('#fPriority').value, category: $('#fCategory').value, year: $('#fYear').value };
@@ -1047,6 +1438,7 @@
       if (filters.overdue) params.set('overdue', '1');
       if (filters.due_soon) params.set('due_soon', '1');
       if (filters.unassigned) params.set('unassigned', '1');
+      syncChips();
       $('#demandTable').innerHTML = `<div class="empty-state"><p>Atualizando lista...</p></div>`;
       const rows = await api('/api/demands?' + params.toString());
       // "Exibir concluídas" é um filtro só de exibição, aplicado sobre os dados já
@@ -1088,14 +1480,17 @@
     let timer; $('#fQ').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(load, 250) });
     ['#fYear', '#fStatus', '#fPriority', '#fCategory'].forEach(id => $(id).addEventListener('change', load));
     $('#clearFilters').addEventListener('click', () => { filters.overdue = false; filters.due_soon = false; filters.unassigned = false;['#fQ', '#fStatus', '#fPriority', '#fCategory'].forEach(id => $(id).value = ''); $('#fYear').value = '2026'; $('#overdueChip')?.remove(); $('#dueSoonChip')?.remove(); $('#unassignedChip')?.remove(); load(); });
-    $$('[data-chip-status]').forEach(b => b.addEventListener('click', () => {
-      $('#fStatus').value = b.dataset.chipStatus;
+    quickChips.forEach(b => b.addEventListener('click', () => {
+      const status = b.dataset.chipStatus || '';
+      const priority = b.dataset.chipPriority || '';
+      const jaAtivo = b.classList.contains('is-active');
+      $('#fStatus').value = jaAtivo ? '' : status;
+      $('#fPriority').value = jaAtivo ? '' : priority;
       // Ao clicar em "Concluídas", garante que o toggle "Exibir concluídas" esteja
       // ligado — senão o filtro de exibição esconderia o próprio resultado pedido.
-      if (b.dataset.chipStatus === 'Concluída' && $('#toggleCompleted')) $('#toggleCompleted').checked = true;
+      if (!jaAtivo && status === 'Concluída' && $('#toggleCompleted')) $('#toggleCompleted').checked = true;
       load();
     }));
-    $$('[data-chip-priority]').forEach(b => b.addEventListener('click', () => { $('#fPriority').value = b.dataset.chipPriority; load() }));
     $('#toggleCompleted')?.addEventListener('change', load);
     $('#overdueChip')?.addEventListener('click', () => { filters.overdue = false; $('#overdueChip').remove(); load() });
     $('#dueSoonChip')?.addEventListener('click', () => { filters.due_soon = false; $('#dueSoonChip').remove(); load() });
@@ -1103,171 +1498,273 @@
     await load();
   }
 
-  function detailTabContent(name, payload) {
-    const d = payload.demand;
-    if (name === 'summary') {
-      const catColor = CATEGORY_COLORS[d.category] || 'blue', catIcon = CATEGORY_ICONS[d.category] || 'clipboard';
-      const provType = PROV_ACTION_TYPES.find(t => t.key === d.prov_action_type);
-      const isCompleted = statusClass(d.status) === 'completed';
-      const isExecution = statusClass(d.status) === 'execution';
-      const hasResponsible = Boolean((d.prov_responsible || d.responsible || '').trim());
-      const hasAction = Boolean(d.prov_action_type || (d.status && !['Nova', 'Recebida'].includes(d.status)));
-      const provStep = isCompleted ? 4 : (isExecution ? 3 : (hasResponsible ? 2 : (hasAction ? 1 : 0)));
-      const defaultResp = d.prov_responsible || d.responsible || (ctx.user ? ctx.user.name : '');
-      const staffOptions = (payload.staff || []).map(s => `<option value="${esc(s.name)}" ${s.name === defaultResp ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
-      return `<div class="detail-layout"><div>
-      <!-- FLUXO DA PROVIDÊNCIA NO TOPO -->
-      <section class="info-card flow-card accent">
-        <div class="flow-card-head">
-          <div>
-            <h3 style="margin:0">${icon('trend')}Fluxo da providência</h3>
-            <p class="wizard-hint" style="margin:4px 0 0">Acompanhe o ciclo de atendimento e execute as ações de avanço em 1 clique.</p>
-          </div>
-          <span class="flow-status-tag ${provStep === 4 ? 'done' : ''}">${provStep === 4 ? 'Concluído' : `Etapa ${provStep} de 4`}</span>
-        </div>
-        <div class="flow-stepper mt-16">
-          <div class="flow-step ${provStep >= 1 ? 'done' : ''} ${provStep === 1 ? 'active' : ''}" data-step-action="1" style="cursor:pointer" data-tooltip="Clique para focar no registro da providência">
-            <div class="flow-step-marker"><span class="flow-step-num">1</span><span class="flow-step-badge">${icon('building')}</span></div>
-            <strong>Providência registrada</strong>
-            <small>${d.prov_action_type ? esc(provType?.label || d.prov_action_type) : (provStep >= 1 ? 'Em triagem/análise' : 'Definir ação')}</small>
-          </div>
-          <div class="flow-connector ${provStep >= 2 ? 'done' : ''}"></div>
-          <div class="flow-step ${provStep >= 2 ? 'done' : ''} ${provStep === 2 ? 'active' : ''}" data-step-action="2" style="cursor:pointer" data-tooltip="Clique para designar responsável">
-            <div class="flow-step-marker outline">${icon('user')}</div>
-            <strong>Responsável designado</strong>
-            <small>${d.prov_responsible || d.responsible ? esc(d.prov_responsible || d.responsible) : 'Designar equipe'}</small>
-          </div>
-          <div class="flow-connector ${provStep >= 3 ? 'done' : ''}"></div>
-          <div class="flow-step ${provStep >= 3 ? 'done' : ''} ${provStep === 3 ? 'active' : ''}" data-step-action="3" style="cursor:pointer" data-tooltip="Clique para iniciar a execução">
-            <div class="flow-step-marker outline"><span class="flow-step-num">3</span></div>
-            <strong>Em execução</strong>
-            <small>${statusClass(d.status) === 'completed' ? 'Serviço concluído' : (statusClass(d.status) === 'execution' ? 'Em andamento' : 'Iniciar execução')}</small>
-          </div>
-          <div class="flow-connector ${provStep >= 4 ? 'done' : ''}"></div>
-          <div class="flow-step ${provStep >= 4 ? 'done' : ''} ${provStep === 4 ? 'active' : ''}" data-step-action="4" style="cursor:pointer" data-tooltip="Clique para concluir a providência">
-            <div class="flow-step-marker outline">${icon('check-circle')}</div>
-            <strong>Providência concluída</strong>
-            <small>${provStep === 4 ? 'Finalizado com sucesso' : 'Concluir providência'}</small>
-          </div>
-        </div>
+  // ---------------------------------------------------------------------------
+  // TELA DA DEMANDA
+  // A pagina responde a tres perguntas — em que ponto a demanda esta, de quem e
+  // para quando ela e, e o que fazer agora — e nada alem disso. Toda escrita
+  // passa pelo assistente "Registrar andamento" (openProgressWizard), em tres
+  // etapas. Leituras profundas (historico, anexos, planejamento, analise
+  // tecnica, devolutivas) abrem em gavetas, no lugar das antigas abas.
+  // ---------------------------------------------------------------------------
 
-        ${ctx.user.perm.can_edit_analysis ? `
-        <div class="flow-actions-bar mt-16" style="padding-top:14px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
-          <span class="flow-actions-title" style="font-weight:600;font-size:12.5px;color:var(--ink)">Ações rápidas de avanço:</span>
-          <div class="flow-actions-btns" style="display:flex;gap:8px;flex-wrap:wrap">
-            ${provStep < 2 ? `<button type="button" class="btn btn-secondary btn-sm" id="btnFlowAssign">${icon('user')}Assumir Responsabilidade</button>` : ''}
-            ${provStep < 3 && !isCompleted ? `<button type="button" class="btn btn-secondary btn-sm" id="btnFlowStart">${icon('bolt')}Iniciar Execução</button>` : ''}
-            ${!isCompleted ? `<button type="button" class="btn btn-primary btn-sm" id="btnFlowComplete">${icon('check-circle')}Concluir Providência</button>` : ''}
-            ${isCompleted ? `<button type="button" class="btn btn-secondary btn-sm" id="btnFlowReopen">${icon('clock')}Reabrir Demanda</button>` : ''}
-          </div>
-        </div>
-        ` : ''}
-      </section>
+  const DV_MILESTONES = [
+    { label: 'Solicitação registrada', icon: 'clipboard' },
+    { label: 'Providência definida', icon: 'send' },
+    { label: 'Em execução', icon: 'bolt' },
+    { label: 'Conclusão', icon: 'check-circle' }
+  ];
 
-      <!-- DADOS DA SOLICITAÇÃO RECOLHÍVEIS / OCULTÁVEIS -->
-      <details class="demand-details-accordion mt-16">
-        <summary class="details-summary">
-          <div class="summary-left">
-            <span class="summary-icon">${icon('clipboard')}</span>
-            <div>
-              <strong style="font-size:13px;color:var(--ink)">Dados da Solicitação & Impacto</strong>
-              <div style="display:flex;gap:8px;align-items:center;margin-top:2px">
-                <span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span>
-                <span style="font-size:11.5px;color:var(--muted)">${esc(d.category)} · ${money(d.cost_estimate)}</span>
-              </div>
-            </div>
-          </div>
-          <span class="summary-toggle-btn">${icon('chevron')} Detalhes</span>
-        </summary>
-        <div class="details-expanded-body">
-          <div class="info-stat-row">
-            <div class="info-stat"><span class="info-stat-icon" style="background:var(--${catColor}-soft);color:var(--${catColor})">${icon(catIcon)}</span><div><span>Categoria</span><strong>${esc(d.category)}</strong></div></div>
-            <div class="info-stat"><span class="info-stat-icon" style="background:var(--blue-soft);color:var(--blue)">${icon('money')}</span><div><span>Custo estimado</span><strong>${money(d.cost_estimate)}</strong></div></div>
-            <div class="info-stat"><span class="info-stat-icon" style="background:var(--violet-soft);color:var(--violet)">${icon('users')}</span><div><span>Pessoas afetadas</span><strong>${num(d.affected_people)}</strong></div></div>
-          </div>
-          <div class="info-card mt-12" style="background:var(--surface);border:1px solid var(--line);box-shadow:none">
-            <h4 style="margin:0 0 6px;font-size:12.5px;color:var(--muted)">${icon('clipboard')} Descrição detalhada</h4>
-            <p style="margin:0;font-size:13.5px;line-height:1.6">${esc(d.description)}</p>
-          </div>
-          ${d.subcategory ? `<p class="wizard-hint mt-12">Também identificado como: <strong>${esc(d.subcategory)}</strong></p>` : ''}
-          <div class="info-card mt-12" style="background:var(--surface);border:1px solid var(--line);box-shadow:none">
-            <h4 style="margin:0 0 6px;font-size:12.5px;color:var(--muted)">${icon('warning')} Impacto informado</h4>
-            <p style="margin:0;font-size:13.5px;line-height:1.6">${esc(d.impact || 'Impacto não detalhado.')}</p>
-          </div>
-        </div>
-      </details>
+  const demandStage = d => {
+    if (statusClass(d.status) === 'completed') return 4;
+    if (statusClass(d.status) === 'execution') return 3;
+    if (d.prov_action_type || (d.prov_responsible || d.responsible || '').trim()) return 2;
+    return 1;
+  };
 
-      <!-- FORMULÁRIO DE PROVIDÊNCIA E ENCAMINHAMENTO -->
-      <section class="info-card mt-16 prov-form-card">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
-          <div>
-            <h3 style="margin:0">${icon('send')}Providência / Encaminhamento</h3>
-            <p class="wizard-hint" style="margin:4px 0 0">Defina o responsável, tipologia de ação e prazo previsto.</p>
-          </div>
-        </div>
-        <p class="wizard-question mt-16">Tipo de ação</p>
-        <div class="prov-type-row" id="provTypeRow">${PROV_ACTION_TYPES.map(t => `<button type="button" class="prov-type-chip ${d.prov_action_type === t.key ? 'active' : ''}" data-prov-type="${t.key}" style="--chip-color:var(--${t.color});--chip-soft:var(--${t.color}-soft)"><span class="prov-type-icon">${icon(t.icon)}</span>${esc(t.label)}</button>`).join('')}</div>
+  const dvResponsible = d => (d.prov_responsible || d.responsible || '').trim();
 
-        <p class="wizard-question mt-16">A SMEDU tem o material necessário disponível agora?</p>
-        <p class="wizard-hint">Se precisar comprar, esta demanda é sinalizada automaticamente no <strong>Planejamento 2027</strong> — dali é só destinar a um exercício futuro.</p>
-        <div class="toggle-row" id="materialToggleRow">
-          <button type="button" class="toggle-btn toggle-btn-no ${!d.needs_material ? 'active' : ''}" data-toggle="needs_material" data-val="0">${icon('check-circle')}Sim, tem material</button>
-          <button type="button" class="toggle-btn toggle-btn-yes ${d.needs_material ? 'active' : ''}" data-toggle="needs_material" data-val="1">${icon('cart')}Precisa comprar</button>
-        </div>
-        <div class="procurement-panel ${d.needs_material ? '' : 'hidden'}" id="materialProcurementPanel">
-          <div class="alert info procurement-alert clickable-row" id="materialPlanningShortcut" role="button" tabindex="0" data-tooltip="Abrir Planejamento Futuro" style="cursor:pointer;justify-content:space-between"><span style="display:flex;align-items:center;gap:9px">${icon('calendar')}<span>Sem o material em estoque, essa necessidade é registrada no <strong>Planejamento 2027</strong>. Toque aqui para destinar a um exercício futuro.</span></span>${icon('chevron')}</div>
-          <div class="prov-form-grid mt-12">
-            <div class="field"><label>Quantidade necessária</label><input class="input" type="number" min="0" step="0.01" id="materialQty" value="${d.planned_quantity ? esc(String(d.planned_quantity)) : ''}" placeholder="1"></div>
-            <div class="field" id="materialUnitField"><label>Unidade de medida</label><select class="select" id="materialUnit"></select></div>
-          </div>
-        </div>
-
-        <div class="prov-form-grid mt-16">
-          <div class="field"><label>Responsável</label><select class="select" id="provResponsible"><option value="">Selecionar responsável...</option>${staffOptions}</select></div>
-          <div class="field"><label>Prazo previsto</label><div class="datepicker" data-datepicker data-dp-target="provDueDate"><input type="hidden" id="provDueDate" value="${esc(d.prov_due_date || d.due_date || '')}"><div class="datepicker-input-wrap"><input class="input datepicker-display" type="text" placeholder="dd/mm/aaaa" readonly autocomplete="off"><button type="button" class="datepicker-icon-btn" aria-label="Abrir calendário" data-tooltip="Escolher data">${icon('calendar')}</button></div></div></div>
-          <div class="field"><label>Prioridade da providência</label><select class="select" id="provPriority"><option value="">Selecionar...</option>${PROV_PRIORITIES.map(p => `<option ${p === d.prov_priority ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
-          <div class="field"><label>Status da Demanda</label><select class="select" id="provStatus">${ctx.statuses.map(s => `<option ${s === d.status ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></div>
-          <div class="field span-4"><label>Observação / Encaminhamento</label><textarea class="textarea" id="provNote" placeholder="Detalhe a providência tomada ou o encaminhamento dado...">${esc(d.prov_note || '')}</textarea></div>
-        </div>
-        <div class="prov-form-footer mt-16" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding-top:14px;border-top:1px solid var(--line)">
-          <button type="button" class="attach-btn" id="provAttachBtn">${icon('paperclip')}Anexar documento</button>
-          <input type="file" id="provAttachInput" hidden>
-          <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-            <label class="prov-notify-row" style="cursor:pointer;margin:0" data-tooltip="Envia automaticamente um registro de devolutiva para a unidade escolar">
-              <span>Notificar escola</span>
-              <span class="switch"><input type="checkbox" id="provNotify" ${d.prov_notify_school ? 'checked' : ''}><span class="switch-track"></span></span>
-            </label>
-            <button type="button" class="btn btn-primary" id="saveProvidence" style="min-width:170px">
-              ${icon('bookmark')}Salvar Providência
-            </button>
-          </div>
-        </div>
-      </section>
-    </div><aside class="side-stack">
-      <section class="info-card"><h3>${icon('school')}Unidade Escolar</h3><div class="key-value"><div class="kv"><span>Unidade</span><strong>${esc(d.school_name)}</strong></div><div class="kv"><span>Direção</span><strong>${esc(d.director || '—')}</strong></div><div class="kv"><span>Local da ocorrência</span><strong>${esc(d.location || '—')}</strong></div><div class="kv"><span>Endereço</span><strong>${esc(d.address || '—')}</strong></div></div></section>
-      <section class="info-card providence-status">
-        <h3>${icon('send')}Status da providência</h3>
-        ${provType ? `<div class="prov-status-type" style="--chip-color:var(--${provType.color});--chip-soft:var(--${provType.color}-soft)"><span class="prov-type-icon">${icon(provType.icon)}</span>${esc(provType.label)}</div><div class="key-value mt-12"><div class="kv"><span>Responsável</span><strong>${esc(d.prov_responsible || d.responsible || 'Não definido')}</strong></div><div class="kv"><span>Prazo</span><strong>${fmtDate(d.prov_due_date || d.due_date)}</strong></div><div class="kv"><span>Prioridade</span><strong>${esc(d.prov_priority || d.priority || 'Não definida')}</strong></div></div>` : `<div class="prov-empty-state" style="padding:4px 0"><p class="text-muted" style="font-size:12px;margin:0 0 10px">Nenhum encaminhamento registrado ainda.</p><div style="display:flex;gap:6px;align-items:center"><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span></div></div>`}
-      </section>
-      <section class="info-card"><h3>${icon('warning')}Sinais de atenção</h3>${d.risk ? `<div class="impact-item">${icon('warning')}<span>Há risco informado à comunidade escolar.</span></div>` : ''}${d.blocks_activity ? `<div class="impact-item">${icon('clock')}<span>Impacta ou impede atividade escolar.</span></div>` : ''}${!d.risk && !d.blocks_activity ? `<p>Nenhum sinal crítico registrado.</p>` : ''}</section>
-    </aside></div>`;
-    }
-    if (name === 'technical') return `<div class="detail-layout"><div>
-      <section class="info-card accent"><h3>${icon('settings')}Análise Técnica</h3><div class="key-value"><div class="kv"><span>Parecer técnico</span><strong>${esc(d.technical_opinion || 'Ainda não registrado.')}</strong></div><div class="kv"><span>Ação definida</span><strong>${esc(d.action_defined || 'Ainda não definida.')}</strong></div><div class="kv"><span>Dependências</span><strong>${esc(d.dependencies || 'Nenhuma dependência registrada.')}</strong></div></div></section>
-      ${ctx.user.perm.can_edit_analysis ? `<button class="btn btn-primary" id="editTechnical">${icon('edit')}Atualizar análise técnica</button>` : ''}
-    </div><aside class="side-stack"><section class="info-card"><h3>${icon('user')}Responsabilidade</h3><div class="key-value"><div class="kv"><span>Responsável</span><strong>${esc(d.responsible || 'Não definido')}</strong></div><div class="kv"><span>Setor</span><strong>${esc(d.sector || 'Não definido')}</strong></div><div class="kv"><span>Prazo</span><strong>${fmtDate(d.due_date)}</strong></div></div></section><section class="info-card"><h3>${icon('info')}Dependências operacionais</h3><div class="check-grid"><span class="check">${d.needs_visit ? '✓' : '—'} Visita técnica</span><span class="check">${d.needs_budget ? '✓' : '—'} Orçamento</span><span class="check">${d.needs_material ? '✓' : '—'} Material</span><span class="check">${d.needs_contract ? '✓' : '—'} Contratação</span></div></section></aside></div>`;
-    if (name === 'responses') return `<div class="detail-layout"><div>
-      <div class="composer"><textarea id="updateMessage" placeholder="Registre uma devolutiva, orientação, informação complementar ou andamento..."></textarea><div class="composer-actions"><span class="text-muted" style="font-size:10px">A mensagem ficará registrada no histórico.</span><button class="btn btn-primary" id="sendUpdate">${icon('message')}Registrar devolutiva</button></div></div>
-      <section class="info-card"><h3>${icon('message')}Linha do tempo de devolutivas</h3>${renderTimeline(payload.updates.filter(x => x.kind === 'Devolutiva' || x.kind === 'Status' || x.kind === 'Alteração'))}</section>
-    </div><aside class="side-stack"><section class="info-card"><h3>${icon('info')}Boa devolutiva</h3><p>Informe o que foi analisado, qual é o próximo passo, quem está responsável e a previsão atualizada.</p></section></aside></div>`;
-    if (name === 'attachments') return `<section class="info-card"><h3>${icon('paperclip')}Anexos</h3><label class="upload-zone" id="uploadZone">${icon('paperclip')}<strong>Arraste um arquivo ou clique para selecionar</strong><small>PDF, DOCX, XLSX e imagens · até 12 MB</small><input type="file" id="attachmentInput" hidden></label>${renderFiles(payload.attachments)}</section>`;
-    if (name === 'history') return `<section class="info-card"><h3>${icon('clock')}Histórico completo</h3>${renderTimeline(payload.updates)}</section>`;
-    if (name === 'planning') return `<div class="detail-layout"><div><section class="info-card accent"><h3>${icon('calendar')}Planejamento</h3>${d.future_year ? `<p>Esta demanda está vinculada ao planejamento do exercício de <strong>${d.future_year}</strong>.</p><div class="metric-row mt-16"><div class="metric"><span>Tipo</span><strong>${esc(d.planning_kind || 'Planejamento futuro')}</strong></div><div class="metric"><span>Quantidade</span><strong>${num(d.planned_quantity || 0)} ${esc(d.planned_unit || '')}</strong></div><div class="metric"><span>Estimativa</span><strong>${money(d.cost_estimate)}</strong></div></div>` : (d.needs_material ? `<div class="alert warning" style="display:flex;align-items:center;gap:9px">${icon('cart')}<span>A Providência sinalizou que a SMEDU <strong>não possui o material</strong> necessário${d.planned_quantity ? ` (aprox. ${num(d.planned_quantity)} ${esc(d.planned_unit || '')})` : ''}. Clique em <strong>"Destinar a um exercício futuro"</strong> abaixo para confirmar o Planejamento 2027.</span></div>
-      <div class="table-wrap mt-16"><table class="data-table"><thead><tr><th>Categoria</th><th>Descrição</th><th>Quantidade</th><th>Unidade</th><th>Situação</th></tr></thead><tbody><tr id="materialPlanningRow" class="clickable-row" data-tooltip="Abrir Planejamento Futuro" style="cursor:pointer" tabindex="0" role="button"><td data-label="Categoria"><span class="review-category-icon" style="width:28px;height:28px;display:inline-flex;vertical-align:middle;margin-right:6px;background:var(--${CATEGORY_COLORS[d.category] || 'blue'}-soft);color:var(--${CATEGORY_COLORS[d.category] || 'blue'})">${icon(CATEGORY_ICONS[d.category] || 'clipboard')}</span><strong>${esc(d.category)}</strong></td><td data-label="Descrição">${esc(d.description || '—')}</td><td data-label="Quantidade"><strong>${num(d.planned_quantity || 0)}</strong></td><td data-label="Unidade">${esc(d.planned_unit || '—')}</td><td data-label="Situação"><span class="status-badge future">${icon('cart')}Precisa comprar</span></td></tr></tbody></table></div>` : `<p>Esta demanda ainda não foi destinada a um exercício futuro.</p>`)}</section>
-      ${ctx.user.perm.can_edit_analysis ? `<button class="btn btn-primary" id="editPlanningLink">${icon('calendar')}${d.future_year ? 'Editar planejamento' : 'Destinar a um exercício futuro'}</button>` : ''}
-      ${payload.planning.length ? payload.planning.map(p => `<section class="info-card mt-16"><div class="detail-code-line"><span class="badge P4">${esc(p.code)}</span><span class="status-badge future">${esc(p.status)}</span></div><h3 style="margin-top:12px">${esc(p.title)}</h3><div class="metric-row"><div class="metric"><span>Exercício</span><strong>${p.year}</strong></div><div class="metric"><span>Estimativa</span><strong>${money(p.estimated_cost)}</strong></div><div class="metric"><span>Escolas</span><strong>${p.schools_count}</strong></div></div></section>`).join('') : ''}</div><aside class="side-stack"><section class="info-card"><h3>${icon('info')}Fluxo futuro</h3><p>Demanda → Planejamento → Consolidação → Processo administrativo → Licitação/Contratação → Execução.</p></section></aside></div>`;
-    return '';
+  function dvGuidance(d, stage) {
+    const resp = dvResponsible(d);
+    // Demanda concluída não recebe andamento comum: o que resta é destiná-la a
+    // um exercício futuro ou consultar o que já foi registrado.
+    if (stage === 4) return {
+      title: 'Demanda concluída',
+      text: `Serviço encerrado em ${fmtDateTime(d.updated_at)}.`,
+      notice: 'Com a demanda concluída, o andamento possível é destiná-la a um exercício futuro, em Planejamento, ou consultar o histórico completo.',
+      actions: [
+        { label: 'Destinar a um exercício futuro', act: 'planning', kind: 'primary', ic: 'calendar', needsEdit: true },
+        { label: 'Ver histórico completo', act: 'history', kind: 'secondary', ic: 'clock', needsEdit: false }
+      ]
+    };
+    if (stage === 3) return {
+      title: 'O que fazer agora',
+      text: 'O serviço está em execução. Registre o andamento para atualizar o prazo, sinalizar falta de material ou informar a conclusão.',
+      cta: 'Registrar andamento'
+    };
+    if (stage === 2) return {
+      title: 'O que fazer agora',
+      text: `A providência está definida${resp ? ` com ${resp}` : ''}. Registre o andamento assim que a equipe começar o serviço no local.`,
+      cta: 'Registrar andamento'
+    };
+    return {
+      title: 'O que fazer agora',
+      text: 'Esta demanda ainda não tem providência definida. Registre o andamento para informar o tipo de ação, quem responde e o prazo previsto.',
+      cta: 'Registrar andamento'
+    };
   }
+
+  function dvMilestoneNote(d, i, stage) {
+    if (i === 0) return fmtDateTime(d.created_at);
+    if (i === 1) {
+      if (stage < 2) return 'Aguardando definição';
+      const t = PROV_ACTION_TYPES.find(x => x.key === d.prov_action_type);
+      return t ? t.label : (dvResponsible(d) || 'Definida');
+    }
+    if (i === 2) return stage > 3 ? 'Serviço executado' : (stage === 3 ? 'Em andamento' : 'Não iniciado');
+    return stage === 4 ? fmtDateTime(d.updated_at) : 'Aguardando';
+  }
+
+  // `tip` e o tooltip do cartao. O cartao ja mostra rotulo, valor e complemento;
+  // o tooltip responde o que nao esta na tela — o que aquele campo significa e
+  // o que ele muda em outros lugares do sistema (indicadores do Painel,
+  // planejamento). Repetir o que ja se le seria so ruido.
+  function dvFact({ icon: ic, label, value, sub = '', action = '', actionLabel = '', actionType = '', tip = '' }) {
+    return `<article class="dv-fact"${tip ? ` data-tooltip="${esc(tip)}"` : ''}>
+      <div class="dv-fact-head">${icon(ic)}<span>${esc(label)}</span></div>
+      <strong>${value}</strong>
+      ${sub ? `<span class="dv-fact-sub">${sub}</span>` : ''}
+      ${action ? `<button type="button" class="dv-fact-link" data-dv-action="${action}"${actionType ? ` data-dv-type="${actionType}"` : ''}>${esc(actionLabel)}${icon('chevron')}</button>` : ''}
+    </article>`;
+  }
+
+  function demandViewHTML(payload) {
+    const d = payload.demand;
+    const stage = demandStage(d);
+    const due = dueInfo(d);
+    const guide = dvGuidance(d, stage);
+    const canEdit = ctx.user.perm.can_edit_analysis;
+    const resp = dvResponsible(d);
+    const provType = PROV_ACTION_TYPES.find(t => t.key === d.prov_action_type);
+    const catColor = CATEGORY_COLORS[d.category] || 'blue';
+    const moves = (payload.updates || []).slice(0, 3);
+    const nextSteps = [
+      { label: 'Definir providência e responsável', at: 1 },
+      { label: 'Registrar início do serviço', at: 2 },
+      { label: 'Informar conclusão do serviço', at: 3 },
+      { label: 'Encerrar e arquivar a demanda', at: 4 }
+    ];
+    const isDone = stage === 4;
+    // Demanda concluida tranca os painies que registrariam andamento: sobram
+    // o planejamento e a consulta ao historico, como diz o aviso do topo.
+    const travado = isDone;
+    const semAcao = 'Indisponível com a demanda concluída.';
+
+    return `<div class="breadcrumb"><a href="/">Painel</a><span>›</span><a href="/demandas">Demandas</a><span>›</span><span>${esc(d.code)}</span></div>
+
+    <header class="dv-head">
+      <div>
+        <h1 class="dv-title">${esc(d.title)}</h1>
+        <div class="dv-badges">
+          <span class="dv-code">${esc(d.code)}</span>
+          <span class="badge ${d.priority}">${esc(d.priority)} · ${esc(priorityLabel(d.priority))}</span>
+          <span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span>
+          ${due.cls ? `<span class="deadline ${due.cls}">${esc(due.text)}</span>` : ''}
+        </div>
+      </div>
+      <div class="dv-head-actions">
+        <button class="btn btn-secondary" data-dv-action="devolutiva" data-tooltip="Escrever uma devolutiva para a escola">${icon('message')}Devolutiva</button>
+        <button class="dv-menu-btn" id="dvMenuBtn" aria-haspopup="true" aria-expanded="false" aria-label="Mais ações" data-tooltip="Mais ações">${icon('dots')}</button>
+        <div class="dv-menu-pop" id="dvMenuPop" role="menu" hidden>
+          ${travado ? '' : `<button type="button" role="menuitem" data-dv-action="attachments">${icon('paperclip')}Anexos (${payload.attachments.length})</button>`}
+          <button type="button" role="menuitem" data-dv-action="history">${icon('clock')}Histórico completo</button>
+          ${travado ? '' : `<button type="button" role="menuitem" data-dv-action="technical">${icon('settings')}Análise técnica</button>`}
+          <button type="button" role="menuitem" data-dv-action="planning">${icon('calendar')}Planejamento</button>
+          <button type="button" role="menuitem" data-dv-action="school">${icon('school')}Dados da unidade escolar</button>
+          ${canEdit ? `<hr>
+          <button type="button" role="menuitem" data-dv-action="edit-demand">${icon('edit')}Editar dados da demanda</button>
+          ${travado ? '' : `<button type="button" role="menuitem" data-dv-action="wizard" data-dv-type="executado">${icon('check-circle')}Informar conclusão</button>`}` : ''}
+        </div>
+      </div>
+    </header>
+
+    <section class="dv-now">
+      <span class="dv-now-icon">${icon(isDone ? 'check-circle' : 'bolt')}</span>
+      <div>
+        <h2>${esc(guide.title)}</h2>
+        <p>${esc(guide.text)}</p>
+        ${guide.notice ? `<p class="dv-now-notice">${icon('info')}<span>${esc(guide.notice)}</span></p>` : ''}
+        <div class="dv-now-actions">
+        ${guide.actions
+        ? guide.actions.filter(x => canEdit || !x.needsEdit).map(x => `<button class="btn btn-${x.kind}" data-dv-action="${x.act}">${icon(x.ic)}${esc(x.label)}</button>`).join('')
+        : (canEdit
+          ? `<button class="btn btn-primary" data-dv-action="wizard">${esc(guide.cta)}${icon('chevron')}</button>`
+          : `<button class="btn btn-primary" data-dv-action="devolutiva">${icon('message')}Enviar devolutiva</button>`)}
+        </div>
+      </div>
+    </section>
+
+    <ol class="dv-rail">
+      ${DV_MILESTONES.map((m, i) => {
+      const n = i + 1;
+      const cls = stage > n ? 'done' : (stage === n ? 'current' : 'todo');
+      return `<li class="${cls}">
+          <span class="dv-rail-marker">${icon(m.icon)}</span>
+          <strong>${esc(m.label)}</strong>
+          <small>${esc(dvMilestoneNote(d, i, stage))}</small>
+        </li>`;
+    }).join('')}
+    </ol>
+
+    <div class="dv-facts">
+      ${dvFact({
+      icon: 'school', label: 'Unidade Escolar', value: esc(d.school_name),
+      tip: 'Escola onde a demanda foi registrada. Em "Ver detalhes" está o histórico de infraestrutura da unidade.',
+      sub: d.director ? `Direção: ${esc(d.director)}` : '',
+      action: 'school', actionLabel: 'Ver detalhes'
+    })}
+      ${dvFact({
+      icon: 'user', label: 'Responsável atual',
+      tip: 'Quem responde pelo atendimento hoje. Enquanto ninguém for designado, a demanda entra em "Sem responsável" no Painel.',
+      value: resp ? esc(resp) : '<span class="dv-muted">Não definido</span>',
+      sub: d.sector ? esc(d.sector) : (provType ? esc(provType.label) : ''),
+      action: canEdit && !travado ? 'wizard' : '', actionType: 'responsavel', actionLabel: resp ? 'Alterar responsável' : 'Designar responsável'
+    })}
+      ${dvFact({
+      icon: 'calendar', label: 'Prazo previsto',
+      tip: 'Data de conclusão prevista pela equipe técnica. É ela que alimenta "Prazo vencido" e "Vence em 7 dias" no Painel.',
+      value: esc(fmtDate(d.prov_due_date || d.due_date)),
+      sub: due.cls ? `<span class="deadline ${due.cls}">${esc(due.text)}</span>` : '',
+      action: canEdit && !travado ? 'wizard' : '', actionType: 'prazo', actionLabel: 'Reprogramar prazo'
+    })}
+      ${dvFact({
+      icon: CATEGORY_ICONS[d.category] || 'clipboard', label: 'Categoria',
+      tip: 'Classificação técnica do serviço. Define as unidades sugeridas no planejamento e a fatia da categoria no Painel.',
+      value: esc(d.category), sub: d.subcategory ? esc(d.subcategory) : ''
+    })}
+      ${dvFact({
+      icon: 'cart', label: 'Material',
+      tip: 'Diz se o serviço depende de compra. Em "Precisa comprar", o item é levado para a carteira de planejamento.',
+      value: d.needs_material ? '<span style="color:var(--orange)">Precisa comprar</span>' : 'Disponível no estoque',
+      sub: d.needs_material && d.planned_quantity ? `${num(d.planned_quantity)} ${esc(d.planned_unit || '')}` : '',
+      action: 'planning', actionLabel: d.needs_material ? 'Ver no planejamento' : 'Ver planejamento'
+    })}
+    </div>
+
+    <div class="dv-panels">
+      <section class="dv-panel">
+        <h3>${icon('clipboard')}Resumo da solicitação</h3>
+        <p>${esc(d.description)}</p>
+        ${d.impact ? `<p class="dv-muted">${esc(d.impact)}</p>` : ''}
+        <div class="dv-kv"><span>Local da ocorrência</span><strong>${esc(d.location || '—')}</strong></div>
+        <div class="dv-kv"><span>Pessoas afetadas</span><strong>${num(d.affected_people)}</strong></div>
+        <div class="dv-kv"><span>Custo estimado</span><strong>${money(d.cost_estimate)}</strong></div>
+        ${d.risk ? `<div class="dv-kv"><span>Risco</span><strong style="color:var(--red)">Risco informado</strong></div>` : ''}
+        ${d.blocks_activity ? `<div class="dv-kv"><span>Atividade escolar</span><strong style="color:var(--orange)">Impedida</strong></div>` : ''}
+        <div class="dv-kv"><span>Solicitada em</span><strong>${esc(fmtDateTime(d.created_at))}</strong></div>
+      </section>
+
+      <section class="dv-panel">
+        <h3>${icon('clock')}Últimas movimentações</h3>
+        ${moves.length ? `<div class="dv-moves">${moves.map((m, i) => `<div class="dv-move ${i ? 'is-old' : ''}">
+            <strong>${esc(m.kind)}</strong>
+            <p>${esc(m.message)}</p>
+            <small>${esc(fmtDateTime(m.created_at))} · ${esc(m.author)}</small>
+          </div>`).join('')}</div>` : `<p class="dv-muted">Nenhuma movimentação registrada até agora.</p>`}
+        <button type="button" class="dv-panel-foot" data-dv-action="history">Ver histórico completo${icon('chevron')}</button>
+      </section>
+
+      <section class="dv-panel">
+        <h3>${icon('check-circle')}Próximos passos</h3>
+        <ul class="dv-next">
+          ${nextSteps.map(s => {
+      const done = stage > s.at;
+      const now = stage === s.at;
+      return `<li class="${now ? 'is-now' : ''}">
+              <span class="dv-next-dot${done ? ' is-done' : ''}">${done ? icon('check-circle') : ''}</span>
+              <span>${esc(s.label)}</span>
+            </li>`;
+    }).join('')}
+        </ul>
+        ${travado ? `<p class="dv-panel-locked">${icon('info')}<span>${esc(semAcao)}</span></p>`
+        : (canEdit ? `<button type="button" class="dv-panel-foot" data-dv-action="wizard">Registrar andamento${icon('chevron')}</button>` : '')}
+      </section>
+    </div>
+
+    <div class="dv-panels">
+      <section class="dv-panel">
+        <h3>${icon('settings')}Análise técnica</h3>
+        <p class="${d.technical_opinion ? '' : 'dv-muted'}">${esc(d.technical_opinion || 'Parecer técnico ainda não registrado.')}</p>
+        <div class="dv-kv"><span>Ação definida</span><strong>${esc(d.action_defined || '—')}</strong></div>
+        <div class="dv-kv"><span>Dependências</span><strong>${esc(d.dependencies || 'Nenhuma')}</strong></div>
+        ${travado ? `<p class="dv-panel-locked">${icon('info')}<span>${esc(semAcao)}</span></p>`
+        : (canEdit ? `<button type="button" class="dv-panel-foot" data-dv-action="technical">Atualizar análise técnica${icon('chevron')}</button>` : '')}
+      </section>
+
+      <section class="dv-panel">
+        <h3>${icon('calendar')}Planejamento</h3>
+        ${d.future_year
+        ? `<p>Destinada ao exercício de <strong>${esc(String(d.future_year))}</strong> como ${esc(d.planning_kind || 'planejamento futuro')}.</p>
+             <div class="dv-kv"><span>Quantidade</span><strong>${num(d.planned_quantity || 0)} ${esc(d.planned_unit || '')}</strong></div>
+             <div class="dv-kv"><span>Estimativa</span><strong>${money(d.cost_estimate)}</strong></div>`
+        : (d.needs_material
+          ? `<p>A providência sinalizou que a SMEDU <strong>não tem o material</strong>. Destine a demanda a um exercício futuro para seguir com a compra.</p>`
+          : `<p class="dv-muted">Esta demanda não está vinculada a um exercício futuro.</p>`)}
+        ${payload.planning.length ? payload.planning.map(p => `<div class="dv-kv"><span>${esc(p.code)}</span><strong>${esc(p.title)}</strong></div>`).join('') : ''}
+        ${canEdit ? `<button type="button" class="dv-panel-foot" data-dv-action="planning">${d.future_year ? 'Editar planejamento' : 'Destinar a um exercício futuro'}${icon('chevron')}</button>` : ''}
+      </section>
+
+      <section class="dv-panel">
+        <h3>${icon('paperclip')}Anexos</h3>
+        ${payload.attachments.length
+        ? `<p>${num(payload.attachments.length)} arquivo${payload.attachments.length === 1 ? '' : 's'} anexado${payload.attachments.length === 1 ? '' : 's'} a esta demanda.</p>
+             ${payload.attachments.slice(0, 3).map(f => `<div class="dv-kv"><span>${esc(f.filename)}</span><strong>${Math.max(1, Math.round(f.size / 1024))} KB</strong></div>`).join('')}`
+        : `<p class="dv-muted">Nenhum arquivo anexado. Fotos do local e orçamentos ajudam a equipe a decidir mais rápido.</p>`}
+        ${travado ? `<p class="dv-panel-locked">${icon('info')}<span>${esc(semAcao)}</span></p>`
+        : `<button type="button" class="dv-panel-foot" data-dv-action="attachments">${payload.attachments.length ? 'Abrir anexos' : 'Anexar arquivo'}${icon('chevron')}</button>`}
+      </section>
+    </div>`;
+  }
+
   function renderTimeline(items) {
     if (!items?.length) return empty('Ainda sem registros', 'As movimentações aparecerão aqui em ordem cronológica.');
     return `<div class="timeline">${items.map(x => `<div class="timeline-item"><div class="timeline-meta">${fmtDateTime(x.created_at)} · ${esc(x.author)}</div><strong>${esc(x.kind)}</strong><p>${esc(x.message)}</p></div>`).join('')}</div>`;
@@ -1308,20 +1805,33 @@
     const pk = overrides.planning_kind ?? d.planning_kind;
     modal({
       title: 'Planejamento Futuro', subtitle: `${d.code} · ${d.title}`, mode: 'drawer', body: `<form id="planningLinkForm"><div class="form-grid">
-      <div class="field"><label>Exercício futuro</label><input class="input" type="number" min="2026" max="2035" name="future_year" value="${esc(d.future_year || '')}" placeholder="Ex.: 2027"></div>
+      <div class="field"><label>Exercício futuro <span class="pw-req">*</span></label><input class="input" type="number" min="2026" max="2035" name="future_year" value="${esc(d.future_year || (new Date().getFullYear() + 1))}" placeholder="Ex.: 2027"></div>
       <div class="field"><label>Tipo de necessidade</label><select class="select" name="planning_kind"><option value="">Não definido</option>${PLANNING_KINDS.map(k => `<option ${k === pk ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select></div>
       <div class="field"><label>Quantidade</label><input class="input" type="number" min="0" step="0.01" name="planned_quantity" value="${esc(pq || '')}"></div>
-      <div class="field"><label>Unidade de medida</label><input class="input" name="planned_unit" value="${esc(pu || '')}" placeholder="un, m², serviço..."></div>
-      <div class="field span-2"><label>Estimativa de custo (R$)</label><input class="input" type="number" min="0" step="0.01" name="cost_estimate" value="${esc(d.cost_estimate || 0)}"></div>
-    </div><p class="wizard-hint mt-12">Deixe o exercício em branco para remover o vínculo desta demanda com o planejamento futuro.</p></form>`,
-      footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="savePlanningLink">Salvar planejamento</button>`, onOpen() {
+      <div class="field"><label>Unidade de medida</label><select class="select" name="planned_unit" data-search data-search-placeholder="Buscar unidade...">${unitOptionsHTML(pu || '', (CATEGORIA_UNIDADES[d.category] || CATEGORIA_UNIDADES_DEFAULT).permitidas || [], `Sugeridas para ${d.category}`)}</select></div>
+      <div class="field"><label>Estimativa de custo (R$)</label><input class="input" type="number" min="0" step="0.01" name="cost_estimate" id="planCost" value="${esc(d.cost_estimate || 0)}"></div>
+      <div class="field"><label for="planTotal">Total</label><input class="input" id="planTotal" readonly tabindex="-1" aria-readonly="true" value=""></div>
+    </div><p class="wizard-hint mt-12">${d.future_year ? 'Apague o exercício para remover o vínculo desta demanda com o planejamento futuro.' : 'Ao salvar, a demanda passa a constar na tabela do exercício escolhido, em Planejamento Futuro.'}</p></form>`,
+      footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="savePlanningLink">Salvar planejamento</button>`, onOpen(root) {
+        // Total e apenas o produto exibido: quantidade x estimativa de custo.
+        const qtd = $('[name="planned_quantity"]', root), custo = $('#planCost', root), total = $('#planTotal', root);
+        const recalcular = () => { total.value = money((Number(qtd.value) || 0) * (Number(custo.value) || 0)); };
+        [qtd, custo].forEach(el => el.addEventListener('input', recalcular));
+        recalcular();
         $('#savePlanningLink').addEventListener('click', async () => {
           const f = $('#planningLinkForm');
           const payload = Object.fromEntries(new FormData(f).entries());
+          // Sem exercicio nao ha o que destinar: salvar em silencio criava a
+          // impressao de que a demanda tinha ido para o planejamento.
+          if (!String(payload.future_year || '').trim() && !d.future_year) {
+            toast('Falta o exercício', 'Informe o ano para destinar a demanda ao planejamento futuro.', 'error');
+            $('[name="future_year"]', root)?.focus();
+            return;
+          }
           try {
             await api(`/api/demands/${d.id}`, { method: 'PUT', body: payload });
             closeModal();
-            toast('Planejamento atualizado', payload.future_year ? `Demanda destinada ao exercício ${payload.future_year}.` : 'Vínculo com exercício futuro removido.');
+            toast('Planejamento atualizado', payload.future_year ? `Demanda incluída na tabela do Planejamento ${payload.future_year}.` : 'Vínculo com exercício futuro removido.');
             await reload();
           } catch (e) { toast('Não foi possível salvar', e.message, 'error'); }
         });
@@ -1335,16 +1845,37 @@
   // pode alterar no backend: title, description, category, subcategory, location, impact,
   // affected_people, risk, blocks_activity.
   async function openEditDemand(d, reload) {
+    // A unidade escolar de uma demanda só pode ser trocada pelo Gestor da Infraestrutura
+    // (perfil com can_manage_admin) — o PUT /api/demands/{id} aplica a mesma regra no backend.
+    const canMoveSchool = !!ctx.user.perm.can_manage_admin;
+    let schools = [];
+    if (canMoveSchool) {
+      try { schools = await api('/api/schools'); } catch { schools = []; }
+    }
     modal({
       title: 'Editar demanda', subtitle: `${d.code} · ${d.school_name || ''}`, mode: 'drawer', body: `<form id="editDemandForm"><div class="form-grid">
       <div class="field span-2"><label>Nome curto</label><input class="input" name="title" maxlength="140" value="${esc(d.title || '')}" required></div>
+      ${canMoveSchool ? `<div class="field span-2"><label>Unidade Escolar</label><select class="select" name="school_id" data-search data-search-placeholder="Buscar escola pelo nome...">${schools.map(x => `<option value="${x.id}" ${x.id === d.school_id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>` : ''}
+      <div class="field"><label>Prioridade</label><select class="select" name="priority"><option value="P1 - Urgente" ${d.priority === 'P1 - Urgente' ? 'selected' : ''}>P1 - Urgente</option><option value="P2 - Alta" ${d.priority === 'P2 - Alta' ? 'selected' : ''}>P2 - Alta</option><option value="P3 - Programada" ${d.priority === 'P3 - Programada' ? 'selected' : ''}>P3 - Programada</option></select></div>
+      <div class="field"><label>Status</label><select class="select" name="status"><option value="P1 Urgentes" ${d.status === 'P1 Urgentes' ? 'selected' : ''}>P1 Urgentes</option><option value="Aguardando contratação" ${d.status === 'Aguardando contratação' ? 'selected' : ''}>Aguardando contratação</option><option value="Em execução" ${d.status === 'Em execução' ? 'selected' : ''}>Em execução</option><option value="Planejamento futuro" ${d.status === 'Planejamento futuro' ? 'selected' : ''}>Planejamento futuro</option><option value="Concluída" ${d.status === 'Concluída' ? 'selected' : ''}>Concluída</option></select></div>
       <div class="field"><label>Tipo de problema</label><select class="select" name="category">${ctx.categories.map(c => `<option ${c === d.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
+      <div class="field"><label>Data de vencimento</label><input class="input" type="date" name="due_date" value="${d.due_date || ''}"></div>
       <div class="field"><label>Local</label><input class="input" name="location" placeholder="Ex.: Sala 3, banheiro do pátio, cozinha..." value="${esc(d.location || '')}"></div>
+      <div class="field"><label>Responsável</label><input class="input" name="responsible" placeholder="Nome do responsável" value="${esc(d.responsible || '')}"></div>
       <div class="field span-2"><label>Descrição</label><textarea class="textarea" name="description" required>${esc(d.description || '')}</textarea></div>
+      <div class="field span-2"><label>Parecer técnico</label><textarea class="textarea" name="technical_opinion" placeholder="Parecer ou análise técnica da demanda">${esc(d.technical_opinion || '')}</textarea></div>
       <div class="field"><label>Pessoas afetadas (aprox.)</label><input class="input" type="number" min="0" name="affected_people" value="${esc(d.affected_people || 0)}"></div>
+      <div class="field"><label>Setor</label><input class="input" name="sector" placeholder="Setor responsável" value="${esc(d.sector || '')}"></div>
       <div class="field span-2"><label>Sinais de impacto</label><div class="check-grid"><label class="check"><input type="checkbox" name="blocks_activity" ${d.blocks_activity ? 'checked' : ''}> Impede atividade escolar</label><label class="check"><input type="checkbox" name="risk" ${d.risk ? 'checked' : ''}> Risco de acidente</label></div></div>
     </div></form>`,
-      footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="saveEditDemand">Salvar alterações</button>`, onOpen() {
+      footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-danger" id="deleteEditDemand" style="margin-left:auto;margin-right:auto">${icon('trash')}Deletar</button><button class="btn btn-primary" id="saveEditDemand">Salvar alterações</button>`, onOpen() {
+        // Espelha no subtítulo do modal a escola escolhida, para quem está corrigindo
+        // uma unidade selecionada por engano ver a troca antes de salvar.
+        const schoolSelect = $('#editDemandForm [name="school_id"]');
+        schoolSelect?.addEventListener('change', () => {
+          const head = $('.modal-header p');
+          if (head) head.textContent = `${d.code} · ${schoolSelect.selectedOptions[0]?.textContent || ''}`;
+        });
         $('#saveEditDemand').addEventListener('click', async () => {
           const f = $('#editDemandForm');
           if (!f.reportValidity()) return;
@@ -1358,62 +1889,14 @@
             await reload();
           } catch (e) { toast('Não foi possível salvar', e.message, 'error'); }
         });
-      }
-    });
-  }
-
-  function openCompleteDemandModal(d, reload) {
-    modal({
-      title: 'Concluir Providência',
-      subtitle: `${d.code} · ${d.title}`,
-      mode: 'center',
-      body: `<form id="completeDemandForm">
-        <div class="form-grid">
-          <div class="field span-2">
-            <label>Parecer / Resumo da Conclusão *</label>
-            <textarea class="textarea" id="completeResolution" name="resolution" required placeholder="Descreva os serviços ou providências executadas para solucionar a demanda..." style="min-height:100px">${esc(d.action_defined || d.prov_note || '')}</textarea>
-          </div>
-          <div class="field span-2">
-            <label class="prov-notify-row" style="padding:10px 14px;background:var(--surface-soft);border-radius:var(--radius-md);border:1px solid var(--line);cursor:pointer">
-              <div>
-                <strong>Enviar devolutiva de conclusão à escola</strong>
-                <p style="margin:2px 0 0;font-size:11.5px;color:var(--muted)">A unidade escolar receberá o aviso de que o serviço foi finalizado no histórico.</p>
-              </div>
-              <span class="switch"><input type="checkbox" id="completeNotifySchool" checked><span class="switch-track"></span></span>
-            </label>
-          </div>
-        </div>
-      </form>`,
-      footer: `<button type="button" class="btn btn-secondary" data-close>Cancelar</button><button type="button" class="btn btn-primary" id="btnConfirmComplete">${icon('check-circle')} Confirmar Conclusão</button>`,
-      onOpen() {
-        $('#btnConfirmComplete').addEventListener('click', async () => {
-          const form = $('#completeDemandForm');
-          if (!form.reportValidity()) return;
-          const resolution = ($('#completeResolution').value || '').trim();
-          const notify = $('#completeNotifySchool').checked;
-          try {
-            await api(`/api/demands/${d.id}`, {
-              method: 'PUT',
-              body: {
-                status: 'Concluída',
-                action_defined: resolution || d.action_defined || 'Serviço concluído',
-                prov_note: resolution || d.prov_note
-              }
-            });
-            if (notify && resolution) {
-              await api(`/api/demands/${d.id}/updates`, {
-                method: 'POST',
-                body: {
-                  kind: 'Devolutiva',
-                  message: `Demanda concluída: ${resolution}`
-                }
-              });
-            }
-            closeModal();
-            toast('Demanda Concluída com Sucesso', 'A escola foi notificada e o atendimento foi encerrado.');
-            await reload();
-          } catch (e) {
-            toast('Erro ao concluir demanda', e.message, 'error');
+        $('#deleteEditDemand')?.addEventListener('click', async () => {
+          if (confirm(`Tem certeza que deseja deletar esta demanda (${d.code})? Esta ação não pode ser desfeita.`)) {
+            try {
+              await api(`/api/demands/${d.id}`, { method: 'DELETE' });
+              closeModal();
+              toast('Demanda deletada', `${d.code} foi removida do sistema.`);
+              await reload();
+            } catch (e) { toast('Erro ao deletar', e.message, 'error'); }
           }
         });
       }
@@ -1424,256 +1907,455 @@
     setLoading();
     const id = Number(document.body.dataset.entityId);
     let [payload, staff] = await Promise.all([api(`/api/demands/${id}`), loadStaff().catch(() => [])]);
-    payload.staff = staff; let active = 'summary';
-    const render = () => {
-      const d = payload.demand, due = dueInfo(d);
-      content.innerHTML = `<div class="breadcrumb"><a href="/">Painel</a><span>›</span><a href="/demandas">Demandas</a><span>›</span><span>${esc(d.code)}</span></div>
-        <div class="detail-head"><div><div class="detail-code-line"><span class="code-label">${esc(d.code)}</span><span class="badge ${d.priority}">${d.priority} · ${priorityLabel(d.priority)}</span><span class="status-badge ${statusClass(d.status)}">${esc(d.status)}</span><span class="deadline ${due.cls}">${esc(due.text)}</span></div><h1>${esc(d.title)}</h1></div><div class="page-actions">${ctx.user.perm.can_edit_analysis ? `<button class="btn btn-secondary" id="editDemand">${icon('edit')}Editar análise</button>` : ''}<button class="btn btn-primary" id="quickUpdate">${icon('message')}Devolutiva</button></div></div>
-        <nav class="tabs" aria-label="Detalhes da demanda">
-          <button class="tab ${active === 'summary' ? 'active' : ''}" data-tab="summary">${icon('file')}Resumo</button>
-          <button class="tab ${active === 'technical' ? 'active' : ''}" data-tab="technical">${icon('settings')}Análise Técnica</button>
-          <button class="tab ${active === 'responses' ? 'active' : ''}" data-tab="responses">${icon('message')}Devolutivas</button>
-          <button class="tab ${active === 'attachments' ? 'active' : ''}" data-tab="attachments">${icon('paperclip')}Anexos <span class="badge P3">${payload.attachments.length}</span></button>
-          <button class="tab ${active === 'history' ? 'active' : ''}" data-tab="history">${icon('clock')}Histórico</button>
-          <button class="tab ${active === 'planning' ? 'active' : ''}" data-tab="planning">${icon('calendar')}Planejamento</button>
-        </nav>
-        <div id="tabContent">${detailTabContent(active, payload)}</div>`;
+    payload.staff = staff;
 
-      const reload = async () => { payload = await api(`/api/demands/${id}`); payload.staff = staff; render() };
+    const reload = async () => { payload = await api(`/api/demands/${id}`); payload.staff = staff; render(); };
 
-      $$('[data-tab]', content).forEach(b => b.addEventListener('click', () => {
-        active = b.dataset.tab; render();
-      }));
+    async function upload(file) {
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        toast('Enviando anexo', file.name);
+        await api(`/api/demands/${id}/attachments`, { method: 'POST', body: fd });
+        closeModal();
+        await reload();
+        toast('Anexo enviado', file.name);
+      } catch (e) { toast('Falha no envio', e.message, 'error'); }
+    }
 
-      $('#editDemand')?.addEventListener('click', () => openEditTechnical(d, reload));
-      $('#editTechnical')?.addEventListener('click', () => openEditTechnical(d, reload));
-      $('#editPlanningLink')?.addEventListener('click', () => openEditPlanning(d, reload));
-      $('#materialPlanningRow')?.addEventListener('click', () => openEditPlanning(d, reload));
-      $('#materialPlanningRow')?.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEditPlanning(d, reload); } });
-
-      // Stepper click actions
-      $$('[data-step-action]', content).forEach(el => {
-        el.addEventListener('click', () => {
-          const action = Number(el.dataset.stepAction);
-          if (action === 1 || action === 2) {
-            $('.prov-form-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            if (action === 2) $('#provResponsible')?.focus();
-          } else if (action === 3) {
-            if (statusClass(d.status) !== 'execution' && statusClass(d.status) !== 'completed') {
-              $('#btnFlowStart')?.click();
-            }
-          } else if (action === 4) {
-            if (statusClass(d.status) !== 'completed') {
-              openCompleteDemandModal(d, reload);
-            }
-          }
-        });
+    // -- gavetas de leitura (substituem as antigas abas) ----------------------
+    function openHistoryDrawer() {
+      modal({
+        title: 'Histórico completo', subtitle: `${payload.demand.code} · ${payload.updates.length} registro${payload.updates.length === 1 ? '' : 's'}`,
+        mode: 'drawer', body: renderTimeline(payload.updates),
+        footer: `<button class="btn btn-secondary" data-close>Fechar</button>`
       });
+    }
 
-      // Ações rápidas de avanço do fluxo
-      $('#btnFlowAssign')?.addEventListener('click', async () => {
-        const userResp = (ctx.user?.name || '').trim() || 'Gestor da Infraestrutura';
-        const newStatus = ['Nova', 'Recebida'].includes(d.status) ? 'Em análise técnica' : d.status;
-        const actionType = d.prov_action_type || (d.category?.toLowerCase().includes('obra') ? 'obra' : 'manutencao');
-        try {
-          await api(`/api/demands/${d.id}`, {
-            method: 'PUT',
-            body: {
-              responsible: userResp,
-              prov_responsible: userResp,
-              prov_action_type: actionType,
-              status: newStatus
-            }
+    function openResponsesDrawer() {
+      modal({
+        title: 'Devolutivas', subtitle: `${payload.demand.code} · ${esc(payload.demand.school_name)}`, mode: 'drawer',
+        body: `<div class="composer"><textarea id="updateMessage" placeholder="Descreva o que foi analisado, qual é o próximo passo, quem está responsável e a previsão atualizada."></textarea></div>
+          <section class="info-card mt-16"><h3>${icon('message')}Linha do tempo</h3>${renderTimeline(payload.updates.filter(x => ['Devolutiva', 'Status', 'Alteração'].includes(x.kind)))}</section>`,
+        footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="sendUpdate">${icon('message')}Registrar devolutiva</button>`,
+        onOpen(root) {
+          setTimeout(() => $('#updateMessage', root)?.focus(), 30);
+          $('#sendUpdate', root).addEventListener('click', async () => {
+            const ta = $('#updateMessage', root);
+            if (!ta.value.trim()) { toast('Escreva a devolutiva', 'O campo de mensagem está vazio.', 'error'); return; }
+            try {
+              await api(`/api/demands/${id}/updates`, { method: 'POST', body: { kind: 'Devolutiva', message: ta.value.trim() } });
+              closeModal();
+              toast('Devolutiva registrada', 'A escola verá a mensagem no histórico da demanda.');
+              await reload();
+            } catch (e) { toast('Não foi possível registrar', e.message, 'error'); }
           });
-          await api(`/api/demands/${d.id}/updates`, {
-            method: 'POST',
-            body: {
-              kind: 'Alteração',
-              message: `Responsabilidade assumida por ${userResp}. Status atualizado para "${newStatus}".`
-            }
-          });
-          toast('Responsabilidade Assumida', `${userResp} é agora o responsável pela demanda.`);
-          await reload();
-        } catch (e) {
-          toast('Erro ao assumir demanda', e.message, 'error');
         }
       });
+    }
 
-      $('#btnFlowStart')?.addEventListener('click', async () => {
-        const userResp = d.prov_responsible || d.responsible || (ctx.user?.name || '').trim() || 'Equipe de Infraestrutura';
-        const actionType = d.prov_action_type || 'manutencao';
-        try {
-          await api(`/api/demands/${d.id}`, {
-            method: 'PUT',
-            body: {
-              status: 'Em execução',
-              responsible: userResp,
-              prov_responsible: userResp,
-              prov_action_type: actionType
-            }
-          });
-          await api(`/api/demands/${d.id}/updates`, {
-            method: 'POST',
-            body: {
-              kind: 'Status',
-              message: `Execução iniciada pelo setor responsável (${userResp}).`
-            }
-          });
-          toast('Execução Iniciada', 'Demanda marcada como "Em execução".');
-          await reload();
-        } catch (e) {
-          toast('Erro ao iniciar execução', e.message, 'error');
+    function openAttachmentsDrawer() {
+      modal({
+        title: 'Anexos', subtitle: `${payload.demand.code} · ${payload.attachments.length} arquivo${payload.attachments.length === 1 ? '' : 's'}`,
+        mode: 'drawer',
+        body: `<label class="upload-zone" id="uploadZone">${icon('paperclip')}<strong>Arraste um arquivo ou clique para selecionar</strong><small>PDF, DOCX, XLSX e imagens · até 12 MB</small><input type="file" id="attachmentInput" hidden></label>${renderFiles(payload.attachments)}`,
+        footer: `<button class="btn btn-secondary" data-close>Fechar</button>`,
+        onOpen(root) {
+          const zone = $('#uploadZone', root), input = $('#attachmentInput', root);
+          zone.addEventListener('click', () => input.click());
+          input.addEventListener('change', () => input.files[0] && upload(input.files[0]));
+          ['dragover', 'dragenter'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.add('drag'); }));
+          ['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.remove('drag'); }));
+          zone.addEventListener('drop', e => e.dataTransfer.files[0] && upload(e.dataTransfer.files[0]));
         }
       });
+    }
 
-      $('#btnFlowComplete')?.addEventListener('click', () => openCompleteDemandModal(d, reload));
-
-      $('#btnFlowReopen')?.addEventListener('click', async () => {
-        try {
-          await api(`/api/demands/${d.id}`, {
-            method: 'PUT',
-            body: { status: 'Em triagem' }
-          });
-          await api(`/api/demands/${d.id}/updates`, {
-            method: 'POST',
-            body: {
-              kind: 'Status',
-              message: 'Demanda reaberta para reavaliação ou complementação de serviço.'
-            }
-          });
-          toast('Demanda Reaberta', 'Status retornado para "Em triagem".');
-          await reload();
-        } catch (e) {
-          toast('Erro ao reabrir demanda', e.message, 'error');
-        }
+    function openSchoolDrawer() {
+      const d = payload.demand;
+      modal({
+        title: esc(d.school_name), subtitle: 'Unidade escolar responsável pela solicitação', mode: 'drawer',
+        body: `<section class="info-card"><h3>${icon('school')}Contato e endereço</h3><div class="key-value">
+          <div class="kv"><span>Direção</span><strong>${esc(d.director || '—')}</strong></div>
+          <div class="kv"><span>Endereço</span><strong>${esc(d.address || '—')}</strong></div>
+          <div class="kv"><span>Telefone</span><strong>${esc(d.phone || '—')}</strong></div>
+          <div class="kv"><span>E-mail</span><strong>${esc(d.school_email || '—')}</strong></div>
+          <div class="kv"><span>Local da ocorrência</span><strong>${esc(d.location || '—')}</strong></div>
+        </div></section>`,
+        footer: `<button class="btn btn-secondary" data-close>Fechar</button>`
       });
+    }
 
-      initDatePickers(content);
+    // -- assistente "Registrar andamento" ------------------------------------
+    // Uma escrita por vez: escolher o tipo (1), preencher só o que aquele tipo
+    // exige (2) e conferir o que muda antes de salvar (3).
+    function openProgressWizard(preType) {
+      const d = payload.demand;
+      const isDone = statusClass(d.status) === 'completed';
+      // `hint` fica no cartao e diz o que o tipo significa; `tip` e o tooltip e
+      // responde outra pergunta — quando escolher este e o que ele muda sozinho
+      // (o status que applyPreset aplica). Sao papeis diferentes de proposito:
+      // repetir o hint no tooltip so acrescentaria ruido.
+      const TYPES = [
+        { key: 'atualizacao', icon: 'edit', label: 'Atualização', hint: 'Informar andamento geral da demanda.', tip: 'Quando há novidade a registrar e o status continua o mesmo.' },
+        { key: 'iniciado', icon: 'bolt', label: 'Serviço iniciado', hint: 'A equipe começou o atendimento no local.', tip: 'Quando a equipe chegou ao local. Marca a demanda como Em execução.' },
+        { key: 'material', icon: 'cart', label: 'Aguardando material', hint: 'O serviço depende de material para continuar.', tip: 'Quando o serviço depende de compra ou entrega. Marca como Aguardando material.' },
+        { key: 'responsavel', icon: 'users', label: 'Alterar responsável', hint: 'Trocar quem responde pela demanda.', tip: 'Quando outra pessoa assume a demanda. O status continua o mesmo.' },
+        { key: 'prazo', icon: 'calendar', label: 'Reprogramar prazo', hint: 'Ajustar a data de conclusão prevista.', tip: 'Quando a data prevista não se sustenta. O status continua o mesmo.' },
+        isDone
+          ? { key: 'reabrir', icon: 'refresh', label: 'Reabrir demanda', hint: 'O local precisa de retorno da equipe.', tip: 'Quando o problema voltou depois de concluído. Devolve para Em triagem.' }
+          : { key: 'executado', icon: 'check-circle', label: 'Serviço executado', hint: 'Serviço concluído com sucesso.', tip: 'Quando o atendimento terminou. Conclui a demanda e liga o aviso à escola.' }
+      ];
+      const KEY_FIELD = { atualizacao: 'note', iniciado: 'action', material: 'material', responsavel: 'responsible', prazo: 'due', executado: 'note', reabrir: 'note' };
+      const REQUIRED = { responsavel: 'responsible', prazo: 'due', executado: 'note' };
 
-      // Chips de tipo de providência
-      $$('#provTypeRow .prov-type-chip', content).forEach(chip => chip.addEventListener('click', () => {
-        const already = chip.classList.contains('active');
-        $$('#provTypeRow .prov-type-chip', content).forEach(c => c.classList.remove('active'));
-        if (!already) chip.classList.add('active');
-      }));
+      const st = {
+        step: 1,
+        type: TYPES.some(t => t.key === preType) ? preType : TYPES[0].key,
+        status: d.status,
+        responsible: dvResponsible(d),
+        actionType: d.prov_action_type || '',
+        due: d.prov_due_date || d.due_date || '',
+        needsMaterial: !!d.needs_material,
+        qty: d.planned_quantity || '',
+        unit: d.planned_unit || '',
+        note: '',
+        notify: !!d.prov_notify_school
+      };
 
-      const provAttachInput = $('#provAttachInput');
-      $('#provAttachBtn')?.addEventListener('click', () => provAttachInput?.click());
-      provAttachInput?.addEventListener('change', () => provAttachInput.files[0] && upload(provAttachInput.files[0]));
+      const typeLabel = k => PROV_ACTION_TYPES.find(t => t.key === k)?.label || '';
+      const currentType = () => TYPES.find(t => t.key === st.type);
 
-      // Providência: "A SMEDU tem o material?" -> reflete no Planejamento 2027
-      const refreshMaterialUnitOptions = () => {
-        const sel = $('#materialUnit', content), field = $('#materialUnitField', content);
-        if (!sel) return;
+      const applyPreset = () => {
+        if (st.type === 'iniciado') { st.status = 'Em execução'; if (!st.actionType) st.actionType = 'manutencao'; }
+        else if (st.type === 'material') { st.status = 'Aguardando material'; st.needsMaterial = true; }
+        else if (st.type === 'executado') { st.status = 'Concluída'; st.notify = true; }
+        else if (st.type === 'reabrir') { st.status = 'Em triagem'; }
+        else st.status = d.status;
+        if (st.type === 'responsavel' && !st.responsible) st.responsible = ctx.user?.name || '';
+      };
+
+      // Sugestões de unidade: a categoria da demanda define o conjunto, e palavras
+      // da descrição (lâmpada, fio/cabo, tinta...) afinam ainda mais. O catálogo
+      // completo continua disponível logo abaixo, nos grupos.
+      const unitSuggestions = () => {
         const meta = CATEGORIA_UNIDADES[d.category] || CATEGORIA_UNIDADES_DEFAULT;
-        if (!meta.usar) { field?.classList.add('hidden'); sel.innerHTML = ''; return }
-        field?.classList.remove('hidden');
+        if (!meta.usar) return [];
         const desc = (d.description || '').toLowerCase();
         const matched = new Set();
         Object.entries(meta.porItem || {}).forEach(([kw, units]) => { if (desc.includes(kw)) units.forEach(u => matched.add(u)); });
-        const allowed = matched.size ? [...matched] : meta.permitidas;
-        const prev = sel.value || d.planned_unit;
-        sel.innerHTML = allowed.map(c => UNIDADES_MEDIDA_BY_CODE[c]).filter(Boolean)
-          .map(u => `<option value="${esc(u.simbolo)}">${esc(u.simbolo)} — ${esc(u.nome)}</option>`).join('');
-        if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+        return matched.size ? [...matched] : (meta.permitidas || []);
       };
-      $$('.toggle-btn[data-toggle="needs_material"]', content).forEach(b => b.addEventListener('click', () => {
-        $$('.toggle-btn[data-toggle="needs_material"]', content).forEach(x => x.classList.remove('active'));
-        b.classList.add('active');
-        const show = b.dataset.val === '1';
-        $('#materialProcurementPanel', content)?.classList.toggle('hidden', !show);
-        if (show) refreshMaterialUnitOptions();
-      }));
-      if (d.needs_material) refreshMaterialUnitOptions();
-      const openMaterialPlanningShortcut = () => {
-        const overrides = {
-          planned_quantity: Number($('#materialQty', content)?.value) || d.planned_quantity,
-          planned_unit: ($('#materialUnit', content)?.value || d.planned_unit || '').trim(),
-          planning_kind: d.planning_kind || 'Aquisição futura'
-        };
-        openEditPlanning(d, reload, overrides);
-      };
-      $('#materialPlanningShortcut', content)?.addEventListener('click', openMaterialPlanningShortcut);
-      $('#materialPlanningShortcut', content)?.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMaterialPlanningShortcut(); } });
 
-      const saveProv = async (sendUpdate) => {
-        const type = $('#provTypeRow .prov-type-chip.active')?.dataset.provType || '';
-        const selectedStatus = $('#provStatus')?.value || d.status;
-        const selectedResp = $('#provResponsible')?.value || '';
-        const needsMaterial = $('.toggle-btn[data-toggle="needs_material"].active', content)?.dataset.val === '1';
+      const defaultMessage = () => ({
+        atualizacao: 'Andamento registrado pela equipe de infraestrutura.',
+        iniciado: `Execução iniciada no local${st.responsible ? ` por ${st.responsible}` : ''}.`,
+        material: 'Serviço aguardando material. Necessidade sinalizada para o planejamento.',
+        responsavel: `Responsabilidade atribuída a ${st.responsible || 'equipe de infraestrutura'}.`,
+        prazo: `Prazo previsto reprogramado para ${fmtDate(st.due)}.`,
+        executado: 'Serviço executado e demanda concluída.',
+        reabrir: 'Demanda reaberta para novo atendimento no local.'
+      })[st.type];
+
+      const stepsHTML = () => `<ol class="pw-steps">${['Registrar andamento', 'Detalhes da atualização', 'Revisar e salvar'].map((label, i) => {
+        const n = i + 1;
+        return `<li class="${st.step > n ? 'done' : (st.step === n ? 'current' : '')}"><span class="pw-disc">${st.step > n ? icon('arrow') : n}</span><span>${esc(label)}</span></li>`;
+      }).join('')}</ol>`;
+
+      // Cada linha da prévia carrega a cor do assunto que ela representa, usando
+      // os tokens de cor que o resto do sistema já emprega por categoria.
+      const previewRow = (ic, label, value, empty = false, tone = 'blue') =>
+        `<div class="pw-prow"><span class="pw-prow-ico" style="color:var(--${tone})">${icon(ic)}</span><span class="pw-prow-label">${esc(label)}</span><span class="pw-prow-value ${empty ? 'is-empty' : ''}">${esc(value)}</span></div>`;
+
+      const stepOneHTML = () => {
+        const t = currentType();
+        const preview = { ...st };
+        const savedStatus = st.status, savedMaterial = st.needsMaterial;
+        applyPreset();
+        const rows = previewRow('wrench', 'Tipo de ação', typeLabel(st.actionType) || 'A definir', !st.actionType, 'blue')
+          + previewRow('cart', 'Disponibilidade de material', st.needsMaterial ? 'Precisa comprar' : 'Disponível no estoque', false, 'orange')
+          + previewRow('grid', 'Status da demanda', st.status, false, 'violet')
+          + previewRow('calendar', 'Prazo previsto', st.due ? fmtDate(st.due) : 'Selecionar data', !st.due, 'green')
+          + previewRow('message', 'Observação / andamento', st.note || 'Descreva o que foi realizado, próximos passos ou pendências.', !st.note, 'teal');
+        st.status = savedStatus; st.needsMaterial = savedMaterial; void preview;
+        return `${stepsHTML()}
+          <p class="pw-lead">Escolha primeiro o tipo de atualização. Os detalhes são preenchidos na próxima etapa.</p>
+          <p class="pw-legend">1. Escolha o tipo de atualização</p>
+          <div class="pw-type-grid">${TYPES.map(x => `<button type="button" class="pw-type" data-pw-type="${x.key}" aria-pressed="${x.key === st.type}" data-tooltip="${esc(x.tip)}">
+            <span class="pw-check">${icon('arrow')}</span>
+            <span class="pw-type-icon">${icon(x.icon)}</span>
+            <b>${esc(x.label)}</b><small>${esc(x.hint)}</small>
+          </button>`).join('')}</div>
+          <div class="pw-preview">
+            <div class="pw-preview-head">${icon('info')}<div><b>Próxima etapa: detalhes da atualização</b><small>Com "${esc(t.label)}", você confirma os campos abaixo.</small></div></div>
+            <div class="pw-preview-rows">${rows}</div>
+          </div>`;
+      };
+
+      // Quando o registro aponta compra, quem responde pela aquisicao pode ser a
+      // Direcao Escolar da unidade, e nao so a equipe de Infraestrutura. Os dois
+      // conjuntos vao em <optgroup> separados para o gestor ver de onde vem cada
+      // nome; a Direcao so entra com "Precisa comprar" ligado -- ou quando ja e
+      // a responsavel gravada, para uma opcao escolhida nunca sumir sozinha.
+      const direcaoEscolar = (d.director || '').trim();
+      const respOptionsHTML = comDirecao => {
+        const equipe = (payload.staff || []).map(x => `<option ${x.name === st.responsible ? 'selected' : ''}>${esc(x.name)}</option>`).join('');
+        let html = equipe ? `<optgroup label="Equipe de Infraestrutura">${equipe}</optgroup>` : '';
+        if (direcaoEscolar && comDirecao) {
+          html += `<optgroup label="Direção Escolar · ${esc(d.school_name || 'Unidade')}"><option ${direcaoEscolar === st.responsible ? 'selected' : ''}>${esc(direcaoEscolar)}</option></optgroup>`;
+        }
+        return html;
+      };
+
+      const stepTwoHTML = () => {
+        const key = KEY_FIELD[st.type];
+        const k = f => f === key ? ' is-key' : '';
+        return `${stepsHTML()}
+          <p class="pw-lead">Atualização do tipo <strong>${esc(currentType().label)}</strong>. Preencha o que mudou — o restante permanece como está.</p>
+          <div class="pw-card">
+
+          <div class="pw-field${k('action')}">
+            <span class="pw-field-label">Tipo de ação</span>
+            <div class="prov-type-row" id="pwTypeRow">${PROV_ACTION_TYPES.map(t => `<button type="button" class="prov-type-chip ${st.actionType === t.key ? 'active' : ''}" data-pw-action="${t.key}" style="--chip-color:var(--${t.color});--chip-soft:var(--${t.color}-soft)"><span class="prov-type-icon">${icon(t.icon)}</span>${esc(t.label)}</button>`).join('')}</div>
+          </div>
+
+          <div class="pw-field${k('material')}">
+            <span class="pw-field-label">Disponibilidade de material</span>
+            <p class="pw-field-hint">Se precisar comprar, a demanda é sinalizada para o Planejamento 2027.</p>
+            <div class="toggle-row">
+              <button type="button" class="toggle-btn tg-ok ${!st.needsMaterial ? 'active' : ''}" data-pw-material="0">${icon('check-circle')}Sim, tem material</button>
+              <button type="button" class="toggle-btn tg-buy ${st.needsMaterial ? 'active' : ''}" data-pw-material="1">${icon('cart')}Precisa comprar</button>
+            </div>
+            <div class="pw-grid-2 mt-12 ${st.needsMaterial ? '' : 'hidden'}" id="pwMaterialPanel">
+              <div class="field"><label class="pw-lbl">Quantidade necessária <span class="pw-req">*</span></label><input class="input" type="number" min="0" step="0.01" id="pwQty" value="${esc(String(st.qty || ''))}" placeholder="1"></div>
+              <div class="field"><label class="pw-lbl">Unidade de medida</label><select class="select" id="pwUnit" data-search data-search-placeholder="Buscar unidade...">${unitOptionsHTML(st.unit, unitSuggestions(), `Sugeridas para ${d.category}`)}</select></div>
+            </div>
+          </div>
+
+          <div class="pw-grid-2">
+            <div class="pw-field"><label for="pwStatus">Status da demanda</label><select class="select" id="pwStatus">${ctx.statuses.map(s => `<option ${s === st.status ? 'selected' : ''}>${esc(s)}</option>`).join('')}</select></div>
+            <div class="pw-field${k('responsible')}"><label for="pwResponsible">Responsável ${REQUIRED[st.type] === 'responsible' ? '<span class="pw-req">*</span>' : ''}</label><select class="select" id="pwResponsible"><option value="">Selecionar responsável...</option>${respOptionsHTML(st.needsMaterial || st.responsible === direcaoEscolar)}</select><p class="pw-field-hint pw-resp-hint${st.needsMaterial && direcaoEscolar ? '' : ' hidden'}" id="pwRespHint">${icon('cart')}<span>Compras também podem ficar sob a Direção Escolar da unidade.</span></p></div>
+          </div>
+
+          <div class="pw-field${k('due')}">
+            <label>Prazo previsto ${REQUIRED[st.type] === 'due' ? '<span class="pw-req">*</span>' : ''}</label>
+            <div class="datepicker" data-datepicker data-dp-target="pwDue"><input type="hidden" id="pwDue" value="${esc(st.due || '')}"><div class="datepicker-input-wrap"><input class="input datepicker-display" type="text" placeholder="dd/mm/aaaa" readonly autocomplete="off"><button type="button" class="datepicker-icon-btn" aria-label="Abrir calendário" data-tooltip="Escolher data">${icon('calendar')}</button></div></div>
+          </div>
+
+          <div class="pw-field${k('note')}">
+            <label for="pwNote">Observação / andamento ${REQUIRED[st.type] === 'note' ? '<span class="pw-req">*</span>' : ''}</label>
+            <p class="pw-field-hint">Este texto vira a devolutiva publicada no histórico da demanda.</p>
+            <textarea class="textarea" id="pwNote" placeholder="${esc(defaultMessage())}">${esc(st.note)}</textarea>
+          </div>
+
+          <div class="prov-form-footer" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding-top:14px;border-top:1px solid var(--line)">
+            <button type="button" class="attach-btn" id="pwAttachBtn">${icon('paperclip')}Anexar documento</button>
+            <input type="file" id="pwAttachInput" hidden>
+            <label class="prov-notify-row" style="cursor:pointer;margin:0" data-tooltip="Envia a devolutiva para a unidade escolar">
+              <span>Notificar escola</span>
+              <span class="switch"><input type="checkbox" id="pwNotify" ${st.notify ? 'checked' : ''}><span class="switch-track"></span></span>
+            </label>
+          </div>
+          </div>`;
+      };
+
+      const diffRows = () => {
+        const rows = [];
+        // Compara normalizado para nao listar como mudanca o que so difere em
+        // caixa ou espaco (ex.: unidade "UN" vinda do banco vs "un" da lista).
+        const same = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+        const push = (label, from, to) => { if (!same(from, to)) rows.push([label, from, to]); };
+        push('Status', d.status, st.status);
+        push('Responsável', dvResponsible(d) || '—', st.responsible || '—');
+        push('Tipo de ação', typeLabel(d.prov_action_type) || '—', typeLabel(st.actionType) || '—');
+        push('Prazo previsto', fmtDate(d.prov_due_date || d.due_date), fmtDate(st.due));
+        push('Material', d.needs_material ? 'Precisa comprar' : 'Disponível no estoque', st.needsMaterial ? 'Precisa comprar' : 'Disponível no estoque');
+        if (st.needsMaterial) push('Quantidade', `${num(d.planned_quantity || 0)} ${d.planned_unit || ''}`.trim(), `${num(st.qty || 0)} ${st.unit || ''}`.trim());
+        return rows;
+      };
+
+      const stepThreeHTML = () => {
+        const rows = diffRows();
+        return `${stepsHTML()}
+          <p class="pw-lead">Confira o que será alterado na demanda ${esc(d.code)} antes de salvar.</p>
+          <div class="pw-card">
+          <div class="pw-review">
+            <div class="pw-review-row"><span class="pw-prow-label">Tipo de atualização</span><span class="pw-to">${esc(currentType().label)}</span></div>
+            ${rows.length ? rows.map(([label, from, to]) => `<div class="pw-review-row"><span class="pw-prow-label">${esc(label)}</span><span><span class="pw-from">${esc(from)}</span> <span class="pw-arrow">→</span> <span class="pw-to">${esc(to)}</span></span></div>`).join('')
+            : `<div class="pw-review-row"><span class="pw-prow-label">Dados da demanda</span><span class="pw-nochange" style="padding:0">Nada muda. Só a devolutiva abaixo é publicada no histórico.</span></div>`}
+          </div>
+          <p class="pw-legend" style="margin-top:18px">Devolutiva que será publicada</p>
+          <div class="pw-note-preview">${esc(st.note.trim() || defaultMessage())}</div>
+          <p class="pw-lead" style="margin:12px 0 0">${st.notify ? 'A unidade escolar será notificada deste registro.' : 'A unidade escolar não será notificada deste registro.'}</p>
+          </div>`;
+      };
+
+      const footerHTML = () => {
+        if (st.step === 1) return `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="pwNext">Continuar para detalhes${icon('chevron')}</button>`;
+        if (st.step === 2) return `<button class="btn btn-secondary" id="pwBack">Voltar</button><button class="btn btn-primary" id="pwNext">Continuar para revisão${icon('chevron')}</button>`;
+        return `<button class="btn btn-secondary" id="pwBack">Voltar</button><button class="btn btn-primary" id="pwSave">${icon('bookmark')}Salvar andamento</button>`;
+      };
+
+      const collectStepTwo = root => {
+        st.actionType = $('#pwTypeRow .prov-type-chip.active', root)?.dataset.pwAction || '';
+        st.status = $('#pwStatus', root)?.value || st.status;
+        st.responsible = $('#pwResponsible', root)?.value || '';
+        st.due = $('#pwDue', root)?.value || '';
+        st.note = $('#pwNote', root)?.value || '';
+        st.notify = !!$('#pwNotify', root)?.checked;
+        st.needsMaterial = $('.toggle-btn[data-pw-material="1"]', root)?.classList.contains('active') || false;
+        st.qty = $('#pwQty', root)?.value || '';
+        st.unit = $('#pwUnit', root)?.value || st.unit;
+      };
+
+      const validateStepTwo = () => {
+        const req = REQUIRED[st.type];
+        if (req === 'due' && !st.due) return 'Escolha a nova data de conclusão prevista.';
+        if (req === 'responsible' && !st.responsible) return 'Selecione quem passa a responder pela demanda.';
+        if (req === 'note' && !st.note.trim()) return 'Descreva o que foi realizado — este texto vira a devolutiva.';
+        // A quantidade so faz sentido quando o registro aponta compra: e ela que
+        // alimenta o Planejamento. Com "Sim, tem material" o campo nem aparece,
+        // entao exigi-lo deixaria a etapa sem saida.
+        if (st.needsMaterial && !(Number(st.qty) > 0)) return 'Em "Disponibilidade de material", informe a quantidade que precisa ser comprada.';
+        return '';
+      };
+
+      const save = async () => {
         const body = {
-          prov_action_type: type,
-          prov_responsible: selectedResp,
-          responsible: selectedResp || d.responsible,
-          status: selectedStatus,
-          prov_due_date: $('#provDueDate')?.value || null,
-          prov_priority: $('#provPriority')?.value || null,
-          prov_note: $('#provNote')?.value || '',
-          prov_notify_school: $('#provNotify')?.checked ? 1 : 0,
-          needs_material: needsMaterial ? 1 : 0
+          prov_action_type: st.actionType,
+          prov_responsible: st.responsible,
+          responsible: st.responsible || d.responsible,
+          status: st.status,
+          prov_due_date: st.due || null,
+          due_date: st.due || null,
+          prov_note: st.note,
+          prov_notify_school: st.notify ? 1 : 0,
+          needs_material: st.needsMaterial ? 1 : 0
         };
-        if (needsMaterial) {
-          body.planned_quantity = Number($('#materialQty', content)?.value) || d.planned_quantity || 1;
-          body.planned_unit = $('#materialUnit', content)?.value || d.planned_unit || 'un';
+        if (st.needsMaterial) {
+          body.planned_quantity = Number(st.qty) || 1;
+          body.planned_unit = st.unit || 'un';
           if (!d.planning_kind) body.planning_kind = 'Aquisição futura';
         }
+        // Concluir registra o parecer tambem em "Acao definida", como fazia o
+        // antigo modal de conclusao, para a analise tecnica nao ficar vazia.
+        if (st.type === 'executado') body.action_defined = st.note.trim() || d.action_defined || 'Serviço concluído';
         try {
           await api(`/api/demands/${id}`, { method: 'PUT', body });
-          if (sendUpdate) {
-            const typeLabel = PROV_ACTION_TYPES.find(t => t.key === type)?.label || 'Providência';
-            const msg = (body.prov_note || '').trim() || `Providência registrada: ${typeLabel}${body.prov_responsible ? ` · Responsável: ${body.prov_responsible}` : ''}${body.prov_due_date ? ` · Prazo: ${fmtDate(body.prov_due_date)}` : ''}`;
-            await api(`/api/demands/${id}/updates`, { method: 'POST', body: { kind: 'Devolutiva', message: msg } });
-          }
-          toast(sendUpdate ? 'Providência salva e devolutiva enviada' : 'Providência salva com sucesso');
-          if (needsMaterial && !d.future_year) {
-            toast('Sinalizado para o Planejamento 2027', 'Acesse a aba Planejamento e clique em "Destinar a um exercício futuro" para dar prosseguimento à compra.');
-            active = 'planning';
-          }
+          await api(`/api/demands/${id}/updates`, {
+            method: 'POST',
+            body: { kind: st.type === 'atualizacao' ? 'Devolutiva' : 'Status', message: st.note.trim() || defaultMessage() }
+          });
+          closeModal();
+          toast('Andamento registrado', `${currentType().label} · ${d.code}`);
+          if (st.needsMaterial && !d.future_year) toast('Sinalizado para o Planejamento 2027', 'Abra o painel Planejamento para destinar a demanda a um exercício futuro.');
           await reload();
         } catch (e) { toast('Não foi possível salvar', e.message, 'error'); }
       };
 
-      $('#saveProvidence')?.addEventListener('click', () => {
-        const notify = Boolean($('#provNotify')?.checked);
-        saveProv(notify);
+      const wireStep = root => {
+        enhanceSearchableSelects(root);
+        $$('[data-close]', root).forEach(b => b.addEventListener('click', closeModal));
+        $('.close-btn')?.addEventListener('click', closeModal);
+
+        if (st.step === 1) {
+          $$('[data-pw-type]', root).forEach(b => b.addEventListener('click', () => { st.type = b.dataset.pwType; paint(); }));
+          $('#pwNext', root).addEventListener('click', () => { applyPreset(); st.step = 2; paint(); });
+        }
+
+        if (st.step === 2) {
+          initDatePickers(root);
+          $$('#pwTypeRow .prov-type-chip', root).forEach(chip => chip.addEventListener('click', () => {
+            const on = chip.classList.contains('active');
+            $$('#pwTypeRow .prov-type-chip', root).forEach(c => c.classList.remove('active'));
+            if (!on) chip.classList.add('active');
+          }));
+          const sincronizaResponsavel = comprar => {
+            const sel = $('#pwResponsible', root);
+            if (!sel) return;
+            const atual = sel.value;
+            st.responsible = atual;
+            sel.innerHTML = `<option value="">Selecionar responsável...</option>` + respOptionsHTML(comprar || atual === direcaoEscolar);
+            sel.value = atual;
+            $('#pwRespHint', root)?.classList.toggle('hidden', !(comprar && direcaoEscolar));
+          };
+          $$('[data-pw-material]', root).forEach(b => b.addEventListener('click', () => {
+            $$('[data-pw-material]', root).forEach(x => x.classList.remove('active'));
+            b.classList.add('active');
+            const comprar = b.dataset.pwMaterial === '1';
+            $('#pwMaterialPanel', root)?.classList.toggle('hidden', !comprar);
+            sincronizaResponsavel(comprar);
+          }));
+          const fileInput = $('#pwAttachInput', root);
+          $('#pwAttachBtn', root)?.addEventListener('click', () => fileInput.click());
+          fileInput?.addEventListener('change', () => fileInput.files[0] && upload(fileInput.files[0]));
+          const focusKey = { note: '#pwNote', responsible: '#pwResponsible', due: '.datepicker-display', material: '#pwQty', action: '#pwTypeRow .prov-type-chip' }[KEY_FIELD[st.type]];
+          setTimeout(() => $(focusKey, root)?.focus(), 40);
+          $('#pwBack', root).addEventListener('click', () => { collectStepTwo(root); st.step = 1; paint(); });
+          $('#pwNext', root).addEventListener('click', () => {
+            collectStepTwo(root);
+            const err = validateStepTwo();
+            if (err) { toast('Falta um dado', err, 'error'); return; }
+            st.step = 3; paint();
+          });
+        }
+
+        if (st.step === 3) {
+          $('#pwBack', root).addEventListener('click', () => { st.step = 2; paint(); });
+          $('#pwSave', root).addEventListener('click', save);
+        }
+      };
+
+      const paint = () => {
+        const body = st.step === 1 ? stepOneHTML() : (st.step === 2 ? stepTwoHTML() : stepThreeHTML());
+        const wrapped = `<div class="pw">${body}</div>`;
+        const open = $('#modalRoot .pw');
+        if (open) {
+          const m = open.closest('.modal');
+          $('.modal-body', m).innerHTML = wrapped;
+          $('.modal-footer', m).innerHTML = footerHTML();
+          wireStep(m);
+        } else {
+          modal({
+            title: 'Registrar andamento', subtitle: `${d.code} · ${d.school_name}`, mode: 'drawer',
+            body: wrapped, footer: footerHTML(), onOpen(root) { wireStep(root); }
+          });
+        }
+      };
+
+      paint();
+    }
+
+    // -- render ---------------------------------------------------------------
+    const render = () => {
+      const d = payload.demand;
+      content.innerHTML = demandViewHTML(payload);
+
+      const menuBtn = $('#dvMenuBtn', content), menuPop = $('#dvMenuPop', content);
+      const closeMenu = () => { if (menuPop) { menuPop.hidden = true; menuBtn.setAttribute('aria-expanded', 'false'); } };
+      menuBtn?.addEventListener('click', e => {
+        e.stopPropagation();
+        const open = menuPop.hidden;
+        menuPop.hidden = !open;
+        menuBtn.setAttribute('aria-expanded', String(open));
       });
+      document.addEventListener('click', closeMenu, { once: true });
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); }, { once: true });
 
-      const goResponses = () => { active = 'responses'; render(); setTimeout(() => $('#updateMessage')?.focus(), 20) };
-      $('#quickUpdate')?.addEventListener('click', goResponses);
-      $('#sendUpdate')?.addEventListener('click', async () => {
-        const ta = $('#updateMessage');
-        if (!ta.value.trim()) { toast('Escreva uma devolutiva', 'O campo de mensagem está vazio.', 'error'); return }
-        try {
-          await api(`/api/demands/${id}/updates`, { method: 'POST', body: { kind: 'Devolutiva', message: ta.value.trim() } });
-          toast('Devolutiva registrada');
-          await reload();
-          active = 'responses';
-          render();
-        } catch (e) { toast('Erro ao registrar', e.message, 'error') }
-      });
-
-      const zone = $('#uploadZone'); const input = $('#attachmentInput');
-      if (zone && input) {
-        zone.addEventListener('click', () => input.click());
-        input.addEventListener('change', () => input.files[0] && upload(input.files[0]));
-        ['dragover', 'dragenter'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.add('drag') }));
-        ['dragleave', 'drop'].forEach(ev => zone.addEventListener(ev, e => { e.preventDefault(); zone.classList.remove('drag') }));
-        zone.addEventListener('drop', e => e.dataTransfer.files[0] && upload(e.dataTransfer.files[0]));
-      }
-
-      async function upload(file) {
-        const fd = new FormData();
-        fd.append('file', file);
-        try {
-          toast('Enviando anexo', file.name);
-          await api(`/api/demands/${id}/attachments`, { method: 'POST', body: fd });
-          payload = await api(`/api/demands/${id}`);
-          active = 'attachments';
-          render();
-          toast('Anexo enviado', file.name);
-        } catch (e) { toast('Falha no envio', e.message, 'error') }
-      }
+      $$('[data-dv-action]', content).forEach(btn => btn.addEventListener('click', () => {
+        closeMenu();
+        const what = btn.dataset.dvAction;
+        if (what === 'wizard') openProgressWizard(btn.dataset.dvType);
+        else if (what === 'devolutiva') openResponsesDrawer();
+        else if (what === 'history') openHistoryDrawer();
+        else if (what === 'attachments') openAttachmentsDrawer();
+        else if (what === 'school') openSchoolDrawer();
+        else if (what === 'technical') openEditTechnical(d, reload);
+        else if (what === 'planning') openEditPlanning(d, reload);
+        else if (what === 'edit-demand') openEditDemand(d, reload);
+      }));
     };
+
     render();
   }
 
@@ -1683,13 +2365,13 @@
     const schoolOptions = ctx.user.perm.school_scoped ? `<option value="${ctx.user.school_id}">${esc(ctx.user.school_name || 'Minha unidade')}</option>` : schools.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('');
     modal({
       title: 'Nova Demanda Futura', subtitle: 'Registre uma necessidade dos próximos exercícios para planejamento, aquisição, contratação ou licitação.', mode: 'drawer', body: `<form id="futureDemandForm"><div class="form-grid">
-      <div class="field span-2"><label>Unidade Escolar *</label><select class="select" name="school_id" required>${schoolOptions}</select></div>
+      <div class="field span-2"><label>Unidade Escolar *</label><select class="select" name="school_id" required data-search data-search-placeholder="Buscar escola pelo nome...">${schoolOptions}</select></div>
       <div class="field"><label>Exercício pretendido *</label><select class="select" name="future_year" required>${[2027, 2028, 2029, 2030, 2031].map(y => `<option>${y}</option>`).join('')}</select></div>
       <div class="field"><label>Tipo de necessidade *</label><select class="select" name="planning_kind"><option>Aquisição futura</option><option>Contratação futura</option><option>Obra futura</option><option>Projeto futuro</option><option>Serviço continuado</option></select></div>
       <div class="field span-2"><label>Objeto necessário *</label><input class="input" name="title" required placeholder="Ex.: Aquisição de 8 aparelhos de ar-condicionado"></div>
       <div class="field"><label>Categoria *</label><select class="select" name="category">${ctx.categories.map(c => `<option>${esc(c)}</option>`).join('')}</select></div>
       <div class="field"><label>Quantidade</label><input class="input" type="number" min="0" step="0.01" name="planned_quantity"></div>
-      <div class="field"><label>Unidade de medida</label><input class="input" name="planned_unit" placeholder="un, m², serviço..."></div>
+      <div class="field"><label>Unidade de medida</label><select class="select" name="planned_unit" data-search data-search-placeholder="Buscar unidade...">${unitOptionsHTML()}</select></div>
       <div class="field"><label>Estimativa inicial (R$)</label><input class="input" type="number" min="0" step="0.01" name="cost_estimate"></div>
       <div class="field span-2"><label>Descrição / especificação inicial *</label><textarea class="textarea" name="description" required placeholder="Descreva o que a unidade necessita e as características já conhecidas."></textarea></div>
       <div class="field span-2"><label>Justificativa</label><textarea class="textarea" name="impact" placeholder="Explique por que a necessidade deve entrar no planejamento do exercício escolhido."></textarea></div>
@@ -1711,7 +2393,7 @@
       <div class="field"><label>Categoria *</label><select class="select" name="category">${ctx.categories.map(c => `<option>${esc(c)}</option>`).join('')}</select></div>
       <div class="field"><label>Status</label><select class="select" name="status"><option>Identificada</option><option>Em análise</option><option>Em levantamento</option><option>Consolidada</option><option>Aprovada para planejamento</option><option>Aguardando estimativa</option><option>Aguardando orçamento</option><option>Prevista no exercício</option></select></div>
       <div class="field"><label>Quantidade</label><input class="input" type="number" min="0" step="0.01" name="quantity"></div>
-      <div class="field"><label>Unidade de medida</label><input class="input" name="unit" placeholder="un, m², escolas..."></div>
+      <div class="field"><label>Unidade de medida</label><select class="select" name="unit" data-search data-search-placeholder="Buscar unidade...">${unitOptionsHTML()}</select></div>
       <div class="field"><label>Estimativa inicial (R$)</label><input class="input" type="number" min="0" step="0.01" name="estimated_cost"></div>
       <div class="field"><label>Escolas envolvidas</label><input class="input" type="number" min="1" name="schools_count" value="1"></div>
       <div class="field span-2"><label>Justificativa</label><textarea class="textarea" name="justification" placeholder="Justifique a necessidade e o benefício esperado."></textarea></div>
@@ -1733,7 +2415,12 @@
       </div>
       ${pageHeader(`Planejamento ${selected}`, 'Itens previstos, consolidados e em preparação para contratação.', `<a class="btn btn-secondary" href="/api/export/planning.pdf?year=${selected}" data-tooltip="Baixar os itens deste exercício em PDF">${icon('file')}Gerar um PDF</a><button class="btn btn-secondary" id="planningHelp">${icon('info')}Como funciona</button><button class="btn btn-secondary" id="newFutureDemand">${icon('plus')}Nova Demanda Futura</button>${ctx.user.perm.can_edit_analysis ? `<button class="btn btn-primary" id="newPlanning">${icon('plus')}Consolidar Item</button>` : ''}`)}
       <section class="panel"><div class="panel-header"><div><h2>Demandas de aquisição e contratação</h2><p>Itens consolidados para o exercício selecionado.</p></div><div class="search-field" style="width:260px">${icon('search')}<input class="input" id="planningQ" placeholder="Pesquisar planejamento..."></div></div><div id="planningTable"></div></section>`;
-    const load = async () => { const q = $('#planningQ')?.value || ''; const res = await api(`/api/planning?year=${selected}&q=${encodeURIComponent(q)}`); $('#planningTable').innerHTML = renderPlanningTable(res.items) };
+    const load = async () => {
+      const q = $('#planningQ')?.value || '';
+      const res = await api(`/api/planning?year=${selected}&q=${encodeURIComponent(q)}`);
+      $('#planningTable').innerHTML = renderPlanningTable(res.items);
+      wirePlanningActions(res.items, load);
+    };
     $('#planningYear').addEventListener('change', e => location.href = `/planejamento?year=${e.target.value}`); $('#newFutureDemand')?.addEventListener('click', openFutureDemandForm); $('#newPlanning')?.addEventListener('click', openPlanningForm); let t; $('#planningQ').addEventListener('input', () => { clearTimeout(t); t = setTimeout(load, 200) }); $('#planningHelp').addEventListener('click', () => modal({ title: 'Fluxo do Planejamento', mode: 'center', body: `<div class="info-card accent"><h3>${icon('trend')}Do registro à execução</h3><p><strong>Demanda da escola</strong> → Análise técnica → Planejamento futuro → Consolidação → Processo administrativo → Licitação/Contratação → Contrato → Execução.</p></div><div class="alert info">A consolidação permite agrupar necessidades semelhantes de várias unidades sem perder o vínculo com cada escola de origem.</div>` }));
     $$('[data-planning-insight]', $('#planningStatsGrid')).forEach(card => card.addEventListener('click', () => openPlanningInsights(selected)));
     await load();
@@ -1762,9 +2449,82 @@
       </div>`).join('') : empty('Nenhum item neste exercício', '')}</div></div>`;
     $('#modalRoot .modal-body').innerHTML = body;
   }
+  // Ações da carteira de planejamento. Ver está aberto a todos; editar e
+  // excluir só ao perfil com administração, e o backend repete a checagem.
+  function wirePlanningActions(items, reload) {
+    const achar = id => items.find(x => String(x.id) === String(id));
+    $$('[data-plan-view]').forEach(b => b.addEventListener('click', () => openPlanningItem(achar(b.dataset.planView))));
+    $$('[data-plan-edit]').forEach(b => b.addEventListener('click', () => openPlanningEdit(achar(b.dataset.planEdit), reload)));
+    $$('[data-plan-del]').forEach(b => b.addEventListener('click', async () => {
+      const it = achar(b.dataset.planDel);
+      if (!it) return;
+      const ok = await confirmAction('Excluir item de planejamento',
+        `Excluir "${it.title}" (${it.code})? As demandas vinculadas voltam a ficar sem exercício futuro. Esta ação não pode ser desfeita.`,
+        { confirmLabel: 'Excluir' });
+      if (!ok) return;
+      try {
+        await api(`/api/planning/${it.id}`, { method: 'DELETE' });
+        toast('Item excluído', `${it.code} saiu do planejamento.`);
+        await reload();
+      } catch (e) { toast('Não foi possível excluir', e.message, 'error'); }
+    }));
+  }
+
+  function openPlanningItem(it) {
+    if (!it) return;
+    modal({
+      title: it.title, subtitle: `${it.code || ''} · Exercício ${it.year}`, mode: 'drawer',
+      body: `<section class="info-card"><h3>${icon('calendar')}Item consolidado</h3><div class="key-value">
+        <div class="kv"><span>Tipo</span><strong>${esc(it.kind)}</strong></div>
+        <div class="kv"><span>Categoria</span><strong>${esc(it.category)}</strong></div>
+        <div class="kv"><span>Status</span><strong>${esc(it.status)}</strong></div>
+        <div class="kv"><span>Quantidade</span><strong>${num(it.quantity || 0)} ${esc(it.unit || '')}</strong></div>
+        <div class="kv"><span>Estimativa</span><strong>${money(it.estimated_cost)}</strong></div>
+        <div class="kv"><span>Escolas impactadas</span><strong>${num(it.schools_count || 0)}</strong></div>
+      </div></section>
+      ${it.justification ? `<section class="info-card mt-16"><h3>${icon('clipboard')}Justificativa</h3><p style="margin:0;font-size:13px;line-height:1.6">${esc(it.justification)}</p></section>` : ''}`,
+      footer: `<button class="btn btn-secondary" data-close>Fechar</button>`
+    });
+  }
+
+  const PLANNING_STATUSES = ['Identificada', 'Em análise', 'Em levantamento', 'Consolidada',
+    'Aprovada para planejamento', 'Aguardando estimativa', 'Aguardando orçamento'];
+
+  function openPlanningEdit(it, reload) {
+    if (!it) return;
+    modal({
+      title: 'Editar item de planejamento', subtitle: `${it.code || ''} · Exercício ${it.year}`, mode: 'drawer',
+      body: `<form id="planningEditForm"><div class="form-grid">
+        <div class="field span-2"><label>Objeto consolidado *</label><input class="input" name="title" required value="${esc(it.title)}"></div>
+        <div class="field"><label>Exercício *</label><input class="input" type="number" min="2026" max="2035" name="year" required value="${esc(String(it.year))}"></div>
+        <div class="field"><label>Tipo</label><select class="select" name="kind">${PLANNING_KINDS.map(k => `<option ${k === it.kind ? 'selected' : ''}>${esc(k)}</option>`).join('')}</select></div>
+        <div class="field"><label>Categoria</label><select class="select" name="category" data-search data-search-placeholder="Buscar categoria...">${ctx.categories.map(c => `<option ${c === it.category ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>
+        <div class="field"><label>Status</label><select class="select" name="status">${PLANNING_STATUSES.map(x => `<option ${x === it.status ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>
+        <div class="field"><label>Quantidade</label><input class="input" type="number" min="0" step="0.01" name="quantity" value="${esc(String(it.quantity || 0))}"></div>
+        <div class="field"><label>Unidade de medida</label><select class="select" name="unit" data-search data-search-placeholder="Buscar unidade...">${unitOptionsHTML(it.unit || '')}</select></div>
+        <div class="field"><label>Estimativa de custo (R$)</label><input class="input" type="number" min="0" step="0.01" name="estimated_cost" value="${esc(String(it.estimated_cost || 0))}"></div>
+        <div class="field"><label>Escolas impactadas</label><input class="input" type="number" min="0" name="schools_count" value="${esc(String(it.schools_count || 0))}"></div>
+        <div class="field span-2"><label>Justificativa</label><textarea class="textarea" name="justification">${esc(it.justification || '')}</textarea></div>
+      </div><p class="wizard-hint mt-12">Mudar o exercício move também as demandas vinculadas a este item.</p></form>`,
+      footer: `<button class="btn btn-secondary" data-close>Cancelar</button><button class="btn btn-primary" id="savePlanningItem">Salvar alterações</button>`,
+      onOpen(root) {
+        $('#savePlanningItem', root).addEventListener('click', async () => {
+          const f = $('#planningEditForm', root);
+          if (!f.reportValidity()) return;
+          try {
+            await api(`/api/planning/${it.id}`, { method: 'PUT', body: Object.fromEntries(new FormData(f).entries()) });
+            closeModal();
+            toast('Item atualizado', `${it.code || ''} foi salvo.`);
+            await reload();
+          } catch (e) { toast('Não foi possível salvar', e.message, 'error'); }
+        });
+      }
+    });
+  }
+
   function renderPlanningTable(items) {
     if (!items.length) return empty('Nenhum item neste exercício', 'Cadastre uma necessidade futura ou altere o exercício.');
-    return `<div class="table-wrap"><table class="data-table"><thead><tr><th>Código</th><th>Objeto consolidado</th><th>Tipo</th><th>Escolas</th><th>Estimativa</th><th>Status</th><th>Ações</th></tr></thead><tbody>${items.map(p => `<tr><td class="mono" data-label="Código"><strong>${esc(p.code)}</strong></td><td class="cell-title" data-label="Objeto consolidado"><strong>${esc(p.title)}</strong><small>${esc(p.category)} · ${p.year}</small></td><td data-label="Tipo">${esc(p.kind)}</td><td data-label="Escolas">${num(p.schools_count)}</td><td data-label="Estimativa">${money(p.estimated_cost)}</td><td data-label="Status"><span class="status-badge future">${esc(p.status)}</span></td><td data-label="Ações"><button class="icon-btn" data-tooltip="Detalhes do planejamento" aria-label="Detalhes do planejamento">${icon('eye')}</button></td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="table-wrap"><table class="data-table"><thead><tr><th>Código</th><th>Objeto consolidado</th><th>Tipo</th><th>Escolas</th><th>Estimativa</th><th>Status</th><th>Ações</th></tr></thead><tbody>${items.map(p => `<tr><td class="mono" data-label="Código"><strong>${esc(p.code)}</strong></td><td class="cell-title" data-label="Objeto consolidado"><strong>${esc(p.title)}</strong><small>${esc(p.category)} · ${p.year}</small></td><td data-label="Tipo">${esc(p.kind)}</td><td data-label="Escolas">${num(p.schools_count)}</td><td data-label="Estimativa">${money(p.estimated_cost)}</td><td data-label="Status"><span class="status-badge future">${esc(p.status)}</span></td><td data-label="Ações" class="row-actions"><button type="button" class="icon-btn" data-plan-view="${p.id}" data-tooltip="Detalhes do planejamento" aria-label="Detalhes do planejamento">${icon('eye')}</button>${ctx.user.perm.can_manage_admin ? `<button type="button" class="icon-btn" data-plan-edit="${p.id}" data-tooltip="Editar item" aria-label="Editar item">${icon('edit')}</button><button type="button" class="icon-btn" data-plan-del="${p.id}" data-tooltip="Excluir item" aria-label="Excluir item" style="color:var(--red)">${icon('trash')}</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
   }
 
   async function renderSchools() {
@@ -1789,6 +2549,7 @@
       <div class="quick-filters">
         <div class="chip-group">
           <button class="chip-v2 chip-red" data-chip-priority="P1">${icon('warning')}<span>P1 Urgentes</span><b>${num(ds.urgent)}</b></button>
+          <button class="chip-v2 chip-orange" data-chip-priority="P2">${icon('warning')}<span>P2 · Alta</span><b>${num(ds.high)}</b></button>
           <button class="chip-v2 chip-orange" data-chip-status="Aguardando contratação">${icon('clock')}<span>Aguardando contratação</span><b>${num(ds.contract)}</b></button>
           <button class="chip-v2 chip-blue" data-chip-status="Em execução">${icon('trend')}<span>Em execução</span><b>${num(ds.progress)}</b></button>
           <button class="chip-v2 chip-violet" data-chip-status="Planejamento futuro">${icon('calendar')}<span>Planejamento futuro</span><b>${num(ds.future)}</b></button>
@@ -1830,10 +2591,20 @@
         if (narrowing && !(bySchool.get(s.id) || []).length) return false;
         return true;
       });
-      list = [...list].sort((a, b) => {
-        if (!critical) return a.name.localeCompare(b.name);
-        const ua = (bySchool.get(a.id) || []).filter(d => d.priority === 'P1').length, ub = (bySchool.get(b.id) || []).filter(d => d.priority === 'P1').length;
-        return ub - ua || (bySchool.get(b.id) || []).length - (bySchool.get(a.id) || []).length;
+      // Sao 65 unidades e poucas com demanda: em ordem alfabetica pura, as que
+      // interessam ficavam soterradas entre dezenas de cards zerados. Quem tem
+      // demanda vem primeiro; o resto segue alfabetico, sem esconder ninguem.
+      list = [...list].sort((x, y) => {
+        const dx = bySchool.get(x.id) || [], dy = bySchool.get(y.id) || [];
+        if (critical) {
+          const px = dx.filter(d => d.priority === 'P1').length, py = dy.filter(d => d.priority === 'P1').length;
+          if (px !== py) return py - px;
+          const ax = dx.filter(d => d.status !== 'Concluída').length, ay = dy.filter(d => d.status !== 'Concluída').length;
+          if (ax !== ay) return ay - ax;
+        }
+        if (!dx.length !== !dy.length) return dx.length ? -1 : 1;
+        if (dx.length !== dy.length) return dy.length - dx.length;
+        return x.name.localeCompare(y.name);
       });
       $('#schoolGrid').innerHTML = list.length ? list.map(s => renderSchoolCard(s, bySchool.get(s.id) || [])).join('') : empty('Nenhuma unidade encontrada', 'Ajuste os filtros ou o termo de busca.');
       bindSchools();
@@ -2192,7 +2963,7 @@
 
       mapInstance = new maplibregl.Map({
         container: 'networkMapContainer',
-        style: 'https://tiles.openfreemap.org/styles/liberty',
+        style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
         center: [-43.788904, -22.868666],
         zoom: 12.5,
         attributionControl: false
@@ -2955,7 +3726,7 @@
 
   async function renderAdmin() {
     if (!ctx.user.perm.can_manage_admin) { location.href = '/'; return; }
-    const TABS = [['geral', 'Visão Geral', 'grid'], ['categorias', 'Categorias', 'clipboard'], ['prioridades', 'Prioridades', 'warning'], ['kanban', 'Colunas do Kanban', 'kanban'], ['escolas', 'Unidades Escolares', 'school'], ['perfis', 'Perfis de Acesso', 'user'], ['usuarios', 'Usuários', 'user']];
+    const TABS = [['geral', 'Visão Geral', 'grid'], ['categorias', 'Categorias', 'clipboard'], ['prioridades', 'Prioridades', 'warning'], ['kanban', 'Colunas do Kanban', 'kanban'], ['escolas', 'Unidades Escolares', 'school'], ['perfis', 'Perfis de Acesso', 'user'], ['usuarios', 'Usuários', 'user'], ['logo', 'Logo do Sistema', 'paint'], ['logs', 'Logs do Sistema', 'history']];
     let active = new URLSearchParams(location.search).get('tab') || 'geral';
     if (!TABS.some(t => t[0] === active)) active = 'geral';
     async function paint() {
@@ -2973,6 +3744,8 @@
         else if (active === 'escolas') await renderAdminEscolas(body);
         else if (active === 'perfis') await renderAdminPerfis(body);
         else if (active === 'usuarios') await renderAdminUsuarios(body);
+        else if (active === 'logo') await renderAdminLogo(body);
+        else if (active === 'logs') await renderAdminLogs(body);
       } catch (e) { body.innerHTML = `<div class="alert error">${esc(e.message)}</div>`; }
     }
     await paint();
@@ -3134,8 +3907,8 @@
     const rows = await api('/api/schools?include_inactive=1');
     let q = '';
 
-    function paintTable() {
-      const filtered = rows.filter(s => {
+    function getFiltered() {
+      return rows.filter(s => {
         if (!q) return true;
         const low = q.toLowerCase();
         return (
@@ -3146,100 +3919,111 @@
           (s.address || '').toLowerCase().includes(low)
         );
       });
+    }
 
-      body.innerHTML = `
-        <section class="panel">
-          <div class="panel-header">
-            <div>
-              <h2>Unidades Escolares (${rows.length})</h2>
-              <p>Cadastro oficial, georreferenciamento, contatos institucionais e gestão de unidades.</p>
+    function renderRows(filtered) {
+      return filtered.length ? filtered.map(s => `
+        <tr class="${s.active ? '' : 'row-inactive'}">
+          <td>
+            <strong>${esc(s.name)}</strong>
+            <div style="display:flex;gap:6px;margin-top:3px">
+              <span class="badge P4" style="font-family:var(--font-mono)">INEP: ${esc(s.inep || s.code || '—')}</span>
+              ${s.maps_link ? `<a href="${esc(s.maps_link)}" target="_blank" rel="noopener noreferrer" style="color:var(--primary);display:inline-flex;align-items:center;gap:2px;font-size:11px" title="Ver no Google Maps">${icon('globe')} Mapa ↗</a>` : ''}
             </div>
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-              <input type="search" id="adminSchoolSearch" class="input" placeholder="Buscar por nome, INEP ou bairro..." value="${esc(q)}" style="min-width:240px;height:38px">
-              <button class="btn btn-primary" id="newSchool">${icon('plus')}Nova unidade</button>
-            </div>
-          </div>
-          <div class="panel-body">
-            <div class="table-wrap">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>Unidade Escolar / INEP</th>
-                    <th>Tipo & Modalidade</th>
-                    <th>Bairro & Endereço</th>
-                    <th>Direção & Contato</th>
-                    <th>Situação</th>
-                    <th>Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${filtered.length ? filtered.map(s => `
-                    <tr class="${s.active ? '' : 'row-inactive'}">
-                      <td>
-                        <strong>${esc(s.name)}</strong>
-                        <div style="display:flex;gap:6px;margin-top:3px">
-                          <span class="badge P4" style="font-family:var(--font-mono)">INEP: ${esc(s.inep || s.code || '—')}</span>
-                          ${s.maps_link ? `<a href="${esc(s.maps_link)}" target="_blank" rel="noopener noreferrer" style="color:var(--primary);display:inline-flex;align-items:center;gap:2px;font-size:11px" title="Ver no Google Maps">${icon('globe')} Mapa ↗</a>` : ''}
-                        </div>
-                      </td>
-                      <td>
-                        <span class="badge" style="background:var(--blue-soft);color:var(--blue)">${esc(s.school_type || 'Escola')}</span>
-                        <small style="display:block;margin-top:3px;color:var(--muted)">${esc(s.modality || 'Regular')}</small>
-                      </td>
-                      <td>
-                        <strong>${esc(s.neighborhood || 'Itaguaí')}</strong>
-                        <small style="display:block;margin-top:2px;color:var(--muted);max-width:260px" title="${esc(s.address || '')}">${esc(s.address || '—')}</small>
-                      </td>
-                      <td>
-                        <strong>${esc(s.director || '—')}</strong>
-                        <small style="display:block;margin-top:2px;color:var(--muted)">${esc(s.phone || '—')}${s.ramal ? ` (R. ${s.ramal})` : ''}</small>
-                        ${s.email ? `<small style="display:block;color:var(--primary)">${esc(s.email)}</small>` : ''}
-                      </td>
-                      <td>${statePill(!!s.active)}</td>
-                      <td class="row-actions">
-                        <button class="icon-btn" data-edit="${s.id}" data-tooltip="Editar" aria-label="Editar">${icon('edit')}</button>
-                        <button class="icon-btn" data-toggle="${s.id}" data-tooltip="${s.active ? 'Desativar' : 'Ativar'}" aria-label="${s.active ? 'Desativar' : 'Ativar'}">${icon(s.active ? 'x' : 'check-circle')}</button>
-                        <button class="icon-btn" data-del="${s.id}" data-tooltip="Excluir" aria-label="Excluir">${icon('x')}</button>
-                      </td>
-                    </tr>
-                  `).join('') : `<tr><td colspan="6">${empty('Nenhuma unidade encontrada')}</td></tr>`}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-      `;
+          </td>
+          <td>
+            <span class="badge" style="background:var(--blue-soft);color:var(--blue)">${esc(s.school_type || 'Escola')}</span>
+            <small style="display:block;margin-top:3px;color:var(--muted)">${esc(s.modality || 'Regular')}</small>
+          </td>
+          <td>
+            <strong>${esc(s.neighborhood || 'Itaguaí')}</strong>
+            <small style="display:block;margin-top:2px;color:var(--muted);max-width:260px" title="${esc(s.address || '')}">${esc(s.address || '—')}</small>
+          </td>
+          <td>
+            <strong>${esc(s.director || '—')}</strong>
+            <small style="display:block;margin-top:2px;color:var(--muted)">${esc(s.phone || '—')}${s.ramal ? ` (R. ${s.ramal})` : ''}</small>
+            ${s.email ? `<small style="display:block;color:var(--primary)">${esc(s.email)}</small>` : ''}
+          </td>
+          <td>${statePill(!!s.active)}</td>
+          <td class="row-actions">
+            <button class="icon-btn" data-edit="${s.id}" data-tooltip="Editar" aria-label="Editar">${icon('edit')}</button>
+            <button class="icon-btn" data-toggle="${s.id}" data-tooltip="${s.active ? 'Desativar' : 'Ativar'}" aria-label="${s.active ? 'Desativar' : 'Ativar'}">${icon(s.active ? 'x' : 'check-circle')}</button>
+            <button class="icon-btn" data-del="${s.id}" data-tooltip="Excluir" aria-label="Excluir">${icon('x')}</button>
+          </td>
+        </tr>
+      `).join('') : `<tr><td colspan="6">${empty('Nenhuma unidade encontrada')}</td></tr>`;
+    }
 
-      $('#adminSchoolSearch')?.addEventListener('input', (e) => {
-        q = e.target.value;
-        paintTable();
-      });
-
-      $('#newSchool')?.addEventListener('click', () => openSchoolForm(null, body));
+    function bindRowEvents() {
       $$('[data-edit]', body).forEach(b => b.addEventListener('click', () => openSchoolForm(rows.find(r => r.id === Number(b.dataset.edit)), body)));
       $$('[data-toggle]', body).forEach(b => b.addEventListener('click', async () => {
         const s = rows.find(r => r.id === Number(b.dataset.toggle));
-        try { 
-          const res = await api(`/api/admin/schools/${s.id}/toggle-active`, { method: 'POST' }); 
-          toast(res.active ? 'Unidade ativada' : 'Unidade desativada'); 
-          schoolsCache = null; 
-          renderAdminEscolas(body); 
+        try {
+          const res = await api(`/api/admin/schools/${s.id}/toggle-active`, { method: 'POST' });
+          toast(res.active ? 'Unidade ativada' : 'Unidade desativada');
+          schoolsCache = null;
+          renderAdminEscolas(body);
         } catch (e) { toast('Não foi possível atualizar', e.message, 'error'); }
       }));
       $$('[data-del]', body).forEach(b => b.addEventListener('click', async () => {
         const s = rows.find(r => r.id === Number(b.dataset.del));
         const ok = await confirmAction('Excluir unidade', `Excluir "${s.name}"? Só é possível quando não houver demandas ou usuários vinculados a ela.`, { confirmLabel: 'Excluir' });
         if (!ok) return;
-        try { 
-          await api(`/api/admin/schools/${s.id}`, { method: 'DELETE' }); 
-          toast('Unidade excluída'); 
-          schoolsCache = null; 
-          renderAdminEscolas(body); 
+        try {
+          await api(`/api/admin/schools/${s.id}`, { method: 'DELETE' });
+          toast('Unidade excluída');
+          schoolsCache = null;
+          renderAdminEscolas(body);
         } catch (e) { toast('Não foi possível excluir', e.message, 'error'); }
       }));
     }
 
-    paintTable();
+    // O cabeçalho (com o campo de busca) é montado uma única vez; só o <tbody> é
+    // re-renderizado a cada tecla digitada, para o input nunca perder o foco
+    // (recriar o próprio campo de busca a cada tecla fazia os atalhos de teclado
+    // globais capturarem a tecla seguinte e navegarem para outra tela).
+    body.innerHTML = `
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>Unidades Escolares (${rows.length})</h2>
+            <p>Cadastro oficial, georreferenciamento, contatos institucionais e gestão de unidades.</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <input type="search" id="adminSchoolSearch" class="input" placeholder="Buscar por nome, INEP ou bairro..." value="${esc(q)}" style="min-width:240px;height:38px">
+            <button class="btn btn-primary" id="newSchool">${icon('plus')}Nova unidade</button>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Unidade Escolar / INEP</th>
+                  <th>Tipo & Modalidade</th>
+                  <th>Bairro & Endereço</th>
+                  <th>Direção & Contato</th>
+                  <th>Situação</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="adminSchoolsBody">${renderRows(getFiltered())}</tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    `;
+
+    bindRowEvents();
+
+    $('#adminSchoolSearch')?.addEventListener('input', (e) => {
+      q = e.target.value;
+      const tbody = $('#adminSchoolsBody');
+      if (tbody) tbody.innerHTML = renderRows(getFiltered());
+      bindRowEvents();
+    });
+
+    $('#newSchool')?.addEventListener('click', () => openSchoolForm(null, body));
   }
 
   function openSchoolForm(school, body) {
@@ -3390,7 +4174,7 @@
           const p = profiles.find(x => x.slug === $('#userRoleField').value);
           const wrap = $('#userSchoolWrap');
           if (p?.school_scoped) {
-            wrap.innerHTML = `<label>Unidade Escolar *</label><select class="select" name="school_id" required><option value="">Selecione...</option>${schools.map(s => `<option value="${s.id}" ${Number(user?.school_id) === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>`;
+            wrap.innerHTML = `<label>Unidade Escolar *</label><select class="select" name="school_id" required data-search data-search-placeholder="Buscar escola pelo nome..."><option value="">Selecione...</option>${schools.map(s => `<option value="${s.id}" ${Number(user?.school_id) === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>`;
           } else {
             wrap.innerHTML = '';
           }
@@ -3411,6 +4195,207 @@
         });
       }
     });
+  }
+
+  // Tipos de entidade que o back-end grava em system_logs (registrar(...) em app.py).
+  const LOG_TIPOS = [
+    ['auth', 'Acesso'], ['demand', 'Demandas'], ['planning', 'Planejamento'],
+    ['school', 'Unidades escolares'], ['user', 'Usuários'], ['profile', 'Perfis de acesso'],
+    ['category', 'Categorias'], ['priority', 'Prioridades'], ['kanban', 'Colunas do Kanban']
+  ];
+
+  // Troca da logo do cabecalho. O arquivo vai para o Storage do Supabase (bucket
+  // publico) e o endereco fica gravado em app_settings; o template le de la. A
+  // previa usa URL.createObjectURL para o gestor conferir o recorte antes de
+  // publicar — trocar a logo e visivel para todo mundo.
+  async function renderAdminLogo(body) {
+    const info = await api('/api/admin/logo');
+    let arquivo = null;
+    let previaUrl = '';
+
+    const pintar = () => {
+      body.innerHTML = `
+        <div style="margin-bottom:16px">
+          <h3>Logo do Sistema</h3>
+          <p>Imagem exibida no cabeçalho, em todas as telas e para todos os usuários.</p>
+        </div>
+        <div class="logo-admin">
+          <section class="panel logo-preview-card">
+            <div class="panel-header"><div><h2>${previaUrl ? 'Prévia do novo arquivo' : 'Logo em uso'}</h2><p>${previaUrl ? 'Ainda não publicada — confira antes de salvar.' : (info.is_default ? 'Padrão do sistema (portal da Prefeitura).' : 'Enviada por Administração.')}</p></div></div>
+            <div class="logo-preview-box"><img src="${esc(previaUrl || info.url)}" alt="Logo do sistema"></div>
+            <p class="logo-preview-src mono">${esc(previaUrl ? (arquivo?.name || '') : info.url)}</p>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header"><div><h2>Enviar nova logo</h2><p>Vai para o bucket <strong>${esc(info.bucket)}</strong> do Supabase Storage.</p></div></div>
+            <div class="panel-body">
+              <label class="logo-drop" id="logoDrop">
+                ${icon('download')}
+                <strong>Escolher arquivo</strong>
+                <small>${info.formatos.map(f => f.toUpperCase()).join(' · ')} — até ${info.max_mb} MB</small>
+                <input type="file" id="logoInput" accept="image/*" hidden>
+              </label>
+              <p class="wizard-hint" id="logoNome">${arquivo ? esc(arquivo.name) + ' · ' + Math.max(1, Math.round(arquivo.size / 1024)) + ' KB' : 'Nenhum arquivo escolhido.'}</p>
+              <div class="logo-actions">
+                <button class="btn btn-primary" id="logoSalvar" ${arquivo ? '' : 'disabled'}>${icon('check-circle')}Publicar logo</button>
+                <button class="btn btn-secondary" id="logoCancelar" ${arquivo ? '' : 'disabled'}>Cancelar</button>
+                <button class="btn btn-secondary" id="logoPadrao" ${info.is_default ? 'disabled' : ''} data-tooltip="Volta a usar a logo do portal da Prefeitura">${icon('refresh')}Restaurar padrão</button>
+              </div>
+              ${info.updated_at && !info.is_default ? `<p class="wizard-hint">Última alteração em ${esc(fmtDateTime(info.updated_at))}.</p>` : ''}
+            </div>
+          </section>
+        </div>`;
+
+      const entrada = $('#logoInput', body);
+      $('#logoDrop', body).addEventListener('click', e => { e.preventDefault(); entrada.click(); });
+      entrada.addEventListener('change', () => {
+        const f = entrada.files[0];
+        if (!f) return;
+        if (f.size > info.max_mb * 1024 * 1024) { toast('Arquivo muito grande', `O limite é ${info.max_mb} MB.`, 'error'); return; }
+        if (previaUrl) URL.revokeObjectURL(previaUrl);
+        arquivo = f; previaUrl = URL.createObjectURL(f);
+        pintar();
+      });
+
+      $('#logoCancelar', body).addEventListener('click', () => {
+        if (previaUrl) URL.revokeObjectURL(previaUrl);
+        arquivo = null; previaUrl = '';
+        pintar();
+      });
+
+      $('#logoSalvar', body).addEventListener('click', async () => {
+        if (!arquivo) return;
+        const botao = $('#logoSalvar', body);
+        botao.disabled = true; botao.textContent = 'Publicando...';
+        try {
+          const dados = new FormData();
+          dados.append('file', arquivo);
+          const r = await api('/api/admin/logo', { method: 'POST', body: dados });
+          if (previaUrl) URL.revokeObjectURL(previaUrl);
+          arquivo = null; previaUrl = '';
+          info.url = r.url; info.is_default = false; info.updated_at = new Date().toISOString();
+          toast('Logo publicada', 'O cabeçalho será atualizado ao recarregar as telas abertas.');
+          atualizaCabecalho(r.url);
+          pintar();
+        } catch (e) {
+          toast('Não foi possível publicar a logo', e.message, 'error');
+          botao.disabled = false; pintar();
+        }
+      });
+
+      $('#logoPadrao', body).addEventListener('click', async () => {
+        if (!await confirmAction('Restaurar a logo padrão?', 'O arquivo enviado será removido do Storage e o sistema volta a usar a logo do portal da Prefeitura.', { confirmLabel: 'Restaurar', danger: false })) return;
+        try {
+          const r = await api('/api/admin/logo', { method: 'DELETE' });
+          info.url = r.url; info.is_default = true; info.updated_at = null;
+          toast('Logo padrão restaurada');
+          atualizaCabecalho(r.url);
+          pintar();
+        } catch (e) { toast('Não foi possível restaurar', e.message, 'error'); }
+      });
+    };
+
+    // Atualiza a logo desta aba sem esperar um F5.
+    const atualizaCabecalho = url => {
+      const img = $('.header-logo');
+      if (img) { img.src = url; img.hidden = false; }
+    };
+
+    pintar();
+  }
+
+  async function renderAdminLogs(body) {
+    let logs = [];
+    let total = 0;
+    let offset = 0;
+    const limit = 50;
+    // O endpoint ja aceitava action/entity_type; a tela nunca ofereceu os filtros.
+    // Com o log recebendo registros de verdade, sem eles a busca fica inviavel.
+    const filtros = { action: '', entity_type: '' };
+
+    async function loadLogs() {
+      const params = new URLSearchParams({ limit, offset });
+      if (filtros.action) params.set('action', filtros.action);
+      if (filtros.entity_type) params.set('entity_type', filtros.entity_type);
+      const result = await api(`/api/admin/logs?${params}`);
+      logs = result.logs || [];
+      total = result.total || 0;
+      render();
+    }
+
+    function render() {
+      body.innerHTML = `
+        <div style="margin-bottom:16px">
+          <h3>Logs do Sistema</h3>
+          <p>Histórico de ações realizadas no sistema · ${num(total)} registro${total === 1 ? '' : 's'}</p>
+        </div>
+        <section class="filters-card" style="margin-bottom:16px">
+          <div class="field"><label>Buscar ação</label><div class="search-field">${icon('search')}<input class="input" id="logQ" value="${esc(filtros.action)}" placeholder="Ex.: excluiu, entrou, editou..."></div></div>
+          <div class="field"><label>Tipo</label><select class="select" id="logTipo"><option value="">Todos</option>${LOG_TIPOS.map(([v, l]) => `<option value="${v}" ${v === filtros.entity_type ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
+          <button class="btn btn-secondary" id="logLimpar">${icon('filter')}Limpar</button>
+        </section>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th data-label="Data/Hora">Data/Hora</th>
+                <th data-label="Usuário">Usuário</th>
+                <th data-label="Ação">Ação</th>
+                <th data-label="Tipo">Tipo</th>
+                <th data-label="ID">ID da Entidade</th>
+                <th data-label="Detalhes">Detalhes</th>
+                <th data-label="Origem">Origem</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${logs.length ? logs.map(l => `
+                <tr>
+                  <td data-label="Data/Hora" style="font-size:12px">${new Date(l.created_at).toLocaleString('pt-BR')}</td>
+                  <td data-label="Usuário"><strong>${esc(l.user_name || 'Sistema')}</strong></td>
+                  <td data-label="Ação"><span class="badge">${esc(l.action)}</span></td>
+                  <td data-label="Tipo">${l.entity_type ? esc(l.entity_type) : '-'}</td>
+                  <td data-label="ID" class="mono">${l.entity_id ? esc(l.entity_id) : '-'}</td>
+                  <td data-label="Detalhes" style="font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis">${l.details ? esc(l.details) : '-'}</td>
+                  <td data-label="Origem" class="mono" style="font-size:11.5px">${l.ip_address ? esc(l.ip_address) : '-'}</td>
+                </tr>
+              `).join('') : `<tr><td colspan="7" style="text-align:center;padding:20px">${filtros.action || filtros.entity_type ? 'Nenhum registro corresponde a este filtro.' : 'Nenhuma ação registrada ainda.'}</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+        ${total > limit ? `
+          <div style="margin-top:20px;display:flex;gap:10px;justify-content:center;align-items:center">
+            <button class="btn btn-secondary" id="prevLogs" ${offset === 0 ? 'disabled' : ''}>${icon('arrow')}Anterior</button>
+            <span>Página ${Math.floor(offset / limit) + 1} de ${Math.ceil(total / limit)} (${total} total)</span>
+            <button class="btn btn-secondary" id="nextLogs" ${offset + limit >= total ? 'disabled' : ''}>Próxima${icon('arrow')}</button>
+          </div>
+        ` : ''}
+      `;
+
+      let tq;
+      $('#logQ')?.addEventListener('input', e => {
+        clearTimeout(tq);
+        const v = e.target.value;
+        tq = setTimeout(() => { filtros.action = v.trim(); offset = 0; loadLogs(); }, 300);
+      });
+      $('#logTipo')?.addEventListener('change', e => {
+        filtros.entity_type = e.target.value; offset = 0; loadLogs();
+      });
+      $('#logLimpar')?.addEventListener('click', () => {
+        filtros.action = ''; filtros.entity_type = ''; offset = 0; loadLogs();
+      });
+
+      $('#prevLogs')?.addEventListener('click', () => {
+        offset = Math.max(0, offset - limit);
+        loadLogs();
+      });
+
+      $('#nextLogs')?.addEventListener('click', () => {
+        offset += limit;
+        loadLogs();
+      });
+    }
+
+    await loadLogs();
   }
 
   async function renderAbout() {
@@ -3733,6 +4718,20 @@
       const detail = await api(`/api/demands/${id}`);
       await openEditDemand(detail.demand, () => location.reload());
     } catch (err) { toast('Não foi possível carregar a demanda', err.message, 'error'); }
+  });
+
+  content.addEventListener('click', async e => {
+    const deleteBtn = e.target.closest('[data-delete-demand]');
+    if (!deleteBtn) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const id = Number(deleteBtn.dataset.deleteDemand);
+    if (!confirm('Tem certeza que deseja deletar esta demanda? Esta ação não pode ser desfeita.')) return;
+    try {
+      await api(`/api/demands/${id}`, { method: 'DELETE' });
+      toast('Demanda deletada com sucesso');
+      location.reload();
+    } catch (err) { toast('Não foi possível deletar a demanda', err.message, 'error'); }
   });
 
   content.addEventListener('click', e => {

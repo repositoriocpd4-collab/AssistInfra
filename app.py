@@ -7,7 +7,6 @@ import io
 import json
 import os
 import secrets
-import sqlite3
 import math
 from datetime import datetime, timedelta, date
 from pathlib import Path
@@ -20,9 +19,15 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 import httpx
 import uvicorn
+import psycopg2
+import psycopg2.extras
+import psycopg2.extensions
+import psycopg2.pool
+from dotenv import load_dotenv
+
+load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "agenda_integrada.db"
 UPLOAD_DIR = BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
@@ -62,6 +67,32 @@ CATEGORY_ICONS = {
     'Segurança': 'shield', 'Saneamento': 'drain', 'Estrutura': 'column', 'Área externa': 'tree', 'Iluminação': 'bulb',
     'Portas e janelas': 'door', 'Reforma': 'hammer', 'Obra': 'crane', 'Aquisição': 'cart', 'Outros': 'dots',
 }
+# Categorias de CPD/TI. Ficam numa lista propria porque, ao contrario de
+# CATEGORIES (semeada so quando a tabela esta vazia), estas precisam entrar
+# tambem em bancos que ja existem — a insercao abaixo em init_db e idempotente
+# e so cria o que faltar, sem tocar no que o administrador ja editou.
+# O icone sai do sprite de templates/index.html; onde nao existe um desenho
+# proprio (impressora, notebook, tablet...) vale o mais proximo, ja que o
+# rotulo fica logo abaixo no cartao.
+CPDTI_CATEGORIES = [
+    ("Impressora", "file", "Impressora, multifuncional, toner ou atolamento de papel."),
+    ("Computador", "monitor", "Desktop da secretaria, da sala de aula ou do laboratório."),
+    ("Notebook", "monitor", "Notebook institucional com defeito ou sem funcionar."),
+    ("Tablet", "clipboard", "Tablet de uso pedagógico ou administrativo."),
+    ("Câmeras", "camera", "Câmera de segurança, gravador ou monitoramento."),
+    ("Alarme", "bell", "Central de alarme, sensor ou sirene."),
+    ("Câmeras & Alarmes", "camera", "Câmera de segurança, central de alarme, sensor ou sirene."),
+    ("Voip", "message", "Ramal, telefone IP ou central telefônica."),
+    ("Wi-Fi", "globe", "Sinal sem fio, roteador ou ponto de acesso."),
+    ("Rede e Cabeamento", "layers", "Ponto de rede, cabo, switch ou rack."),
+    ("DataShow", "bulb", "Projetor, lâmpada do projetor ou cabo de vídeo."),
+    ("No-Break", "bolt", "No-break, bateria ou estabilizador."),
+    ("Servidor", "kanban", "Servidor local, armazenamento ou backup."),
+    ("Sistema/Software", "settings", "Sistema, programa, acesso ou senha."),
+    ("Sala de Informática", "school", "Laboratório de informática como um todo."),
+    ("Sala de Recursos", "door", "Sala de recursos multifuncionais como um todo."),
+]
+
 CATEGORY_HINTS = {
     'Elétrica': 'Fiação, tomada, quadro de força, curto-circuito', 'Hidráulica': 'Vazamento, entupimento, cano estourado',
     'Cobertura/Telhado': 'Goteira, infiltração, telha quebrada', 'Pintura': 'Parede descascando, mofo, pintura antiga',
@@ -104,11 +135,165 @@ def geocode_address(address: Optional[str]) -> Optional[dict]:
         return None
 
 
-def db() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+def convert_dms_to_decimal(dms_string: str) -> Optional[tuple]:
+    """Converte coordenadas em formato DMS (Degrees, Minutes, Seconds) para decimal.
+    Exemplo: '22°52'28.5"S 43°46'32.4"W' -> (-22.87458, -43.77566)"""
+    if not dms_string or not dms_string.strip():
+        return None
+    try:
+        import re
+        # Padrão flexível que aceita °, º, ˚, ⁰ e similares para graus
+        # e aceita ', ′, ´ para minutos e ", ″, ˮ para segundos
+        pattern = r"(\d+)[°º˚⁰]\s*(\d+)[\'′´]\s*([\d.]+)[\"″ˮ]\s*([NS])\s*(\d+)[°º˚⁰]\s*(\d+)[\'′´]\s*([\d.]+)[\"″ˮ]\s*([EW])"
+        match = re.search(pattern, dms_string)
+
+        if match:
+            lat_deg, lat_min, lat_sec, lat_dir, lon_deg, lon_min, lon_sec, lon_dir = match.groups()
+
+            lat = float(lat_deg) + float(lat_min)/60 + float(lat_sec)/3600
+            lon = float(lon_deg) + float(lon_min)/60 + float(lon_sec)/3600
+
+            # Aplicar direção (S e W são negativas)
+            if lat_dir.upper() == "S":
+                lat = -lat
+            if lon_dir.upper() == "W":
+                lon = -lon
+
+            if -90 <= lat <= 90 and -180 <= lon <= 180:
+                return (lat, lon)
+    except Exception:
+        pass
+    return None
+
+
+def extract_coords_from_maps_link(maps_link: str) -> Optional[dict]:
+    """Extrai latitude/longitude de um link do Google Maps.
+    Suporta: links shortened (maps.app.goo.gl), URLs planas com @lat,lon, etc."""
+    if not maps_link or not maps_link.strip():
+        return None
+    try:
+        link = maps_link.strip()
+
+        # Se for um link shortened (maps.app.goo.gl), faz um GET request para expandir
+        # GET é mais confiável que HEAD para seguir redirects
+        if "maps.app.goo.gl" in link or "goo.gl" in link:
+            resp = httpx.get(link, follow_redirects=True, timeout=5.0)
+            link = str(resp.url)
+
+        # Tenta extrair @lat,lng de uma URL expandida (formato padrão do Google Maps)
+        # Exemplo: https://www.google.com/maps/place/.../@-22.868685,-43.788898,...
+        if "@" in link:
+            parts = link.split("@")[1].split(",")
+            if len(parts) >= 2:
+                lat = float(parts[0].strip())
+                lon = float(parts[1].strip())
+                if -90 <= lat <= 90 and -180 <= lon <= 180:
+                    return {"lat": lat, "lon": lon, "source": "maps_link"}
+    except Exception:
+        pass
+    return None
+
+
+class _PGCursor:
+    """Envolve um cursor psycopg2 para se comportar como um cursor sqlite3:
+    .execute() encadeia (retorna self, permitindo conn.execute(q, p).fetchall())
+    e .lastrowid lê o id devolvido por um RETURNING id da query."""
+
+    __slots__ = ("_cur", "_lastrowid_cache", "_lastrowid_fetched")
+
+    def __init__(self, raw_cursor):
+        self._cur = raw_cursor
+        self._lastrowid_cache = None
+        self._lastrowid_fetched = False
+
+    def execute(self, sql, params=None):
+        self._cur.execute(sql, params if params is not None else ())
+        self._lastrowid_fetched = False
+        self._lastrowid_cache = None
+        return self
+
+    def executemany(self, sql, seq_of_params):
+        self._cur.executemany(sql, seq_of_params)
+        return self
+
+    def fetchone(self):
+        return self._cur.fetchone()
+
+    def fetchall(self):
+        return self._cur.fetchall()
+
+    @property
+    def rowcount(self):
+        return self._cur.rowcount
+
+    @property
+    def lastrowid(self):
+        if not self._lastrowid_fetched:
+            row = self._cur.fetchone()
+            self._lastrowid_cache = row["id"] if row else None
+            self._lastrowid_fetched = True
+        return self._lastrowid_cache
+
+
+class PGConnection:
+    """Envolve uma conexão psycopg2 para se comportar como uma conexão sqlite3
+    (conn.execute/.executemany/.executescript/.cursor/.commit/.close)."""
+
+    def __init__(self, raw_conn):
+        self._conn = raw_conn
+
+    def execute(self, sql, params=None):
+        cur = _PGCursor(self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor))
+        return cur.execute(sql, params)
+
+    def executemany(self, sql, seq_of_params):
+        cur = _PGCursor(self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor))
+        return cur.executemany(sql, seq_of_params)
+
+    def executescript(self, sql):
+        cur = self._conn.cursor()
+        cur.execute(sql)
+        return cur
+
+    def cursor(self):
+        return _PGCursor(self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor))
+
+    def commit(self):
+        self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+
+    def close(self):
+        # Devolve a conexão ao pool em vez de encerrá-la — abrir uma conexão
+        # nova a cada clique custava um handshake TCP+TLS completo contra o
+        # Postgres remoto do Supabase (~150-400ms) em cada chamada de API.
+        try:
+            if self._conn.closed:
+                return
+            # Se alguém esqueceu de commitar/rollback antes do close(), a conexão
+            # não pode voltar ao pool com uma transação aberta.
+            if self._conn.status != psycopg2.extensions.STATUS_READY:
+                self._conn.rollback()
+            _DB_POOL.putconn(self._conn)
+        except Exception:
+            self._conn.close()
+
+
+_DB_POOL: "psycopg2.pool.ThreadedConnectionPool" = psycopg2.pool.ThreadedConnectionPool(
+    minconn=1,
+    maxconn=int(os.environ.get("SUPABASE_DB_POOL_MAX", "10")),
+    host=os.environ["SUPABASE_DB_HOST"],
+    port=int(os.environ.get("SUPABASE_DB_PORT", "6543")),
+    dbname=os.environ.get("SUPABASE_DB_NAME", "postgres"),
+    user=os.environ["SUPABASE_DB_USER"],
+    password=os.environ["SUPABASE_DB_PASSWORD"],
+)
+
+
+def db() -> PGConnection:
+    conn = _DB_POOL.getconn()
+    return PGConnection(conn)
 
 
 def now_iso() -> str:
@@ -133,8 +318,8 @@ def verify_password(password: str, encoded: str) -> bool:
 DEFAULT_PERM = {"school_scoped": True, "can_edit_analysis": False, "can_manage_admin": False, "can_view_reports": False, "can_view_planning": False}
 
 
-def get_profile_by_slug(conn: sqlite3.Connection, slug: str) -> Optional[dict]:
-    row = conn.execute("SELECT * FROM access_profiles WHERE slug=?", (slug,)).fetchone()
+def get_profile_by_slug(conn: PGConnection, slug: str) -> Optional[dict]:
+    row = conn.execute("SELECT * FROM access_profiles WHERE slug=%s", (slug,)).fetchone()
     return dict(row) if row else None
 
 
@@ -155,16 +340,44 @@ def require_admin(user: dict) -> None:
         raise HTTPException(403, "Acesso restrito à administração")
 
 
-def get_categories(conn: sqlite3.Connection, only_active: bool = True) -> list:
+def _ip(request: Request) -> Optional[str]:
+    """IP de quem fez a acao. Atras de proxy o socket e do proxy, entao o
+    X-Forwarded-For (primeiro endereco da lista) vem antes."""
+    encaminhado = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    if encaminhado:
+        return encaminhado
+    return request.client.host if request.client else None
+
+
+def registrar(conn: PGConnection, request: Request, user: dict, acao: str,
+              tipo: str = None, ident=None, detalhe: str = None) -> None:
+    """Atalho para log_action: resolve o IP e os dados do usuario logado.
+    E o que as rotas usam — log_action fica como a camada de escrita."""
+    log_action(conn, (user or {}).get("id"), (user or {}).get("name"), acao, tipo,
+               None if ident is None else str(ident), detalhe, _ip(request))
+
+
+def log_action(conn: PGConnection, user_id: int, user_name: str, action: str, entity_type: str = None, entity_id: str = None, details: str = None, ip_address: str = None) -> None:
+    """Registra uma ação no log do sistema."""
+    try:
+        conn.execute(
+            "INSERT INTO system_logs(user_id, user_name, action, entity_type, entity_id, details, ip_address) VALUES(%s, %s, %s, %s, %s, %s, %s)",
+            (user_id, user_name, action, entity_type, entity_id, details, ip_address)
+        )
+    except Exception:
+        pass  # Não falha a ação se o log não conseguir ser registrado
+
+
+def get_categories(conn: PGConnection, only_active: bool = True) -> list:
     q = "SELECT * FROM categories" + (" WHERE active=1" if only_active else "") + " ORDER BY sort_order, id"
     return [dict(r) for r in conn.execute(q).fetchall()]
 
 
-def get_priorities(conn: sqlite3.Connection) -> list:
+def get_priorities(conn: PGConnection) -> list:
     return [dict(r) for r in conn.execute("SELECT * FROM priority_levels ORDER BY rank").fetchall()]
 
 
-def get_kanban_stages(conn: sqlite3.Connection) -> list:
+def get_kanban_stages(conn: PGConnection) -> list:
     rows = [dict(r) for r in conn.execute("SELECT * FROM kanban_stages ORDER BY sort_order, id").fetchall()]
     for r in rows:
         r["statuses"] = json.loads(r["statuses"])
@@ -176,7 +389,7 @@ def init_db() -> None:
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS schools (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
             name TEXT NOT NULL,
             director TEXT,
             address TEXT,
@@ -187,17 +400,17 @@ def init_db() -> None:
         );
 
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
             name TEXT NOT NULL,
             email TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             role TEXT NOT NULL,
-            school_id INTEGER,
+            school_id BIGINT,
             FOREIGN KEY (school_id) REFERENCES schools(id)
         );
 
         CREATE TABLE IF NOT EXISTS demands (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
             code TEXT UNIQUE,
             title TEXT NOT NULL,
             description TEXT NOT NULL,
@@ -208,7 +421,7 @@ def init_db() -> None:
             affected_people INTEGER DEFAULT 0,
             risk INTEGER DEFAULT 0,
             blocks_activity INTEGER DEFAULT 0,
-            school_id INTEGER NOT NULL,
+            school_id BIGINT NOT NULL,
             priority TEXT NOT NULL DEFAULT 'P3',
             status TEXT NOT NULL DEFAULT 'Nova',
             created_at TEXT NOT NULL,
@@ -228,14 +441,14 @@ def init_db() -> None:
             planning_kind TEXT,
             planned_quantity REAL DEFAULT 0,
             planned_unit TEXT,
-            created_by INTEGER,
+            created_by BIGINT,
             FOREIGN KEY (school_id) REFERENCES schools(id),
             FOREIGN KEY (created_by) REFERENCES users(id)
         );
 
         CREATE TABLE IF NOT EXISTS demand_updates (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            demand_id INTEGER NOT NULL,
+            id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            demand_id BIGINT NOT NULL,
             kind TEXT NOT NULL,
             message TEXT NOT NULL,
             author TEXT NOT NULL,
@@ -245,8 +458,8 @@ def init_db() -> None:
         );
 
         CREATE TABLE IF NOT EXISTS attachments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            demand_id INTEGER NOT NULL,
+            id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            demand_id BIGINT NOT NULL,
             category TEXT,
             filename TEXT NOT NULL,
             stored_name TEXT NOT NULL,
@@ -257,7 +470,7 @@ def init_db() -> None:
         );
 
         CREATE TABLE IF NOT EXISTS planning_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
             code TEXT UNIQUE,
             year INTEGER NOT NULL,
             title TEXT NOT NULL,
@@ -278,15 +491,15 @@ def init_db() -> None:
         );
 
         CREATE TABLE IF NOT EXISTS planning_links (
-            planning_id INTEGER NOT NULL,
-            demand_id INTEGER NOT NULL,
+            planning_id BIGINT NOT NULL,
+            demand_id BIGINT NOT NULL,
             PRIMARY KEY (planning_id, demand_id),
             FOREIGN KEY (planning_id) REFERENCES planning_items(id) ON DELETE CASCADE,
             FOREIGN KEY (demand_id) REFERENCES demands(id) ON DELETE CASCADE
         );
 
         CREATE TABLE IF NOT EXISTS categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
             name TEXT UNIQUE NOT NULL,
             icon TEXT NOT NULL DEFAULT 'wrench',
             color TEXT NOT NULL DEFAULT 'blue',
@@ -296,7 +509,7 @@ def init_db() -> None:
         );
 
         CREATE TABLE IF NOT EXISTS priority_levels (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
             code TEXT UNIQUE NOT NULL,
             label TEXT NOT NULL,
             hint TEXT,
@@ -305,7 +518,7 @@ def init_db() -> None:
         );
 
         CREATE TABLE IF NOT EXISTS kanban_stages (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
             stage_key TEXT UNIQUE NOT NULL,
             label TEXT NOT NULL,
             hint TEXT,
@@ -316,7 +529,7 @@ def init_db() -> None:
         );
 
         CREATE TABLE IF NOT EXISTS access_profiles (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
             slug TEXT UNIQUE NOT NULL,
             label TEXT NOT NULL,
             description TEXT,
@@ -329,45 +542,61 @@ def init_db() -> None:
             active INTEGER NOT NULL DEFAULT 1,
             created_at TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT,
+            updated_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS system_logs (
+            id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+            user_id BIGINT,
+            user_name TEXT,
+            action TEXT NOT NULL,
+            entity_type TEXT,
+            entity_id TEXT,
+            details TEXT,
+            ip_address TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
         """
     )
 
-    # Migração leve para bancos criados antes das colunas code/external_id (importação de escolas reais).
-    school_cols = {r["name"] for r in conn.execute("PRAGMA table_info(schools)").fetchall()}
-    if "code" not in school_cols:
-        conn.execute("ALTER TABLE schools ADD COLUMN code TEXT")
-    if "external_id" not in school_cols:
-        conn.execute("ALTER TABLE schools ADD COLUMN external_id TEXT")
-    if "lat" not in school_cols:
-        conn.execute("ALTER TABLE schools ADD COLUMN lat REAL")
-    if "lon" not in school_cols:
-        conn.execute("ALTER TABLE schools ADD COLUMN lon REAL")
-    if "active" not in school_cols:
-        conn.execute("ALTER TABLE schools ADD COLUMN active INTEGER NOT NULL DEFAULT 1")
+    # Migracao leve/idempotente: adiciona colunas que passaram a existir depois da
+    # primeira versao do schema. No Postgres o ADD COLUMN IF NOT EXISTS ja resolve
+    # sem precisar inspecionar as colunas existentes antes (ao contrario do SQLite).
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS code TEXT")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS external_id TEXT")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS lat REAL")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS lon REAL")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS active INTEGER NOT NULL DEFAULT 1")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS inep TEXT")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS ramal TEXT")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS street TEXT")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS number TEXT")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS complement TEXT")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS neighborhood TEXT")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS city TEXT")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS state TEXT")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS cep TEXT")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS full_address TEXT")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS maps_link TEXT")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS modality TEXT")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS school_type TEXT")
+    conn.execute("ALTER TABLE schools ADD COLUMN IF NOT EXISTS photo_url TEXT")
 
-    user_cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()}
-    if "active" not in user_cols:
-        conn.execute("ALTER TABLE users ADD COLUMN active INTEGER NOT NULL DEFAULT 1")
+    conn.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS active INTEGER NOT NULL DEFAULT 1")
 
-    demand_cols = {r["name"] for r in conn.execute("PRAGMA table_info(demands)").fetchall()}
-    if "prov_description" not in demand_cols:
-        conn.execute("ALTER TABLE demands ADD COLUMN prov_description TEXT")
-    if "prov_action_type" not in demand_cols:
-        conn.execute("ALTER TABLE demands ADD COLUMN prov_action_type TEXT")
-    if "prov_responsible" not in demand_cols:
-        conn.execute("ALTER TABLE demands ADD COLUMN prov_responsible TEXT")
-    if "prov_due_date" not in demand_cols:
-        conn.execute("ALTER TABLE demands ADD COLUMN prov_due_date TEXT")
-    if "prov_priority" not in demand_cols:
-        conn.execute("ALTER TABLE demands ADD COLUMN prov_priority TEXT")
-    if "prov_note" not in demand_cols:
-        conn.execute("ALTER TABLE demands ADD COLUMN prov_note TEXT")
-    if "prov_notify_school" not in demand_cols:
-        conn.execute("ALTER TABLE demands ADD COLUMN prov_notify_school INTEGER NOT NULL DEFAULT 0")
+    conn.execute("ALTER TABLE demands ADD COLUMN IF NOT EXISTS prov_description TEXT")
+    conn.execute("ALTER TABLE demands ADD COLUMN IF NOT EXISTS prov_action_type TEXT")
+    conn.execute("ALTER TABLE demands ADD COLUMN IF NOT EXISTS prov_responsible TEXT")
+    conn.execute("ALTER TABLE demands ADD COLUMN IF NOT EXISTS prov_due_date TEXT")
+    conn.execute("ALTER TABLE demands ADD COLUMN IF NOT EXISTS prov_priority TEXT")
+    conn.execute("ALTER TABLE demands ADD COLUMN IF NOT EXISTS prov_note TEXT")
+    conn.execute("ALTER TABLE demands ADD COLUMN IF NOT EXISTS prov_notify_school INTEGER NOT NULL DEFAULT 0")
 
-    attachment_cols = {r["name"] for r in conn.execute("PRAGMA table_info(attachments)").fetchall()}
-    if "category" not in attachment_cols:
-        conn.execute("ALTER TABLE attachments ADD COLUMN category TEXT")
+    conn.execute("ALTER TABLE attachments ADD COLUMN IF NOT EXISTS category TEXT")
 
     if conn.execute("SELECT COUNT(*) c FROM schools").fetchone()["c"] == 0:
         schools = [
@@ -437,7 +666,7 @@ def init_db() -> None:
             ('E. M. Vereador Taciano Fernandes Nunes', 'ROSINEIA ALVES BATISTA', 'Av. Gov. Mario Covas, nº 36 - Brisamar - Itaguaí/RJ - CEP: 23826-240', '21 96415-4572', 'em.vertaianofernandesnunes@edu.itaguai.rj.gov.br', None, 'c51e906f-a897-4134-8918-eb4183875c1e'),
             ('E. M. VER. PROFESSOR ARTHUR BRITO DE CASTRO', 'MARIA JOSE DE ANDRADE MARIANO', 'Itaguaí/RJ', '21 96931-0516', 'em.verprofessorarthurbritodecastro@edu.itaguai.rj.gov.br', None, 'aff3d54e-e671-4f6f-9248-a4197f49dd3a'),
         ]
-        conn.executemany("INSERT INTO schools(name,director,address,phone,email,code,external_id) VALUES(?,?,?,?,?,?,?)", schools)
+        conn.executemany("INSERT INTO schools(name,director,address,phone,email,code,external_id) VALUES(%s,%s,%s,%s,%s,%s,%s)", schools)
 
     if conn.execute("SELECT COUNT(*) c FROM users").fetchone()["c"] == 0:
         school_id = conn.execute("SELECT id FROM schools ORDER BY id LIMIT 1").fetchone()["id"]
@@ -446,36 +675,7 @@ def init_db() -> None:
             ("Direção Escolar", "escola@agenda.local", hash_password("Escola@2026"), "escola", school_id),
             ("Equipe de Planejamento", "planejamento@agenda.local", hash_password("Planeja@2026"), "planejamento", None),
         ]
-        conn.executemany("INSERT INTO users(name,email,password_hash,role,school_id) VALUES(?,?,?,?,?)", users)
-
-    if conn.execute("SELECT COUNT(*) c FROM demands").fetchone()["c"] == 0:
-        schools = [r["id"] for r in conn.execute("SELECT id FROM schools ORDER BY id").fetchall()]
-        samples = [
-            ("Reparo de infiltração no telhado — Bloco B", "Infiltração intensa em duas salas durante períodos de chuva, com risco de dano ao forro e interrupção das aulas.", "Cobertura/Telhado", "Sala 3 / Bloco B", "Risco à estrutura e às atividades pedagógicas", 64, 1, 1, schools[0], "P1", "Em execução", 5, "Equipe de manutenção predial", "Infraestrutura", 15400, "Reparo emergencial da cobertura e impermeabilização", "Vistoria confirmou falha na membrana de impermeabilização.", "Compra pontual de manta e agendamento da equipe", 1, 1, 1, 0, None),
-            ("Substituição da trava do portão principal", "Trava do portão principal danificada, dificultando o controle seguro do acesso à unidade.", "Serralheria", "Portão principal", "Impacto direto na segurança do acesso", 420, 1, 0, schools[3], "P2", "Aguardando contratação", 10, "Empresa terceirizada", "Infraestrutura", 3200, "Substituição da fechadura e reforço da estrutura", "Necessária contratação de serralheria.", "Contratação de empresa especializada", 0, 1, 1, 1, None),
-            ("Pintura das salas de aula", "Paredes com desgaste de pintura e marcas de umidade já sanadas.", "Pintura", "Bloco pedagógico", "Melhoria do ambiente escolar", 280, 0, 0, schools[1], "P3", "Serviço programado", 35, "Equipe de manutenção", "Infraestrutura", 9800, "Pintura prevista para o próximo recesso", "Serviço pode ser executado sem urgência.", "Recesso escolar", 0, 1, 1, 0, None),
-            ("Construção de rampa de acessibilidade", "Adequação do acesso ao refeitório para garantir acessibilidade.", "Acessibilidade", "Acesso ao refeitório", "Acessibilidade e inclusão", 45, 0, 0, schools[2], "P4", "Planejamento futuro", 180, "Equipe de projetos", "Planejamento", 78000, "Elaboração de projeto e contratação futura", "Demanda requer projeto executivo e previsão orçamentária.", "Projeto, orçamento e licitação", 1, 1, 1, 1, 2027),
-            ("Revisão do quadro elétrico", "Quadro elétrico apresenta aquecimento em períodos de maior consumo.", "Elétrica", "Cozinha", "Risco operacional e possível interrupção", 75, 1, 1, schools[4], "P1", "Em análise técnica", 3, "Engenharia elétrica", "Infraestrutura", 12000, "", "Aguardando medição de carga.", "Visita técnica especializada", 1, 1, 0, 0, None),
-            ("Aquisição de aparelhos de ar-condicionado", "Necessidade de renovação de equipamentos antigos e inoperantes.", "Climatização", "Salas de aula", "Conforto térmico e continuidade das atividades", 310, 0, 0, schools[5], "P4", "Planejamento futuro", 220, "Planejamento de compras", "Planejamento", 145000, "Consolidar com demandas de outras unidades para licitação", "Demanda adequada para aquisição consolidada.", "Planejamento orçamentário e licitação", 0, 1, 1, 1, 2027),
-            ("Reparo de vazamento na cozinha", "Vazamento contínuo sob pia industrial, causando acúmulo de água.", "Hidráulica", "Cozinha", "Risco de queda e prejuízo à rotina da alimentação escolar", 35, 1, 1, schools[0], "P2", "Concluída", -2, "Equipe hidráulica", "Infraestrutura", 950, "Troca de conexão e vedação", "Atendimento concluído e validado pela direção.", "", 0, 0, 1, 0, None),
-            ("Recomposição do muro lateral", "Trecho de muro apresenta fissuras e pontos de desprendimento.", "Estrutura", "Limite lateral", "Segurança patrimonial", 190, 1, 0, schools[1], "P2", "Reprogramada", -4, "Equipe de obras", "Infraestrutura", 28000, "Escoramento preventivo e recomposição", "Prazo reprogramado por indisponibilidade de material.", "Material específico", 1, 1, 1, 0, None),
-        ]
-        for i, s in enumerate(samples, start=1):
-            created = datetime.now() - timedelta(days=18 - i)
-            due = (datetime.now() + timedelta(days=s[11])).date().isoformat()
-            cur = conn.execute(
-                """INSERT INTO demands(title,description,category,location,impact,affected_people,risk,blocks_activity,school_id,priority,status,created_at,updated_at,due_date,responsible,sector,cost_estimate,action_defined,technical_opinion,dependencies,needs_visit,needs_budget,needs_material,needs_contract,future_year,created_by)
-                   VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)""",
-                (s[0],s[1],s[2],s[3],s[4],s[5],s[6],s[7],s[8],s[9],s[10],created.isoformat(sep=" ", timespec="seconds"),created.isoformat(sep=" ", timespec="seconds"),due,s[12],s[13],s[14],s[15],s[16],s[17],s[18],s[19],s[20],s[21],s[22])
-            )
-            did = cur.lastrowid
-            code = f"INF-{created.year}-{did:05d}"
-            conn.execute("UPDATE demands SET code=? WHERE id=?", (code, did))
-            conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(?,?,?,?,?)",
-                         (did, "Criação", "Demanda registrada no sistema.", "Sistema", created.isoformat(sep=" ", timespec="seconds")))
-            if s[10] != "Nova":
-                conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(?,?,?,?,?)",
-                             (did, "Status", f"Status atualizado para {s[10]}.", "Equipe de Infraestrutura", (created + timedelta(days=1)).isoformat(sep=" ", timespec="seconds")))
+        conn.executemany("INSERT INTO users(name,email,password_hash,role,school_id) VALUES(%s,%s,%s,%s,%s)", users)
 
     if conn.execute("SELECT COUNT(*) c FROM planning_items").fetchone()["c"] == 0:
         items = [
@@ -486,9 +686,10 @@ def init_db() -> None:
         ]
         for idx, item in enumerate(items, start=1):
             cur = conn.execute("""INSERT INTO planning_items(year,title,category,kind,status,estimated_cost,quantity,unit,justification,schools_count,created_at,updated_at)
-                                  VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+                                  VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
                                (*item, now_iso(), now_iso()))
-            conn.execute("UPDATE planning_items SET code=? WHERE id=?", (f"PLAN-{item[0]}-{cur.lastrowid:04d}", cur.lastrowid))
+            new_pid = cur.lastrowid
+            conn.execute("UPDATE planning_items SET code=%s WHERE id=%s", (f"PLAN-{item[0]}-{new_pid:04d}", new_pid))
 
     # Categorias, prioridades, colunas do Kanban e perfis de acesso — semeados uma única vez a
     # partir dos valores que já existiam fixos no código; depois disso, editáveis em Administração.
@@ -496,7 +697,7 @@ def init_db() -> None:
         color_cycle = ['red', 'orange', 'teal', 'violet', 'green', 'blue']
         for i, name in enumerate(CATEGORIES):
             conn.execute(
-                "INSERT INTO categories(name,icon,color,hint,sort_order,active) VALUES(?,?,?,?,?,1)",
+                "INSERT INTO categories(name,icon,color,hint,sort_order,active) VALUES(%s,%s,%s,%s,%s,1)",
                 (name, CATEGORY_ICONS.get(name, 'wrench'), color_cycle[i % len(color_cycle)], CATEGORY_HINTS.get(name, ''), i),
             )
 
@@ -507,7 +708,7 @@ def init_db() -> None:
             ("P3", "Programada", "Não atrapalha o dia a dia agora", "blue", 3),
             ("P4", "Planejamento/Projeto", "Reservada para um exercício futuro", "green", 4),
         ]
-        conn.executemany("INSERT INTO priority_levels(code,label,hint,color,rank) VALUES(?,?,?,?,?)", priority_seed)
+        conn.executemany("INSERT INTO priority_levels(code,label,hint,color,rank) VALUES(%s,%s,%s,%s,%s)", priority_seed)
 
     if conn.execute("SELECT COUNT(*) c FROM kanban_stages").fetchone()["c"] == 0:
         stage_seed = [
@@ -525,7 +726,7 @@ def init_db() -> None:
         ]
         for i, (key, label, hint, accent, statuses, target) in enumerate(stage_seed):
             conn.execute(
-                "INSERT INTO kanban_stages(stage_key,label,hint,accent,statuses,target_status,sort_order) VALUES(?,?,?,?,?,?,?)",
+                "INSERT INTO kanban_stages(stage_key,label,hint,accent,statuses,target_status,sort_order) VALUES(%s,%s,%s,%s,%s,%s,%s)",
                 (key, label, hint, accent, json.dumps(statuses, ensure_ascii=False), target, i),
             )
 
@@ -538,16 +739,30 @@ def init_db() -> None:
         for slug, label, desc, school_scoped, can_edit_analysis, can_manage_admin, can_view_reports, can_view_planning in profile_seed:
             conn.execute(
                 """INSERT INTO access_profiles(slug,label,description,school_scoped,can_edit_analysis,can_manage_admin,can_view_reports,can_view_planning,is_system,created_at)
-                   VALUES(?,?,?,?,?,?,?,?,1,?)""",
+                   VALUES(%s,%s,%s,%s,%s,%s,%s,%s,1,%s)""",
                 (slug, label, desc, school_scoped, can_edit_analysis, can_manage_admin, can_view_reports, can_view_planning, now_iso()),
             )
+
+    # CPD/TI entra por fora do seed inicial: bancos ja existentes tambem precisam
+    # receber. Insere apenas o que faltar e nunca sobrescreve uma categoria que o
+    # administrador tenha editado ou desativado.
+    existentes = {r["name"] for r in conn.execute("SELECT name FROM categories").fetchall()}
+    ordem = conn.execute("SELECT COALESCE(MAX(sort_order),-1) m FROM categories").fetchone()["m"]
+    for nome, ic, dica in CPDTI_CATEGORIES:
+        if nome in existentes:
+            continue
+        ordem += 1
+        conn.execute(
+            "INSERT INTO categories(name,icon,color,hint,sort_order,active) VALUES(%s,%s,%s,%s,%s,1)",
+            (nome, ic, "violet", dica, ordem),
+        )
 
     conn.commit()
     seed_school_coordinates(conn)
     conn.close()
 
 
-def seed_school_coordinates(conn: sqlite3.Connection) -> None:
+def seed_school_coordinates(conn: PGConnection) -> None:
     schools = conn.execute("SELECT id, name, address, lat, lon FROM schools").fetchall()
     zones = {
         "chaperó": (-22.8350, -43.7450),
@@ -578,7 +793,7 @@ def seed_school_coordinates(conn: sqlite3.Connection) -> None:
         sid = r["id"]
         lat_offset = (((sid * 17) % 31) - 15) * 0.0012
         lon_offset = (((sid * 23) % 37) - 18) * 0.0012
-        conn.execute("UPDATE schools SET lat=?, lon=? WHERE id=?", (round(base_lat + lat_offset, 6), round(base_lon + lon_offset, 6), sid))
+        conn.execute("UPDATE schools SET lat=%s, lon=%s WHERE id=%s", (round(base_lat + lat_offset, 6), round(base_lon + lon_offset, 6), sid))
     conn.commit()
 
 
@@ -591,7 +806,7 @@ def current_user(request: Request):
         return None
     conn = db()
     row = conn.execute(
-        "SELECT u.id,u.name,u.email,u.role,u.school_id,u.active,s.name school_name FROM users u LEFT JOIN schools s ON s.id=u.school_id WHERE u.id=?",
+        "SELECT u.id,u.name,u.email,u.role,u.school_id,u.active,s.name school_name FROM users u LEFT JOIN schools s ON s.id=u.school_id WHERE u.id=%s",
         (uid,),
     ).fetchone()
     if not row or not row["active"]:
@@ -612,6 +827,22 @@ def require_user(request: Request):
     return user
 
 
+def asset_version() -> str:
+    """Versao dos estaticos derivada da data de modificacao dos arquivos.
+
+    Os templates traziam o numero da versao escrito a mao (?v=govbr-58). Como
+    ninguem lembrava de incrementar, o navegador continuava servindo o CSS e o
+    JS antigos de cache mesmo depois de o arquivo mudar no servidor.
+    """
+    marca = 0
+    for nome in ("styles.css", "app.js"):
+        try:
+            marca = max(marca, int((BASE_DIR / "static" / nome).stat().st_mtime))
+        except OSError:
+            pass
+    return str(marca) if marca else "dev"
+
+
 def render(request: Request, template: str, **context):
     user = current_user(request)
     if not user:
@@ -624,9 +855,12 @@ def render(request: Request, template: str, **context):
     category_names = [c["name"] for c in active_categories] or CATEGORIES
     category_meta = {c["name"]: {"icon": c["icon"], "color": c["color"], "hint": c["hint"]} for c in all_categories}
     kanban_stages = get_kanban_stages(conn)
+    logo_url = get_setting(conn, "logo_url") or LOGO_PADRAO
     conn.close()
     base = {
         "request": request,
+        "asset_v": asset_version(),
+        "logo_url": logo_url,
         "user": user,
         "priorities": priorities,
         "statuses": STATUSES,
@@ -643,22 +877,33 @@ def render(request: Request, template: str, **context):
 def login_page(request: Request):
     if current_user(request):
         return RedirectResponse("/", status_code=303)
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse("login.html", {"request": request, "asset_v": asset_version()})
 
 
 @app.post("/login")
 def login(request: Request, email: str = Form(...), password: str = Form(...)):
     conn = db()
-    row = conn.execute("SELECT * FROM users WHERE lower(email)=lower(?)", (email.strip(),)).fetchone()
-    conn.close()
+    row = conn.execute("SELECT * FROM users WHERE lower(email)=lower(%s)", (email.strip(),)).fetchone()
     if not row or not verify_password(password, row["password_hash"]):
-        return templates.TemplateResponse("login.html", {"request": request, "error": "E-mail ou senha inválidos.", "email": email}, status_code=401)
+        # A tentativa que falha e justamente a que a auditoria precisa ver, entao
+        # ela e registrada com o e-mail digitado mesmo quando nao existe usuario.
+        log_action(conn, row["id"] if row else None, row["name"] if row else None,
+                   "Tentativa de acesso recusada", "auth", None, email.strip(), _ip(request))
+        conn.commit(); conn.close()
+        return templates.TemplateResponse("login.html", {"request": request, "asset_v": asset_version(), "error": "E-mail ou senha inválidos.", "email": email}, status_code=401)
+    log_action(conn, row["id"], row["name"], "Entrou no sistema", "auth", str(row["id"]), None, _ip(request))
+    conn.commit(); conn.close()
     request.session["user_id"] = row["id"]
     return RedirectResponse("/", status_code=303)
 
 
 @app.get("/logout")
 def logout(request: Request):
+    usuario = current_user(request)
+    if usuario:
+        conn = db()
+        registrar(conn, request, usuario, "Saiu do sistema", "auth", usuario["id"])
+        conn.commit(); conn.close()
     request.session.clear()
     return RedirectResponse("/login", status_code=303)
 
@@ -676,7 +921,7 @@ def demands_page(request: Request):
 @app.get("/demandas/{demand_id}", response_class=HTMLResponse)
 def demand_detail_page(request: Request, demand_id: int):
     conn = db()
-    row = conn.execute("SELECT id, code, title FROM demands WHERE id=?", (demand_id,)).fetchone()
+    row = conn.execute("SELECT id, code, title FROM demands WHERE id=%s", (demand_id,)).fetchone()
     conn.close()
     if not row:
         raise HTTPException(404)
@@ -741,7 +986,7 @@ def api_about(request: Request):
         "organization": "Secretaria Municipal de Educação — Prefeitura Municipal de Itaguaí",
         "stack": {
             "backend": "FastAPI",
-            "database": "SQLite",
+            "database": "PostgreSQL (Supabase)",
             "frontend": "HTML + CSS + JavaScript puro",
             "templates": "Jinja2",
             "session": "Starlette SessionMiddleware",
@@ -752,13 +997,19 @@ def api_about(request: Request):
 
 def demand_scope_sql(user: dict):
     if user["perm"]["school_scoped"] and user.get("school_id"):
-        return " AND d.school_id=? ", [user["school_id"]]
+        return " AND d.school_id=%s ", [user["school_id"]]
     return "", []
 
 
 @app.get("/api/dashboard")
 def api_dashboard(request: Request):
-    user = require_user(request)
+    return _dashboard_payload(require_user(request))
+
+
+def _dashboard_payload(user: dict) -> dict:
+    """Monta os dados do Painel. Extraido de /api/dashboard para que o PDF do
+    Painel saia exatamente com os mesmos numeros da tela, sem uma segunda
+    consulta que pudesse divergir com o tempo."""
     scope, params = demand_scope_sql(user)
     conn = db()
     rows = conn.execute(f"SELECT d.* FROM demands d WHERE 1=1 {scope}", params).fetchall()
@@ -789,11 +1040,11 @@ def api_dashboard(request: Request):
         "execution": round((completed / total * 100), 1) if total else 0,
     }
     recent = conn.execute(f"""SELECT d.*, s.name school_name FROM demands d JOIN schools s ON s.id=d.school_id
-                              WHERE 1=1 {scope} ORDER BY datetime(d.updated_at) DESC LIMIT 6""", params).fetchall()
+                              WHERE 1=1 {scope} ORDER BY d.updated_at DESC LIMIT 6""", params).fetchall()
     attention = conn.execute(f"""SELECT d.*, s.name school_name FROM demands d JOIN schools s ON s.id=d.school_id
                                  WHERE d.status NOT IN ('Concluída','Cancelada') {scope}
                                  ORDER BY CASE d.priority WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END,
-                                          date(d.due_date) ASC LIMIT 5""", params).fetchall()
+                                          d.due_date ASC NULLS FIRST LIMIT 5""", params).fetchall()
     category_rows = conn.execute(f"SELECT d.category, COUNT(*) qty FROM demands d WHERE 1=1 {scope} GROUP BY d.category ORDER BY qty DESC LIMIT 6", params).fetchall()
     status_rows = conn.execute(f"SELECT d.status, COUNT(*) qty FROM demands d WHERE 1=1 {scope} GROUP BY d.status ORDER BY qty DESC LIMIT 7", params).fetchall()
     # Detalhamento do "Custo em aberto" para o botão "Ver detalhes" do Painel — campos aditivos,
@@ -829,30 +1080,30 @@ def api_demands(request: Request, q: str = "", status: str = "", priority: str =
     where = ["1=1"]
     params: list = []
     if user["perm"]["school_scoped"] and user.get("school_id"):
-        where.append("d.school_id=?")
+        where.append("d.school_id=%s")
         params.append(user["school_id"])
     if q:
-        where.append("(lower(d.title) LIKE ? OR lower(d.code) LIKE ? OR lower(s.name) LIKE ?)")
+        where.append("(lower(d.title) LIKE %s OR lower(d.code) LIKE %s OR lower(s.name) LIKE %s)")
         like = f"%{q.lower()}%"
         params += [like, like, like]
     if status:
-        where.append("d.status=?"); params.append(status)
+        where.append("d.status=%s"); params.append(status)
     if priority:
-        where.append("d.priority=?"); params.append(priority)
+        where.append("d.priority=%s"); params.append(priority)
     if category:
-        where.append("d.category=?"); params.append(category)
+        where.append("d.category=%s"); params.append(category)
     if year:
-        where.append("substr(d.created_at,1,4)=?"); params.append(str(year))
+        where.append("substr(d.created_at,1,4)=%s"); params.append(str(year))
     if overdue:
-        where.append("d.due_date IS NOT NULL AND date(d.due_date) < date('now','localtime') AND d.status NOT IN ('Concluída','Cancelada')")
+        where.append("d.due_date IS NOT NULL AND d.due_date::date < CURRENT_DATE AND d.status NOT IN ('Concluída','Cancelada')")
     if due_soon:
-        where.append("d.due_date IS NOT NULL AND date(d.due_date) BETWEEN date('now','localtime') AND date('now','localtime','+7 days') AND d.status NOT IN ('Concluída','Cancelada')")
+        where.append("d.due_date IS NOT NULL AND d.due_date::date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '7 days' AND d.status NOT IN ('Concluída','Cancelada')")
     if unassigned:
         where.append("(d.responsible IS NULL OR trim(d.responsible)='') AND d.status NOT IN ('Concluída','Cancelada')")
     conn = db()
     rows = conn.execute(f"""SELECT d.*, s.name school_name, s.director FROM demands d JOIN schools s ON s.id=d.school_id
                             WHERE {' AND '.join(where)}
-                            ORDER BY CASE d.priority WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END, datetime(d.updated_at) DESC""", params).fetchall()
+                            ORDER BY CASE d.priority WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END, d.updated_at DESC""", params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -862,14 +1113,14 @@ def api_demand_detail(request: Request, demand_id: int):
     user = require_user(request)
     conn = db()
     row = conn.execute("""SELECT d.*, s.name school_name, s.director, s.address, s.phone, s.email school_email
-                        FROM demands d JOIN schools s ON s.id=d.school_id WHERE d.id=?""", (demand_id,)).fetchone()
+                        FROM demands d JOIN schools s ON s.id=d.school_id WHERE d.id=%s""", (demand_id,)).fetchone()
     if not row:
         conn.close(); raise HTTPException(404, "Demanda não encontrada")
     if user["perm"]["school_scoped"] and row["school_id"] != user.get("school_id"):
         conn.close(); raise HTTPException(403)
-    updates = conn.execute("SELECT * FROM demand_updates WHERE demand_id=? ORDER BY datetime(created_at) DESC", (demand_id,)).fetchall()
-    attachments = conn.execute("SELECT * FROM attachments WHERE demand_id=? ORDER BY datetime(created_at) DESC", (demand_id,)).fetchall()
-    planning = conn.execute("""SELECT p.* FROM planning_items p JOIN planning_links l ON l.planning_id=p.id WHERE l.demand_id=?""", (demand_id,)).fetchall()
+    updates = conn.execute("SELECT * FROM demand_updates WHERE demand_id=%s ORDER BY created_at DESC", (demand_id,)).fetchall()
+    attachments = conn.execute("SELECT * FROM attachments WHERE demand_id=%s ORDER BY created_at DESC", (demand_id,)).fetchall()
+    planning = conn.execute("""SELECT p.* FROM planning_items p JOIN planning_links l ON l.planning_id=p.id WHERE l.demand_id=%s""", (demand_id,)).fetchall()
     conn.close()
     return {"demand": dict(row), "updates": [dict(x) for x in updates], "attachments": [dict(x) for x in attachments], "planning": [dict(x) for x in planning]}
 
@@ -887,12 +1138,13 @@ async def create_demand(request: Request):
     created = now_iso()
     conn = db()
     cur = conn.execute("""INSERT INTO demands(title,description,category,subcategory,location,impact,affected_people,risk,blocks_activity,school_id,priority,status,created_at,updated_at,due_date,responsible,sector,cost_estimate,action_defined,technical_opinion,dependencies,needs_visit,needs_budget,needs_material,needs_contract,future_year,planning_kind,planned_quantity,planned_unit,created_by)
-                          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                          VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
                        (payload["title"], payload["description"], payload["category"], payload.get("subcategory"), payload.get("location"), payload.get("impact"), int(payload.get("affected_people") or 0), int(bool(payload.get("risk"))), int(bool(payload.get("blocks_activity"))), school_id, payload.get("priority", "P3"), payload.get("status", "Nova"), created, created, payload.get("due_date"), payload.get("responsible"), payload.get("sector"), float(payload.get("cost_estimate") or 0), payload.get("action_defined"), payload.get("technical_opinion"), payload.get("dependencies"), int(bool(payload.get("needs_visit"))), int(bool(payload.get("needs_budget"))), int(bool(payload.get("needs_material"))), int(bool(payload.get("needs_contract"))), int(payload["future_year"]) if payload.get("future_year") else None, payload.get("planning_kind"), float(payload.get("planned_quantity") or 0), payload.get("planned_unit"), user["id"]))
     did = cur.lastrowid
     code = f"INF-{datetime.now().year}-{did:05d}"
-    conn.execute("UPDATE demands SET code=? WHERE id=?", (code, did))
-    conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(?,?,?,?,?)", (did, "Criação", "Demanda registrada no sistema.", user["name"], created))
+    conn.execute("UPDATE demands SET code=%s WHERE id=%s", (code, did))
+    conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(%s,%s,%s,%s,%s)", (did, "Criação", "Demanda registrada no sistema.", user["name"], created))
+    registrar(conn, request, user, "Registrou demanda", "demand", did, f"{code} — {payload['title']}")
     conn.commit(); conn.close()
     return {"ok": True, "id": did, "code": code}
 
@@ -902,7 +1154,7 @@ async def update_demand(request: Request, demand_id: int):
     user = require_user(request)
     payload = await request.json()
     conn = db()
-    old = conn.execute("SELECT * FROM demands WHERE id=?", (demand_id,)).fetchone()
+    old = conn.execute("SELECT * FROM demands WHERE id=%s", (demand_id,)).fetchone()
     if not old:
         conn.close(); raise HTTPException(404)
     if user["perm"]["school_scoped"] and old["school_id"] != user.get("school_id"):
@@ -910,10 +1162,20 @@ async def update_demand(request: Request, demand_id: int):
     allowed = ["title", "description", "category", "subcategory", "location", "impact", "affected_people", "risk", "blocks_activity"]
     if user["perm"]["can_edit_analysis"]:
         allowed += ["priority", "status", "due_date", "responsible", "sector", "cost_estimate", "action_defined", "technical_opinion", "dependencies", "needs_visit", "needs_budget", "needs_material", "needs_contract", "future_year", "planning_kind", "planned_quantity", "planned_unit", "prov_description", "prov_action_type", "prov_responsible", "prov_due_date", "prov_priority", "prov_note", "prov_notify_school"]
+    # Trocar a unidade escolar da demanda é exclusivo do Gestor da Infraestrutura
+    # (unico perfil com can_manage_admin); os demais nem recebem o campo no formulario.
+    if user["perm"]["can_manage_admin"]:
+        allowed += ["school_id"]
     changes = []
     for key in allowed:
         if key in payload:
             new = payload[key]
+            if key == "school_id":
+                if new in (None, ""):
+                    continue
+                new = int(new)
+                if not conn.execute("SELECT id FROM schools WHERE id=%s AND active=1", (new,)).fetchone():
+                    conn.close(); raise HTTPException(400, "Unidade escolar inválida ou inativa")
             if key in ("risk", "blocks_activity", "needs_visit", "needs_budget", "needs_material", "needs_contract", "prov_notify_school"):
                 new = int(bool(new))
             if key in ("affected_people", "future_year") and new not in (None, ""):
@@ -922,12 +1184,89 @@ async def update_demand(request: Request, demand_id: int):
                 new = float(new)
             if old[key] != new:
                 changes.append((key, old[key], new))
-                conn.execute(f"UPDATE demands SET {key}=? WHERE id=?", (new if new != "" else None, demand_id))
-    conn.execute("UPDATE demands SET updated_at=? WHERE id=?", (now_iso(), demand_id))
+                conn.execute(f"UPDATE demands SET {key}=%s WHERE id=%s", (new if new != "" else None, demand_id))
+    conn.execute("UPDATE demands SET updated_at=%s WHERE id=%s", (now_iso(), demand_id))
     if changes:
-        labels = {"priority":"Prioridade", "status":"Status", "due_date":"Prazo", "responsible":"Responsável", "future_year":"Exercício futuro", "prov_action_type":"Tipo de ação", "prov_responsible":"Responsável pela providência", "prov_due_date":"Prazo da providência", "prov_priority":"Prioridade da providência", "prov_description":"Descrição da providência", "prov_note":"Observação da providência"}
-        summary = "; ".join(f"{labels.get(k,k)}: {a or '—'} → {b or '—'}" for k,a,b in changes[:6])
-        conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(?,?,?,?,?)", (demand_id, "Alteração", summary, user["name"], now_iso()))
+        labels = {"priority":"Prioridade", "status":"Status", "due_date":"Prazo", "responsible":"Responsável", "future_year":"Exercício futuro", "prov_action_type":"Tipo de ação", "prov_responsible":"Responsável pela providência", "prov_due_date":"Prazo da providência", "prov_priority":"Prioridade da providência", "prov_description":"Descrição da providência", "prov_note":"Observação da providência", "school_id":"Unidade Escolar"}
+        school_names = {}
+        if any(k == "school_id" for k, _, _ in changes):
+            school_names = {r["id"]: r["name"] for r in conn.execute("SELECT id, name FROM schools").fetchall()}
+        def show(key, value):
+            return school_names.get(value, value) if key == "school_id" else value
+        summary = "; ".join(f"{labels.get(k,k)}: {show(k,a) or '—'} → {show(k,b) or '—'}" for k,a,b in changes[:6])
+        conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(%s,%s,%s,%s,%s)", (demand_id, "Alteração", summary, user["name"], now_iso()))
+        registrar(conn, request, user, "Editou demanda", "demand", demand_id, summary)
+
+    # Destinar a demanda a um exercicio futuro cria o item correspondente em
+    # planning_items: sem isso a demanda so guardava future_year e nao aparecia
+    # na tela de Planejamento, que lista apenas aquela tabela.
+    #
+    # Um item pode ser um consolidado criado a mao servindo varias demandas
+    # (planning_links e N:N). So o item exclusivo desta demanda pode ser
+    # reescrito ou apagado aqui; consolidados compartilhados apenas ganham ou
+    # perdem o vinculo.
+    if "future_year" in payload:
+        atual = conn.execute("SELECT * FROM demands WHERE id=%s", (demand_id,)).fetchone()
+        ano = atual["future_year"]
+        vinculo = conn.execute(
+            """SELECT p.id, (SELECT COUNT(*) FROM planning_links x WHERE x.planning_id=p.id) demandas
+               FROM planning_items p JOIN planning_links l ON l.planning_id=p.id
+               WHERE l.demand_id=%s ORDER BY p.id LIMIT 1""",
+            (demand_id,)).fetchone()
+        exclusivo = bool(vinculo) and int(vinculo["demandas"] or 0) <= 1
+        if ano:
+            tipo = atual["planning_kind"] or "Aquisição futura"
+            qtd = float(atual["planned_quantity"] or 0)
+            unitario = float(atual["cost_estimate"] or 0)
+            # A estimativa do item e o total do exercicio: quantidade x valor
+            # informado. Sem quantidade, o valor informado ja e o total.
+            total = unitario * qtd if qtd else unitario
+            if vinculo and exclusivo:
+                conn.execute("""UPDATE planning_items SET year=%s, title=%s, category=%s, kind=%s,
+                                estimated_cost=%s, quantity=%s, unit=%s, updated_at=%s WHERE id=%s""",
+                             (int(ano), atual["title"], atual["category"], tipo, total, qtd,
+                              atual["planned_unit"], now_iso(), vinculo["id"]))
+            elif not vinculo:
+                cur = conn.execute("""INSERT INTO planning_items(year,title,category,kind,status,estimated_cost,
+                                      quantity,unit,justification,schools_count,created_at,updated_at)
+                                      VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                                   (int(ano), atual["title"], atual["category"], tipo, "Identificada", total, qtd,
+                                    atual["planned_unit"], atual["description"], 1, now_iso(), now_iso()))
+                pid = cur.lastrowid
+                conn.execute("UPDATE planning_items SET code=%s WHERE id=%s", (f"PLAN-{int(ano)}-{pid:04d}", pid))
+                conn.execute("INSERT INTO planning_links(planning_id,demand_id) VALUES(%s,%s) ON CONFLICT DO NOTHING",
+                             (pid, demand_id))
+            # Consolidado compartilhado permanece intacto: a demanda so segue vinculada.
+        elif vinculo:
+            # Exercicio em branco desvincula esta demanda. O item so e apagado
+            # quando nao servia mais ninguem.
+            conn.execute("DELETE FROM planning_links WHERE planning_id=%s AND demand_id=%s",
+                         (vinculo["id"], demand_id))
+            if exclusivo:
+                conn.execute("DELETE FROM planning_items WHERE id=%s", (vinculo["id"],))
+
+    conn.commit(); conn.close()
+    return {"ok": True}
+
+
+@app.delete("/api/demands/{demand_id}")
+async def delete_demand(request: Request, demand_id: int):
+    user = require_user(request)
+    if not user.get("perm", {}).get("can_manage_admin"):
+        raise HTTPException(403, "Permissão insuficiente para deletar demandas")
+    conn = db()
+    demand = conn.execute("SELECT id, code, title FROM demands WHERE id=%s", (demand_id,)).fetchone()
+    if not demand:
+        conn.close(); raise HTTPException(404)
+
+    # Deletar registros relacionados
+    conn.execute("DELETE FROM demand_updates WHERE demand_id=%s", (demand_id,))
+    conn.execute("DELETE FROM attachments WHERE demand_id=%s", (demand_id,))
+    conn.execute("DELETE FROM demands WHERE id=%s", (demand_id,))
+
+    # Registrar ação no log
+    registrar(conn, request, user, "Excluiu demanda", "demand", demand_id, f"{demand['code']} — {demand['title']}")
+
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -942,13 +1281,14 @@ async def add_update(request: Request, demand_id: int):
     kind = payload.get("kind") or "Devolutiva"
     visibility = payload.get("visibility") or "public"
     conn = db()
-    demand = conn.execute("SELECT school_id FROM demands WHERE id=?", (demand_id,)).fetchone()
+    demand = conn.execute("SELECT school_id FROM demands WHERE id=%s", (demand_id,)).fetchone()
     if not demand:
         conn.close(); raise HTTPException(404)
     if user["perm"]["school_scoped"] and demand["school_id"] != user.get("school_id"):
         conn.close(); raise HTTPException(403)
-    conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,visibility,created_at) VALUES(?,?,?,?,?,?)", (demand_id, kind, message, user["name"], visibility, now_iso()))
-    conn.execute("UPDATE demands SET updated_at=? WHERE id=?", (now_iso(), demand_id))
+    conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,visibility,created_at) VALUES(%s,%s,%s,%s,%s,%s)", (demand_id, kind, message, user["name"], visibility, now_iso()))
+    conn.execute("UPDATE demands SET updated_at=%s WHERE id=%s", (now_iso(), demand_id))
+    registrar(conn, request, user, "Registrou andamento", "demand", demand_id, f"{kind}: {message[:120]}")
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -957,7 +1297,7 @@ async def add_update(request: Request, demand_id: int):
 async def upload_attachment(request: Request, demand_id: int, file: UploadFile = File(...), category: Optional[str] = Form(None)):
     user = require_user(request)
     conn = db()
-    demand = conn.execute("SELECT school_id FROM demands WHERE id=?", (demand_id,)).fetchone()
+    demand = conn.execute("SELECT school_id FROM demands WHERE id=%s", (demand_id,)).fetchone()
     if not demand:
         conn.close(); raise HTTPException(404)
     if user["perm"]["school_scoped"] and demand["school_id"] != user.get("school_id"):
@@ -973,9 +1313,10 @@ async def upload_attachment(request: Request, demand_id: int, file: UploadFile =
     stored = f"{demand_id}_{secrets.token_hex(10)}{safe_ext}"
     (UPLOAD_DIR / stored).write_bytes(content)
     cat_text = category.strip() if category and category.strip() else None
-    conn.execute("INSERT INTO attachments(demand_id,category,filename,stored_name,mime,size,created_at) VALUES(?,?,?,?,?,?,?)", (demand_id, cat_text, file.filename or "arquivo", stored, file.content_type, len(content), now_iso()))
+    conn.execute("INSERT INTO attachments(demand_id,category,filename,stored_name,mime,size,created_at) VALUES(%s,%s,%s,%s,%s,%s,%s)", (demand_id, cat_text, file.filename or "arquivo", stored, file.content_type, len(content), now_iso()))
     msg = f"Foto/Arquivo anexado ({cat_text}): {file.filename}" if cat_text else f"Arquivo anexado: {file.filename}"
-    conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(?,?,?,?,?)", (demand_id, "Anexo", msg, user["name"], now_iso()))
+    conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(%s,%s,%s,%s,%s)", (demand_id, "Anexo", msg, user["name"], now_iso()))
+    registrar(conn, request, user, "Anexou arquivo", "demand", demand_id, file.filename or "arquivo")
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -983,7 +1324,7 @@ async def upload_attachment(request: Request, demand_id: int, file: UploadFile =
 @app.get("/uploads/{attachment_id}")
 def download_attachment(request: Request, attachment_id: int):
     require_user(request)
-    conn = db(); row = conn.execute("SELECT * FROM attachments WHERE id=?", (attachment_id,)).fetchone(); conn.close()
+    conn = db(); row = conn.execute("SELECT * FROM attachments WHERE id=%s", (attachment_id,)).fetchone(); conn.close()
     if not row: raise HTTPException(404)
     path = UPLOAD_DIR / row["stored_name"]
     if not path.exists(): raise HTTPException(404)
@@ -1011,7 +1352,7 @@ def api_schools(request: Request, include_inactive: int = 0):
         rows = conn.execute(f"""SELECT s.*, COUNT(d.id) total_demands,
                              SUM(CASE WHEN d.status='Concluída' THEN 1 ELSE 0 END) completed,
                              SUM(CASE WHEN d.priority='P1' AND d.status!='Concluída' THEN 1 ELSE 0 END) urgent
-                             FROM schools s LEFT JOIN demands d ON d.school_id=s.id WHERE s.id=? {active_clause} GROUP BY s.id""", (user["school_id"],)).fetchall()
+                             FROM schools s LEFT JOIN demands d ON d.school_id=s.id WHERE s.id=%s {active_clause} GROUP BY s.id""", (user["school_id"],)).fetchall()
     else:
         rows = conn.execute(f"""SELECT s.*, COUNT(d.id) total_demands,
                              SUM(CASE WHEN d.status='Concluída' THEN 1 ELSE 0 END) completed,
@@ -1026,9 +1367,9 @@ def api_school(request: Request, school_id: int):
     if user["perm"]["school_scoped"] and school_id != user.get("school_id"):
         raise HTTPException(403)
     conn = db()
-    school = conn.execute("SELECT * FROM schools WHERE id=?", (school_id,)).fetchone()
+    school = conn.execute("SELECT * FROM schools WHERE id=%s", (school_id,)).fetchone()
     if not school: conn.close(); raise HTTPException(404)
-    demands = conn.execute("SELECT * FROM demands WHERE school_id=? ORDER BY datetime(updated_at) DESC", (school_id,)).fetchall()
+    demands = conn.execute("SELECT * FROM demands WHERE school_id=%s ORDER BY updated_at DESC", (school_id,)).fetchall()
     conn.close()
     return {"school": dict(school), "demands": [dict(x) for x in demands]}
 
@@ -1039,7 +1380,7 @@ def api_school_geocode(request: Request, school_id: int):
     if user["perm"]["school_scoped"] and school_id != user.get("school_id"):
         raise HTTPException(403)
     conn = db()
-    school = conn.execute("SELECT * FROM schools WHERE id=?", (school_id,)).fetchone()
+    school = conn.execute("SELECT * FROM schools WHERE id=%s", (school_id,)).fetchone()
     if not school:
         conn.close(); raise HTTPException(404)
     if school["lat"] is not None and school["lon"] is not None:
@@ -1050,7 +1391,7 @@ def api_school_geocode(request: Request, school_id: int):
     if not result:
         conn.close()
         raise HTTPException(404, "Não foi possível localizar o endereço desta escola no mapa.")
-    conn.execute("UPDATE schools SET lat=?, lon=? WHERE id=?", (result["lat"], result["lon"], school_id))
+    conn.execute("UPDATE schools SET lat=%s, lon=%s WHERE id=%s", (result["lat"], result["lon"], school_id))
     conn.commit(); conn.close()
     return {"lat": result["lat"], "lon": result["lon"], "cached": False}
 
@@ -1287,7 +1628,7 @@ async def api_school_photo(school_id: int, lat: float = None, lon: float = None)
     
     conn = db()
     c = conn.cursor()
-    row = c.execute("SELECT lat, lon FROM schools WHERE id = ?", (school_id,)).fetchone()
+    row = c.execute("SELECT lat, lon FROM schools WHERE id = %s", (school_id,)).fetchone()
     if row and row["lat"] and row["lon"]:
         s_lat, s_lon = float(row["lat"]), float(row["lon"])
     elif lat is not None and lon is not None:
@@ -1379,7 +1720,7 @@ def api_route_circuit(
     
     selected_ids = raw_ids[:10]  # Limite rigoroso de até 10 unidades
     conn = db()
-    placeholders = ",".join(["?"] * len(selected_ids))
+    placeholders = ",".join(["%s"] * len(selected_ids))
     schools_raw = conn.execute(f"SELECT * FROM schools WHERE id IN ({placeholders})", selected_ids).fetchall()
     
     # Busca demandas ativas para enriquecer as paradas
@@ -1555,8 +1896,8 @@ def api_planning(request: Request, year: Optional[int] = None, q: str = ""):
     require_user(request)
     conn = db()
     where = ["1=1"]; params=[]
-    if year: where.append("year=?"); params.append(year)
-    if q: where.append("lower(title) LIKE ?"); params.append(f"%{q.lower()}%")
+    if year: where.append("year=%s"); params.append(year)
+    if q: where.append("lower(title) LIKE %s"); params.append(f"%{q.lower()}%")
     rows = conn.execute(f"SELECT * FROM planning_items WHERE {' AND '.join(where)} ORDER BY year, id DESC", params).fetchall()
     year_stats = conn.execute("""SELECT year, COUNT(*) items, SUM(estimated_cost) total_cost, SUM(schools_count) schools FROM planning_items GROUP BY year ORDER BY year""").fetchall()
     conn.close()
@@ -1567,7 +1908,7 @@ def api_planning(request: Request, year: Optional[int] = None, q: str = ""):
 def api_planning_insights(request: Request, year: int):
     require_user(request)
     conn = db()
-    items = conn.execute("SELECT * FROM planning_items WHERE year=? ORDER BY estimated_cost DESC", (year,)).fetchall()
+    items = conn.execute("SELECT * FROM planning_items WHERE year=%s ORDER BY estimated_cost DESC", (year,)).fetchall()
 
     all_schools = {}
     item_list = []
@@ -1575,15 +1916,15 @@ def api_planning_insights(request: Request, year: int):
         schools = conn.execute("""SELECT DISTINCT s.id, s.name FROM planning_links l
             JOIN demands d ON d.id = l.demand_id
             JOIN schools s ON s.id = d.school_id
-            WHERE l.planning_id = ? ORDER BY s.name""", (it["id"],)).fetchall()
+            WHERE l.planning_id = %s ORDER BY s.name""", (it["id"],)).fetchall()
         for s in schools:
             all_schools[s["id"]] = s["name"]
         item_list.append({**dict(it), "linked_schools": [dict(s) for s in schools]})
 
     by_category = conn.execute("""SELECT category, COUNT(*) items, SUM(estimated_cost) cost FROM planning_items
-        WHERE year=? GROUP BY category ORDER BY cost DESC""", (year,)).fetchall()
+        WHERE year=%s GROUP BY category ORDER BY cost DESC""", (year,)).fetchall()
     by_status = conn.execute("""SELECT status, COUNT(*) items FROM planning_items
-        WHERE year=? GROUP BY status ORDER BY items DESC""", (year,)).fetchall()
+        WHERE year=%s GROUP BY status ORDER BY items DESC""", (year,)).fetchall()
 
     items_count = len(items)
     total_cost = sum((it["estimated_cost"] or 0) for it in items)
@@ -1614,16 +1955,71 @@ async def create_planning(request: Request):
         if not payload.get(k): raise HTTPException(400, f"Campo obrigatório: {k}")
     conn = db()
     cur = conn.execute("""INSERT INTO planning_items(year,title,category,kind,status,estimated_cost,quantity,unit,justification,schools_count,created_at,updated_at)
-                         VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
+                         VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
                        (int(payload["year"]), payload["title"], payload["category"], payload["kind"], payload.get("status","Identificada"), float(payload.get("estimated_cost") or 0), float(payload.get("quantity") or 0), payload.get("unit"), payload.get("justification"), int(payload.get("schools_count") or 1), now_iso(), now_iso()))
     pid = cur.lastrowid
     code = f"PLAN-{payload['year']}-{pid:04d}"
-    conn.execute("UPDATE planning_items SET code=? WHERE id=?", (code,pid))
+    conn.execute("UPDATE planning_items SET code=%s WHERE id=%s", (code,pid))
     for did in payload.get("demand_ids", []):
-        conn.execute("INSERT OR IGNORE INTO planning_links(planning_id,demand_id) VALUES(?,?)", (pid,int(did)))
-        conn.execute("UPDATE demands SET status='Planejamento futuro', future_year=?, updated_at=? WHERE id=?", (int(payload["year"]), now_iso(), int(did)))
+        conn.execute("INSERT INTO planning_links(planning_id,demand_id) VALUES(%s,%s) ON CONFLICT DO NOTHING", (pid,int(did)))
+        conn.execute("UPDATE demands SET status='Planejamento futuro', future_year=%s, updated_at=%s WHERE id=%s", (int(payload["year"]), now_iso(), int(did)))
+    registrar(conn, request, user, "Criou item de planejamento", "planning", pid, f"{code} — {payload['title']}")
     conn.commit(); conn.close()
     return {"ok":True, "id":pid, "code":code}
+
+
+@app.put("/api/planning/{planning_id}")
+async def update_planning(request: Request, planning_id: int):
+    """Edicao de item de planejamento — restrita ao perfil com administracao."""
+    user = require_user(request); require_admin(user)
+    payload = await request.json()
+    conn = db()
+    item = conn.execute("SELECT * FROM planning_items WHERE id=%s", (planning_id,)).fetchone()
+    if not item:
+        conn.close(); raise HTTPException(404, "Item de planejamento não encontrado")
+    inteiros = ("year", "schools_count")
+    reais = ("estimated_cost", "quantity")
+    for campo in ("year", "title", "category", "kind", "status", "estimated_cost",
+                  "quantity", "unit", "justification", "schools_count"):
+        if campo not in payload:
+            continue
+        valor = payload[campo]
+        if campo in inteiros:
+            valor = int(valor or 0)
+        elif campo in reais:
+            valor = float(valor or 0)
+        conn.execute(f"UPDATE planning_items SET {campo}=%s WHERE id=%s", (valor, planning_id))
+    conn.execute("UPDATE planning_items SET updated_at=%s WHERE id=%s", (now_iso(), planning_id))
+    # O ano do item manda nas demandas vinculadas, senao as duas telas divergem.
+    if payload.get("year") and int(payload["year"]) != item["year"]:
+        conn.execute("""UPDATE demands SET future_year=%s, updated_at=%s
+                        WHERE id IN (SELECT demand_id FROM planning_links WHERE planning_id=%s)""",
+                     (int(payload["year"]), now_iso(), planning_id))
+    registrar(conn, request, user, "Editou item de planejamento", "planning",
+              planning_id, item["code"] or str(planning_id))
+    conn.commit(); conn.close()
+    return {"ok": True}
+
+
+@app.delete("/api/planning/{planning_id}")
+async def delete_planning(request: Request, planning_id: int):
+    """Exclusao de item de planejamento — restrita ao perfil com administracao.
+    As demandas vinculadas voltam a ficar sem exercicio futuro, em vez de
+    apontarem para um item que deixou de existir."""
+    user = require_user(request); require_admin(user)
+    conn = db()
+    item = conn.execute("SELECT id, code, title FROM planning_items WHERE id=%s", (planning_id,)).fetchone()
+    if not item:
+        conn.close(); raise HTTPException(404, "Item de planejamento não encontrado")
+    conn.execute("""UPDATE demands SET future_year=NULL, updated_at=%s
+                    WHERE id IN (SELECT demand_id FROM planning_links WHERE planning_id=%s)""",
+                 (now_iso(), planning_id))
+    conn.execute("DELETE FROM planning_links WHERE planning_id=%s", (planning_id,))
+    conn.execute("DELETE FROM planning_items WHERE id=%s", (planning_id,))
+    registrar(conn, request, user, "Excluiu item de planejamento", "planning",
+              planning_id, f"{item['code'] or planning_id} — {item['title']}")
+    conn.commit(); conn.close()
+    return {"ok": True}
 
 
 @app.get("/api/admin/summary")
@@ -1639,12 +2035,149 @@ def admin_summary(request: Request):
         "attachments": conn.execute("SELECT COUNT(*) c FROM attachments").fetchone()["c"],
         "categories": conn.execute("SELECT COUNT(*) c FROM categories WHERE active=1").fetchone()["c"],
         "profiles": conn.execute("SELECT COUNT(*) c FROM access_profiles WHERE active=1").fetchone()["c"],
-        "db_size": DB_PATH.stat().st_size if DB_PATH.exists() else 0,
+        "db_size": conn.execute("SELECT pg_database_size(current_database()) sz").fetchone()["sz"],
     }
     conn.close(); return data
 
 
-def _pdf_response(filename: str, title: str, subtitle: str, headers: list, rows: list, col_widths=None):
+# Paleta identica a que o navegador aplica (bloco govbr de static/styles.css):
+# e o mesmo azul e cinza que o gestor ve na tela, para o relatorio impresso nao
+# parecer de outro sistema.
+_PDF_INK = "#333333"
+_PDF_MUTED = "#667085"
+_PDF_LINE = "#e0e0e0"
+_PDF_BLUE = "#005A9C"
+_PDF_BLUE_DARK = "#071d41"
+
+
+# --- Cabecalho institucional compartilhado -----------------------------------
+# Um so cabecalho para todos os PDFs do sistema (Painel, Carteira de Demandas e
+# Planejamento): brasao a esquerda, a hierarquia do orgao ao lado, regua azul, e
+# entao o titulo do documento centralizado com os dados de geracao a direita.
+_PDF_LOGO = "logo-cabecalho-brasao.png"
+_PDF_ORGAO = [
+    "PREFEITURA MUNICIPAL DE ITAGUAÍ",
+    "SECRETARIA MUNICIPAL DE EDUCAÇÃO",
+    "SUBSECRETARIA DE INFRAESTRUTURA",
+]
+
+
+# O Frame padrao do SimpleDocTemplate reserva 6pt de padding em cada lado, entao
+# a largura util e sempre doc.width menos isto. Montar tabelas com doc.width cheio
+# as deixa mais largas que o frame e o reportlab as joga para a pagina seguinte.
+_PDF_FRAME_PAD = 12
+
+
+def _pdf_largura_util(doc) -> float:
+    return doc.width - _PDF_FRAME_PAD
+
+
+def _pdf_marca(altura_cm: float = 1.55):
+    """O brasao como flowable, ou '' quando o arquivo faltar/estiver corrompido.
+    A decodificacao e forcada aqui: o reportlab so leria os pixels na hora de
+    montar o documento, e um arquivo quebrado derrubaria o relatorio inteiro em
+    vez de apenas sair sem a marca."""
+    from reportlab.lib.units import cm
+    from reportlab.lib.utils import ImageReader
+    from reportlab.platypus import Image as RLImage
+
+    caminho = BASE_DIR / "static" / "images" / _PDF_LOGO
+    if not caminho.exists():
+        return ""
+    try:
+        leitor = ImageReader(str(caminho))
+        larg, alt = leitor.getSize()
+        leitor.getRGBData()
+        altura = altura_cm * cm
+        return RLImage(str(caminho), width=altura * larg / alt, height=altura, hAlign="LEFT")
+    except Exception:
+        return ""
+
+
+def _pdf_cabecalho(doc_width: float, titulo: str, meta: list, compacto: bool = False):
+    """Flowables do cabecalho institucional. `meta` sao as linhas do bloco da
+    direita (exercicio, escopo, data de geracao...).
+
+    `compacto` encolhe a marca, o titulo e os respiros e joga a meta para a
+    mesma linha do titulo. E para o Painel, que e denso: com o cabecalho em
+    tamanho normal o bloco "Precisa de atenção / Demandas por categoria" nao
+    cabia mais na primeira pagina e deixava meia folha em branco. A faixa do
+    orgao e a regua azul sao as mesmas em todos os relatorios."""
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import Table, TableStyle, Paragraph, Spacer
+    from xml.sax.saxutils import escape as _x
+
+    base = getSampleStyleSheet()["Normal"]
+    s_org1 = ParagraphStyle("o1", parent=base, fontName="Helvetica-Bold", fontSize=11.5, leading=14,
+                            textColor=colors.HexColor(_PDF_BLUE_DARK))
+    s_org2 = ParagraphStyle("o2", parent=base, fontName="Helvetica-Bold", fontSize=10.5, leading=13,
+                            textColor=colors.HexColor(_PDF_BLUE))
+    s_org3 = ParagraphStyle("o3", parent=base, fontName="Helvetica-Bold", fontSize=9.5, leading=12,
+                            textColor=colors.HexColor(_PDF_BLUE))
+    s_titulo = ParagraphStyle("tt", parent=base, fontName="Helvetica-Bold",
+                              fontSize=15 if compacto else 17, leading=19 if compacto else 21,
+                              alignment=1, textColor=colors.HexColor(_PDF_BLUE_DARK))
+    s_meta = ParagraphStyle("mt", parent=base, fontSize=8.5, leading=10.5, alignment=2,
+                            textColor=colors.HexColor(_PDF_MUTED))
+
+    marca = _pdf_marca(1.15 if compacto else 1.55)
+    larg_marca = 2.1 * cm if marca != "" else 0
+    faixa = Table([[marca, [Paragraph(_x(_PDF_ORGAO[0]), s_org1),
+                            Paragraph(_x(_PDF_ORGAO[1]), s_org2),
+                            Paragraph(_x(_PDF_ORGAO[2]), s_org3)]]],
+                  colWidths=[larg_marca, doc_width - larg_marca])
+    faixa.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("LINEBELOW", (0, 0), (-1, -1), 1.2, colors.HexColor(_PDF_BLUE)),
+    ]))
+
+    linhas = [l for l in (meta or []) if l]
+    bloco_meta = Paragraph("<br/>".join(_x(l) for l in linhas), s_meta) if linhas else ""
+
+    if compacto and linhas:
+        # Titulo centrado no documento com a meta a direita, na mesma faixa: as
+        # colunas laterais tem a mesma largura para o titulo nao sair do centro.
+        lateral = doc_width * 0.30
+        titulo_row = Table([["", Paragraph(_x(titulo), s_titulo), bloco_meta]],
+                           colWidths=[lateral, doc_width - 2 * lateral, lateral])
+        titulo_row.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        return [faixa, Spacer(1, 0.18 * cm), titulo_row, Spacer(1, 0.16 * cm)]
+
+    saida = [faixa, Spacer(1, 0.45 * cm), Paragraph(_x(titulo), s_titulo)]
+    if linhas:
+        saida += [Spacer(1, 0.18 * cm), bloco_meta]
+    saida.append(Spacer(1, 0.4 * cm))
+    return saida
+
+
+def _pdf_rodape(canvas, documento):
+    """Rodape com a identificacao do sistema e o numero da pagina."""
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+
+    canvas.saveState()
+    canvas.setStrokeColor(colors.HexColor(_PDF_LINE))
+    canvas.line(documento.leftMargin, 0.95 * cm, documento.pagesize[0] - documento.rightMargin, 0.95 * cm)
+    canvas.setFont("Helvetica", 7)
+    canvas.setFillColor(colors.HexColor(_PDF_MUTED))
+    canvas.drawString(documento.leftMargin, 0.62 * cm,
+                      "Agenda Integrada · Secretaria Municipal de Educação · Prefeitura Municipal de Itaguaí")
+    canvas.drawRightString(documento.pagesize[0] - documento.rightMargin, 0.62 * cm,
+                           "Página %d" % canvas.getPageNumber())
+    canvas.restoreState()
+
+
+def _pdf_response(filename: str, title: str, subtitle: str, headers: list, rows: list, col_widths=None, logo: str = None):
+    # `logo` e aceito e ignorado: a marca vem de _pdf_cabecalho, igual para todos
+    # os relatorios. O parametro fica para nao quebrar chamadas existentes.
     """Monta um PDF tabular simples (relatório) e devolve como download.
     Import feito aqui dentro (não no topo do arquivo) para que, se alguém rodar
     `python app.py` direto sem passar pelos .bat (que reinstalam requirements.txt
@@ -1655,24 +2188,21 @@ def _pdf_response(filename: str, title: str, subtitle: str, headers: list, rows:
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.units import cm
-        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
+        from reportlab.lib.utils import ImageReader
     except ImportError:
         raise HTTPException(500, "Geração de PDF indisponível: instale as dependências com 'pip install -r requirements.txt' (pacote reportlab) e reinicie o sistema.")
     from xml.sax.saxutils import escape as _xesc
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=1.2 * cm, rightMargin=1.2 * cm,
-                             topMargin=1.4 * cm, bottomMargin=1.2 * cm, title=title)
+                             topMargin=1.1 * cm, bottomMargin=1.3 * cm, title=title)
     styles = getSampleStyleSheet()
     cell_style = ParagraphStyle("cell", parent=styles["Normal"], fontSize=8, leading=10)
     head_style = ParagraphStyle("head", parent=styles["Normal"], fontSize=8.5, leading=10, textColor=colors.white, fontName="Helvetica-Bold")
 
-    story = [
-        Paragraph(_xesc(title), styles["Title"]),
-        Paragraph(_xesc(subtitle), styles["Normal"]),
-        Paragraph(f"Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')}", styles["Normal"]),
-        Spacer(1, 0.5 * cm),
-    ]
+    story = _pdf_cabecalho(_pdf_largura_util(doc), title,
+                           [subtitle, f"Gerado em {datetime.now().strftime('%d/%m/%Y às %H:%M')}"])
     data = [[Paragraph(_xesc(str(h)), head_style) for h in headers]]
     for r in rows:
         data.append([Paragraph(_xesc(str(v)) if v not in (None, "") else "—", cell_style) for v in r])
@@ -1689,7 +2219,7 @@ def _pdf_response(filename: str, title: str, subtitle: str, headers: list, rows:
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
     story.append(table)
-    doc.build(story)
+    doc.build(story, onFirstPage=_pdf_rodape, onLaterPages=_pdf_rodape)
     pdf_bytes = buf.getvalue()
     buf.close()
     resp_headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
@@ -1700,9 +2230,9 @@ def _pdf_response(filename: str, title: str, subtitle: str, headers: list, rows:
 def export_demands(request: Request, status: str = "", priority: str = ""):
     user = require_user(request)
     where=["1=1"]; params=[]
-    if user["perm"]["school_scoped"]: where.append("d.school_id=?"); params.append(user["school_id"])
-    if status: where.append("d.status=?"); params.append(status)
-    if priority: where.append("d.priority=?"); params.append(priority)
+    if user["perm"]["school_scoped"]: where.append("d.school_id=%s"); params.append(user["school_id"])
+    if status: where.append("d.status=%s"); params.append(status)
+    if priority: where.append("d.priority=%s"); params.append(priority)
     conn=db()
     rows=conn.execute(f"""SELECT d.code,d.title,s.name school,d.category,d.priority,d.status,d.created_at,d.due_date,d.responsible,d.cost_estimate
                          FROM demands d JOIN schools s ON s.id=d.school_id WHERE {' AND '.join(where)} ORDER BY d.id DESC""", params).fetchall()
@@ -1737,9 +2267,9 @@ def _date_br(v) -> str:
 def export_demands_pdf(request: Request, status: str = "", priority: str = ""):
     user = require_user(request)
     where=["1=1"]; params=[]
-    if user["perm"]["school_scoped"]: where.append("d.school_id=?"); params.append(user["school_id"])
-    if status: where.append("d.status=?"); params.append(status)
-    if priority: where.append("d.priority=?"); params.append(priority)
+    if user["perm"]["school_scoped"]: where.append("d.school_id=%s"); params.append(user["school_id"])
+    if status: where.append("d.status=%s"); params.append(status)
+    if priority: where.append("d.priority=%s"); params.append(priority)
     conn=db()
     rows=conn.execute(f"""SELECT d.code,d.title,s.name school,d.category,d.priority,d.status,d.due_date,d.responsible,d.cost_estimate
                          FROM demands d JOIN schools s ON s.id=d.school_id WHERE {' AND '.join(where)} ORDER BY d.id DESC""", params).fetchall()
@@ -1750,28 +2280,322 @@ def export_demands_pdf(request: Request, status: str = "", priority: str = ""):
     subtitle = "Carteira de demandas"
     if status: subtitle += f" · Status: {status}"
     if priority: subtitle += f" · Prioridade: {priority}"
-    col_widths = [2.7*cm, 5.3*cm, 4.0*cm, 2.6*cm, 2.1*cm, 2.9*cm, 2.0*cm, 2.9*cm, 2.6*cm]
+    col_widths = [2.7*cm, 5.1*cm, 3.9*cm, 2.5*cm, 2.0*cm, 2.9*cm, 2.0*cm, 2.9*cm, 2.6*cm]
     filename = f"demandas_{date.today().isoformat()}.pdf"
     return _pdf_response(filename, "Agenda Integrada — Carteira de Demandas", subtitle,
                           ["Código", "Demanda", "Unidade Escolar", "Categoria", "Prioridade", "Status", "Prazo", "Responsável", "Custo estimado"],
                           table_rows, col_widths)
 
 
+# --- PDF do Painel -----------------------------------------------------------
+_PDF_TONES = {
+    "primary": "#005A9C", "blue": "#005A9C", "teal": "#005A9C",
+    "red": "#b71c1c", "orange": "#c67c00", "green": "#1a7c44", "violet": "#6f42c1",
+}
+# Grupos e cartoes na mesma ordem do Painel (statGroups/cards em static/app.js).
+_PDF_STAT_GROUPS = [
+    ("VISÃO GERAL", [("total", "Total de demandas", "Registro consolidado", "primary", False)]),
+    ("PRIORIDADES", [("urgent", "Urgentes (P1)", "Ação imediata necessária", "red", False),
+                     ("high", "Alta prioridade (P2)", "Já incomoda a rotina", "orange", False)]),
+    ("PRAZOS CRÍTICOS", [("overdue", "Prazo vencido", "Requer atenção da gestão", "red", False),
+                         ("due_soon", "Vence em 7 dias", "Ainda dá tempo de agir", "orange", False)]),
+    ("ANDAMENTO DAS DEMANDAS", [("analysis", "Em análise", "Triagem e avaliação técnica", "orange", False),
+                                ("progress", "Em andamento", "Programados ou em execução", "teal", False),
+                                ("contract", "Aguardando contratação", "Dependência administrativa", "violet", False)]),
+    ("PLANEJAMENTO", [("completed", "Concluídas", "Atendimentos finalizados", "green", False),
+                      ("future", "Planejamento futuro", "Exercícios seguintes", "blue", False)]),
+    ("RESPONSABILIDADE", [("unassigned", "Sem responsável", "Falta indicar quem cuida", "violet", False)]),
+    ("CUSTO EM ABERTO", [("open_cost", "Custo em aberto", "Estimativa do que está aberto", "blue", True)]),
+]
+_PDF_CAT_PALETTE = ["#005A9C", "#0f7b79", "#1a7c44", "#c67c00", "#6f42c1", "#b71c1c"]
+
+
+def _pdf_num_br(v) -> str:
+    try:
+        return f"{int(v):,}".replace(",", ".")
+    except (TypeError, ValueError):
+        return "0"
+
+
+def _dashboard_pdf_story(payload: dict, user: dict, doc_width: float):
+    """Constroi os flowables do PDF do Painel. Separado do endpoint para manter
+    o endpoint legivel e permitir montar o relatorio sem subir o servidor."""
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import Table, TableStyle, Paragraph, Spacer, KeepTogether
+    from xml.sax.saxutils import escape as _x
+
+    st = payload["stats"]
+    base = getSampleStyleSheet()["Normal"]
+
+    def S(nome, **kw):
+        return ParagraphStyle(nome, parent=base, **kw)
+
+    s_group = S("g", fontSize=6.4, leading=8, textColor=colors.HexColor(_PDF_MUTED), fontName="Helvetica-Bold")
+    s_value = S("v", fontSize=15, leading=17, fontName="Helvetica-Bold")
+    s_money = S("vm", fontSize=11, leading=14, fontName="Helvetica-Bold")
+    s_label = S("l", fontSize=7.4, leading=9, textColor=colors.HexColor(_PDF_INK), fontName="Helvetica-Bold")
+    s_note = S("n", fontSize=6.2, leading=7.6, textColor=colors.HexColor(_PDF_MUTED))
+    # keepWithNext gruda o titulo da secao na tabela seguinte: sem isso o
+    # "Atividade recente" ficava sozinho no pe de uma pagina. E preferivel a um
+    # KeepTogether do bloco inteiro, que empurraria a tabela toda e deixaria
+    # meia pagina em branco -- assim a tabela quebra normalmente, repetindo o
+    # cabecalho na pagina seguinte.
+    s_sec = S("s", fontSize=10.5, leading=13, textColor=colors.HexColor(_PDF_BLUE_DARK),
+              fontName="Helvetica-Bold", keepWithNext=1)
+    s_sub = S("ss", fontSize=7, leading=9, textColor=colors.HexColor(_PDF_MUTED),
+              spaceAfter=4.5, keepWithNext=1)
+    # Dentro de uma celula de tabela o cabecalho ja esta preso ao seu conteudo, e
+    # o keepWithNext vaza para a tabela inteira: o bloco "Precisa de atenção /
+    # Demandas por categoria" passava a se colar em "Atividade recente" e os dois
+    # desciam juntos de pagina, deixando meia folha vazia. Aqui, sem keepWithNext.
+    s_sec_cel = S("sc", fontSize=10.5, leading=13, textColor=colors.HexColor(_PDF_BLUE_DARK),
+                  fontName="Helvetica-Bold")
+    s_sub_cel = S("ssc", fontSize=7, leading=9, textColor=colors.HexColor(_PDF_MUTED), spaceAfter=4.5)
+    s_th = S("th", fontSize=6.8, leading=8.5, textColor=colors.white, fontName="Helvetica-Bold")
+    s_td = S("td", fontSize=7.2, leading=9)
+    s_td_b = S("tdb", fontSize=7.2, leading=9, fontName="Helvetica-Bold")
+
+    def secao(titulo, sub):
+        return [Paragraph(_x(titulo), s_sec), Paragraph(_x(sub), s_sub)]
+
+    def tabela(headers, linhas, larguras, vazio):
+        if not linhas:
+            t = Table([[Paragraph(_x(vazio), s_note)]], colWidths=[sum(larguras)])
+            t.setStyle(TableStyle([("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor(_PDF_LINE)),
+                                   ("TOPPADDING", (0, 0), (-1, -1), 10),
+                                   ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+                                   ("LEFTPADDING", (0, 0), (-1, -1), 8)]))
+            return t
+        dados = [[Paragraph(_x(h), s_th) for h in headers]] + linhas
+        t = Table(dados, colWidths=larguras, repeatRows=1)
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(_PDF_BLUE)),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f8fc")]),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.HexColor(_PDF_LINE)),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor(_PDF_LINE)),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 3.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
+        ]))
+        return t
+
+    story = []
+
+    # --- indicadores -------------------------------------------------------
+    # Cada grupo do Painel vira uma coluna; a faixa colorida no topo do cartao
+    # repete o tom que aquele indicador tem na tela.
+    grupos = []
+    for rotulo, itens in _PDF_STAT_GROUPS:
+        cartoes = []
+        for chave, titulo, nota, tom, e_moeda in itens:
+            valor = st.get(chave, 0)
+            texto = _money_br(valor) if e_moeda else _pdf_num_br(valor)
+            celula = Table([[Paragraph(_x(texto), s_money if e_moeda else s_value)],
+                            [Paragraph(_x(titulo), s_label)],
+                            [Paragraph(_x(nota), s_note)]])
+            celula.setStyle(TableStyle([
+                ("LINEABOVE", (0, 0), (-1, 0), 2.2, colors.HexColor(_PDF_TONES[tom])),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor(_PDF_LINE)),
+                ("TEXTCOLOR", (0, 0), (0, 0), colors.HexColor(_PDF_TONES[tom])),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ("TOPPADDING", (0, 0), (0, 0), 5), ("BOTTOMPADDING", (0, 2), (-1, 2), 5),
+                ("TOPPADDING", (0, 1), (-1, 2), 1), ("BOTTOMPADDING", (0, 0), (-1, 1), 1),
+            ]))
+            cartoes.append([celula])
+        pilha = Table(cartoes)
+        pilha.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                   ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                                   ("TOPPADDING", (0, 0), (-1, -1), 0),
+                                   ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
+        grupos.append((rotulo, pilha))
+
+    larg_grupo = [doc_width * p for p in (0.12, 0.15, 0.15, 0.185, 0.15, 0.125, 0.12)]
+    grade = Table([[Paragraph(_x(r), s_group) for r, _ in grupos],
+                   [pilha for _, pilha in grupos]], colWidths=larg_grupo)
+    grade.setStyle(TableStyle([
+        ("VALIGN", (0, 1), (-1, 1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 3), ("RIGHTPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, 0), 0), ("BOTTOMPADDING", (0, 0), (-1, 0), 3),
+    ]))
+    story += secao("Indicadores do Painel", "Os mesmos números exibidos na tela inicial, no momento da geração.")
+    story.append(grade)
+    story.append(Spacer(1, 0.15 * cm))
+
+    # --- indicador de execução ---------------------------------------------
+    # Fica logo abaixo da grade porque resume exatamente aqueles numeros.
+    pct = float(st.get("execution") or 0)
+    cheio = max(0.005, min(1.0, pct / 100))
+    s_pct = ParagraphStyle("pc", parent=base, fontSize=15, leading=17, fontName="Helvetica-Bold",
+                           textColor=colors.HexColor(_PDF_BLUE), alignment=2)
+    # Titulo, barra e percentual na mesma faixa: e um indicador de uma linha so, e
+    # empilhar cabecalho + barra custava ~22pt de altura que fazem falta para o
+    # bloco seguinte caber na primeira pagina.
+    rotulo_exec = [Paragraph("Indicador de execução", s_sec_cel),
+                   Paragraph("Percentual das demandas registradas que já foram concluídas.", s_sub_cel)]
+    larg_rotulo = 8.2 * cm
+    barra_exec = Table([["", ""]],
+                       colWidths=[(doc_width - larg_rotulo - 3.2 * cm) * cheio,
+                                  (doc_width - larg_rotulo - 3.2 * cm) * (1 - cheio)], rowHeights=[11])
+    barra_exec.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, 0), colors.HexColor(_PDF_BLUE)),
+        ("BACKGROUND", (1, 0), (1, 0), colors.HexColor("#eef2f7")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    linha_exec = Table([[rotulo_exec, barra_exec, Paragraph("%.1f%%" % pct, s_pct)]],
+                       colWidths=[larg_rotulo, doc_width - larg_rotulo - 3.2 * cm, 3.2 * cm])
+    linha_exec.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (0, 0), 0), ("RIGHTPADDING", (-1, 0), (-1, 0), 0),
+        ("LEFTPADDING", (1, 0), (1, 0), 10), ("RIGHTPADDING", (1, 0), (1, 0), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    story.append(linha_exec)
+    story.append(Spacer(1, 0.18 * cm))
+
+    # --- atenção + categorias, lado a lado ---------------------------------
+    meia = doc_width * 0.5
+    at_l = [meia * p for p in (0.09, 0.40, 0.29, 0.22)]
+    at_linhas = [[Paragraph(_x(d["priority"] or "—"), s_td_b),
+                  Paragraph(_x(d["title"] or "—"), s_td),
+                  Paragraph(_x(d["school_name"] or "—"), s_td),
+                  Paragraph(_x(_date_br(d["due_date"])), s_td)] for d in payload["attention"]]
+    bloco_at = [Paragraph("Precisa de atenção", s_sec_cel),
+                Paragraph("Priorizado por criticidade e prazo.", s_sub_cel),
+                tabela(["Prio.", "Demanda", "Unidade Escolar", "Prazo"], at_linhas, at_l,
+                       "Tudo em dia — não há demandas críticas neste momento.")]
+
+    cats = payload["categories"]
+    total_cat = sum(c["qty"] for c in cats) or 1
+    cat_l = [meia * p for p in (0.44, 0.34, 0.22)]
+    cat_linhas = []
+    for i, c in enumerate(cats):
+        fatia = c["qty"] / total_cat
+        # Barra proporcional como uma tabela de duas celulas: dispensa um Flowable
+        # customizado e imprime igual em qualquer visualizador.
+        cheio = max(0.04, fatia)
+        barra = Table([["", ""]], colWidths=[cat_l[1] * cheio, cat_l[1] * (1 - cheio)], rowHeights=[7])
+        barra.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (0, 0), colors.HexColor(_PDF_CAT_PALETTE[i % len(_PDF_CAT_PALETTE)])),
+            ("BACKGROUND", (1, 0), (1, 0), colors.HexColor("#eef2f7")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0), ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0), ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        cat_linhas.append([Paragraph(_x(c["category"] or "—"), s_td), barra,
+                           Paragraph("%s · %d%%" % (_pdf_num_br(c["qty"]), round(fatia * 100)), s_td_b)])
+    bloco_cat = [Paragraph("Demandas por categoria", s_sec_cel),
+                 Paragraph(_x("Concentração atual da carteira · %s demandas categorizadas."
+                              % _pdf_num_br(sum(c["qty"] for c in cats))), s_sub_cel),
+                 tabela(["Categoria", "Participação", "Qtd."], cat_linhas, cat_l,
+                        "Ainda não há demandas categorizadas.")]
+
+    duas = Table([[bloco_at, bloco_cat]], colWidths=[meia, meia])
+    duas.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"),
+                              ("LEFTPADDING", (0, 0), (0, 0), 0), ("RIGHTPADDING", (0, 0), (0, 0), 10),
+                              ("LEFTPADDING", (1, 0), (1, 0), 10), ("RIGHTPADDING", (1, 0), (1, 0), 0)]))
+    story.append(duas)
+    story.append(Spacer(1, 0.36 * cm))
+
+    # --- atividade recente -------------------------------------------------
+    rec_l = [doc_width * p for p in (0.10, 0.26, 0.19, 0.13, 0.07, 0.15, 0.10)]
+    rec_linhas = [[Paragraph(_x(d["code"] or "—"), s_td_b),
+                   Paragraph(_x(d["title"] or "—"), s_td),
+                   Paragraph(_x(d["school_name"] or "—"), s_td),
+                   Paragraph(_x(d["category"] or "—"), s_td),
+                   Paragraph(_x(d["priority"] or "—"), s_td),
+                   Paragraph(_x(d["status"] or "—"), s_td),
+                   Paragraph(_x(_date_br(d["due_date"])), s_td)] for d in payload["recent"]]
+    story += secao("Atividade recente", "Últimas demandas atualizadas.")
+    story.append(tabela(["Código", "Demanda", "Unidade Escolar", "Categoria", "Prio.", "Status", "Prazo"],
+                        rec_linhas, rec_l, "Nenhuma demanda registrada."))
+    story.append(Spacer(1, 0.36 * cm))
+
+    return story
+
+
+@app.get("/api/export/dashboard.pdf")
+def export_dashboard_pdf(request: Request):
+    """PDF do Painel em A4 paisagem, com os mesmos indicadores e listas da tela."""
+    user = require_user(request)
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.platypus import SimpleDocTemplate
+    except ImportError:
+        raise HTTPException(500, "Geração de PDF indisponível: instale as dependências com 'pip install -r requirements.txt' (pacote reportlab) e reinicie o sistema.")
+
+    payload = _dashboard_payload(user)
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=1.1 * cm, rightMargin=1.1 * cm,
+                            topMargin=0.9 * cm, bottomMargin=1.15 * cm,
+                            title="Painel — Agenda Integrada")
+    escopo = (user.get("school_name") or "Unidade escolar") if user["perm"]["school_scoped"] \
+        else "Rede municipal — todas as unidades"
+    largura = _pdf_largura_util(doc)
+    story = _pdf_cabecalho(largura, "Painel da Agenda Integrada", [
+        escopo,
+        "Gerado em %s" % datetime.now().strftime("%d/%m/%Y às %H:%M"),
+        user.get("name") or "—",
+    ], compacto=True)
+
+    story += _dashboard_pdf_story(payload, user, largura)
+    doc.build(story, onFirstPage=_pdf_rodape, onLaterPages=_pdf_rodape)
+    pdf_bytes = buf.getvalue()
+    buf.close()
+    nome = "painel_%s.pdf" % date.today().isoformat()
+    return Response(content=pdf_bytes, media_type="application/pdf",
+                    headers={"Content-Disposition": 'attachment; filename="%s"' % nome})
+
+
+def _planning_unidades(nomes: list, total: int) -> str:
+    """Texto da coluna de unidades. Um item de planejamento pode consolidar
+    varias escolas; acima de duas o nome de todas nao caberia, entao entram as
+    duas primeiras e a contagem do resto. Itens sem demanda vinculada nao tem
+    como saber a unidade — nesses o texto fica vazio e a coluna "Escolas" segue
+    informando o alcance previsto."""
+    nomes = sorted({n for n in nomes if n})
+    if not nomes:
+        return "—"
+    if len(nomes) <= 2:
+        return " · ".join(nomes)
+    restantes = (total or len(nomes)) - 2
+    return "%s · e mais %d unidade%s" % (" · ".join(nomes[:2]), restantes, "" if restantes == 1 else "s")
+
+
 @app.get("/api/export/planning.pdf")
 def export_planning_pdf(request: Request, year: Optional[int] = None):
     require_user(request)
     where=["1=1"]; params=[]
-    if year: where.append("year=?"); params.append(year)
+    if year: where.append("p.year=%s"); params.append(year)
     conn=db()
-    rows = conn.execute(f"SELECT * FROM planning_items WHERE {' AND '.join(where)} ORDER BY year, id DESC", params).fetchall()
+    rows = conn.execute(f"""SELECT p.* FROM planning_items p
+                            WHERE {' AND '.join(where)} ORDER BY p.year, p.id DESC""", params).fetchall()
+    # As unidades vem das demandas vinculadas ao item (planning_links). Consulta
+    # separada e agrupada em memoria: um GROUP BY com string_agg devolveria os
+    # nomes repetidos por demanda e ainda dependeria do dialeto.
+    vinculos = conn.execute("""SELECT l.planning_id, s.name FROM planning_links l
+                               JOIN demands d ON d.id=l.demand_id
+                               JOIN schools s ON s.id=d.school_id""").fetchall()
     conn.close()
+    por_item = {}
+    for v in vinculos:
+        por_item.setdefault(v["planning_id"], []).append(v["name"])
+
     from reportlab.lib.units import cm
-    table_rows = [[r["code"] or "—", r["title"], r["kind"], r["schools_count"] or 0, _money_br(r["estimated_cost"]), r["status"]] for r in rows]
+    table_rows = [[r["code"] or "—", _date_br(r["created_at"]), r["title"],
+                   _planning_unidades(por_item.get(r["id"], []), r["schools_count"] or 0),
+                   r["kind"], r["schools_count"] or 0, _money_br(r["estimated_cost"]), r["status"]]
+                  for r in rows]
     subtitle = f"Planejamento {year}" if year else "Planejamento — todos os exercícios"
-    col_widths = [2.6*cm, 9.5*cm, 3.2*cm, 2.2*cm, 3.4*cm, 3.4*cm]
+    col_widths = [2.9*cm, 2.2*cm, 6.8*cm, 5.4*cm, 2.7*cm, 1.5*cm, 2.6*cm, 2.5*cm]
     filename = f"planejamento_{year or 'todos'}_{date.today().isoformat()}.pdf"
     return _pdf_response(filename, "Agenda Integrada — Planejamento Futuro", subtitle,
-                          ["Código", "Objeto consolidado", "Tipo", "Escolas", "Estimativa", "Status"],
+                          ["Código", "Solicitado em", "Objeto consolidado", "Unidade(s) Escolar(es)",
+                           "Tipo", "Escolas", "Estimativa", "Status"],
                           table_rows, col_widths)
 
 
@@ -1798,11 +2622,12 @@ async def admin_create_category(request: Request):
     if not name:
         raise HTTPException(400, "Informe o nome da categoria")
     conn = db()
-    if conn.execute("SELECT id FROM categories WHERE name=?", (name,)).fetchone():
+    if conn.execute("SELECT id FROM categories WHERE name=%s", (name,)).fetchone():
         conn.close(); raise HTTPException(409, "Já existe uma categoria com esse nome")
     max_order = conn.execute("SELECT COALESCE(MAX(sort_order),-1) m FROM categories").fetchone()["m"]
-    cur = conn.execute("INSERT INTO categories(name,icon,color,hint,sort_order,active) VALUES(?,?,?,?,?,1)",
+    cur = conn.execute("INSERT INTO categories(name,icon,color,hint,sort_order,active) VALUES(%s,%s,%s,%s,%s,1) RETURNING id",
                         (name, payload.get("icon") or "wrench", payload.get("color") or "blue", payload.get("hint") or "", max_order + 1))
+    registrar(conn, request, user, "Criou categoria", "category", cur.lastrowid, name)
     conn.commit(); conn.close()
     return {"ok": True, "id": cur.lastrowid}
 
@@ -1812,21 +2637,22 @@ async def admin_update_category(request: Request, cat_id: int):
     user = require_user(request); require_admin(user)
     payload = await request.json()
     conn = db()
-    row = conn.execute("SELECT * FROM categories WHERE id=?", (cat_id,)).fetchone()
+    row = conn.execute("SELECT * FROM categories WHERE id=%s", (cat_id,)).fetchone()
     if not row:
         conn.close(); raise HTTPException(404)
     new_name = (payload.get("name") or row["name"]).strip()
-    if new_name != row["name"] and conn.execute("SELECT id FROM categories WHERE name=? AND id!=?", (new_name, cat_id)).fetchone():
+    if new_name != row["name"] and conn.execute("SELECT id FROM categories WHERE name=%s AND id!=%s", (new_name, cat_id)).fetchone():
         conn.close(); raise HTTPException(409, "Já existe uma categoria com esse nome")
     old_name = row["name"]
     # sort_order é opcional (usado para reordenar a lista de categorias); quando omitido,
     # mantém o valor atual — não altera o comportamento do formulário de edição existente.
     new_sort_order = int(payload["sort_order"]) if payload.get("sort_order") is not None else row["sort_order"]
-    conn.execute("UPDATE categories SET name=?, icon=?, color=?, hint=?, active=?, sort_order=? WHERE id=?",
+    conn.execute("UPDATE categories SET name=%s, icon=%s, color=%s, hint=%s, active=%s, sort_order=%s WHERE id=%s",
                  (new_name, payload.get("icon") or row["icon"], payload.get("color") or row["color"],
                   payload.get("hint", row["hint"]), int(bool(payload.get("active", row["active"]))), new_sort_order, cat_id))
     if new_name != old_name:
-        conn.execute("UPDATE demands SET category=? WHERE category=?", (new_name, old_name))
+        conn.execute("UPDATE demands SET category=%s WHERE category=%s", (new_name, old_name))
+    registrar(conn, request, user, "Editou categoria", "category", cat_id, new_name)
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -1835,13 +2661,14 @@ async def admin_update_category(request: Request, cat_id: int):
 def admin_delete_category(request: Request, cat_id: int):
     user = require_user(request); require_admin(user)
     conn = db()
-    row = conn.execute("SELECT * FROM categories WHERE id=?", (cat_id,)).fetchone()
+    row = conn.execute("SELECT * FROM categories WHERE id=%s", (cat_id,)).fetchone()
     if not row:
         conn.close(); raise HTTPException(404)
-    in_use = conn.execute("SELECT COUNT(*) c FROM demands WHERE category=?", (row["name"],)).fetchone()["c"]
+    in_use = conn.execute("SELECT COUNT(*) c FROM demands WHERE category=%s", (row["name"],)).fetchone()["c"]
     if in_use:
         conn.close(); raise HTTPException(409, f"Categoria usada em {in_use} demanda(s). Desative em vez de excluir.")
-    conn.execute("DELETE FROM categories WHERE id=?", (cat_id,))
+    conn.execute("DELETE FROM categories WHERE id=%s", (cat_id,))
+    registrar(conn, request, user, "Excluiu categoria", "category", cat_id, row["name"])
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -1858,11 +2685,12 @@ async def admin_update_priority(request: Request, code: str):
     user = require_user(request); require_admin(user)
     payload = await request.json()
     conn = db()
-    row = conn.execute("SELECT * FROM priority_levels WHERE code=?", (code,)).fetchone()
+    row = conn.execute("SELECT * FROM priority_levels WHERE code=%s", (code,)).fetchone()
     if not row:
         conn.close(); raise HTTPException(404)
-    conn.execute("UPDATE priority_levels SET label=?, hint=?, color=? WHERE code=?",
+    conn.execute("UPDATE priority_levels SET label=%s, hint=%s, color=%s WHERE code=%s",
                  (payload.get("label") or row["label"], payload.get("hint", row["hint"]), payload.get("color") or row["color"], code))
+    registrar(conn, request, user, "Editou prioridade", "priority", code, payload.get("label") or row["label"])
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -1874,11 +2702,11 @@ def admin_list_stages(request: Request):
     return rows
 
 
-def _validate_stage_statuses(conn: sqlite3.Connection, stage_id: Optional[int], statuses: list) -> None:
+def _validate_stage_statuses(conn: PGConnection, stage_id: Optional[int], statuses: list) -> None:
     for s in statuses:
         if s not in STATUSES:
             raise HTTPException(400, f'Status "{s}" não existe no fluxo do sistema.')
-    others = conn.execute("SELECT id, statuses FROM kanban_stages" + (" WHERE id!=?" if stage_id else ""), ((stage_id,) if stage_id else ())).fetchall()
+    others = conn.execute("SELECT id, statuses FROM kanban_stages" + (" WHERE id!=%s" if stage_id else ""), ((stage_id,) if stage_id else ())).fetchall()
     used = set()
     for r in others:
         used |= set(json.loads(r["statuses"]))
@@ -1903,12 +2731,13 @@ async def admin_create_stage(request: Request):
     if target not in statuses:
         raise HTTPException(400, "O status padrão precisa estar entre os status da coluna")
     conn = db()
-    if conn.execute("SELECT id FROM kanban_stages WHERE stage_key=?", (key,)).fetchone():
+    if conn.execute("SELECT id FROM kanban_stages WHERE stage_key=%s", (key,)).fetchone():
         conn.close(); raise HTTPException(409, "Já existe uma coluna com essa chave")
     _validate_stage_statuses(conn, None, statuses)
     max_order = conn.execute("SELECT COALESCE(MAX(sort_order),0) m FROM kanban_stages").fetchone()["m"]
-    cur = conn.execute("INSERT INTO kanban_stages(stage_key,label,hint,accent,statuses,target_status,sort_order) VALUES(?,?,?,?,?,?,?)",
+    cur = conn.execute("INSERT INTO kanban_stages(stage_key,label,hint,accent,statuses,target_status,sort_order) VALUES(%s,%s,%s,%s,%s,%s,%s) RETURNING id",
                         (key, label, payload.get("hint") or "", payload.get("accent") or "blue", json.dumps(statuses, ensure_ascii=False), target, max_order + 1))
+    registrar(conn, request, user, "Criou coluna do Kanban", "kanban", cur.lastrowid, label)
     conn.commit(); conn.close()
     return {"ok": True, "id": cur.lastrowid}
 
@@ -1918,7 +2747,7 @@ async def admin_update_stage(request: Request, stage_id: int):
     user = require_user(request); require_admin(user)
     payload = await request.json()
     conn = db()
-    row = conn.execute("SELECT * FROM kanban_stages WHERE id=?", (stage_id,)).fetchone()
+    row = conn.execute("SELECT * FROM kanban_stages WHERE id=%s", (stage_id,)).fetchone()
     if not row:
         conn.close(); raise HTTPException(404)
     statuses = payload.get("statuses", json.loads(row["statuses"]))
@@ -1928,9 +2757,10 @@ async def admin_update_stage(request: Request, stage_id: int):
     if target not in statuses:
         conn.close(); raise HTTPException(400, "O status padrão precisa estar entre os status da coluna")
     _validate_stage_statuses(conn, stage_id, statuses)
-    conn.execute("UPDATE kanban_stages SET label=?, hint=?, accent=?, statuses=?, target_status=?, sort_order=? WHERE id=?",
+    conn.execute("UPDATE kanban_stages SET label=%s, hint=%s, accent=%s, statuses=%s, target_status=%s, sort_order=%s WHERE id=%s",
                  (payload.get("label") or row["label"], payload.get("hint", row["hint"]), payload.get("accent") or row["accent"],
                   json.dumps(statuses, ensure_ascii=False), target, payload.get("sort_order", row["sort_order"]), stage_id))
+    registrar(conn, request, user, "Editou coluna do Kanban", "kanban", stage_id, payload.get("label") or row["label"])
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -1939,12 +2769,13 @@ async def admin_update_stage(request: Request, stage_id: int):
 def admin_delete_stage(request: Request, stage_id: int):
     user = require_user(request); require_admin(user)
     conn = db()
-    row = conn.execute("SELECT * FROM kanban_stages WHERE id=?", (stage_id,)).fetchone()
+    row = conn.execute("SELECT * FROM kanban_stages WHERE id=%s", (stage_id,)).fetchone()
     if not row:
         conn.close(); raise HTTPException(404)
     if json.loads(row["statuses"]):
         conn.close(); raise HTTPException(409, "Mova os status desta coluna para outra antes de excluí-la")
-    conn.execute("DELETE FROM kanban_stages WHERE id=?", (stage_id,))
+    conn.execute("DELETE FROM kanban_stages WHERE id=%s", (stage_id,))
+    registrar(conn, request, user, "Excluiu coluna do Kanban", "kanban", stage_id, row["label"])
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -1978,18 +2809,38 @@ async def admin_create_school(request: Request):
     full_addr = payload.get("full_address") or payload.get("address") or (" · ".join(parts) if parts else f"{city} - {state}")
 
     inep = payload.get("inep") or payload.get("code") or ""
+
+    # Tenta extrair coordenadas: formato decimal, DMS, maps_link, ou usa padrão
+    lat, lon = None, None
     try:
-        lat = float(payload.get("lat") or payload.get("latitude") or -22.868685)
-        lon = float(payload.get("lon") or payload.get("longitude") or -43.788898)
+        lat = float(payload.get("lat") or payload.get("latitude"))
+        lon = float(payload.get("lon") or payload.get("longitude"))
     except (ValueError, TypeError):
-        lat, lon = -22.868685, -43.788898
+        pass
+
+    if lat is None or lon is None:
+        # Tenta converter de formato DMS (ex: '22°52'28.5"S 43°46'32.4"W')
+        dms = payload.get("dms_coords") or payload.get("coordinates") or ""
+        if dms:
+            dms_result = convert_dms_to_decimal(dms)
+            if dms_result:
+                lat, lon = dms_result
+
+    if lat is None or lon is None:
+        # Tenta extrair do maps_link
+        maps_link = payload.get("maps_link") or ""
+        coords = extract_coords_from_maps_link(maps_link)
+        if coords:
+            lat, lon = coords["lat"], coords["lon"]
+        else:
+            lat, lon = -22.868685, -43.788898
 
     cur = conn.execute("""
         INSERT INTO schools(
             name, inep, code, director, email, phone, ramal, 
             street, number, complement, neighborhood, city, state, cep, 
             address, full_address, lat, lon, maps_link, modality, school_type, active
-        ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        ) VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 1) RETURNING id
     """, (
         name, inep, inep, payload.get("director") or "", payload.get("email") or "",
         payload.get("phone") or "", payload.get("ramal") or "",
@@ -1998,6 +2849,7 @@ async def admin_create_school(request: Request):
         payload.get("maps_link") or "", payload.get("modality") or "",
         payload.get("school_type") or "Escola"
     ))
+    registrar(conn, request, user, "Cadastrou unidade escolar", "school", cur.lastrowid, name)
     conn.commit(); conn.close()
     return {"ok": True, "id": cur.lastrowid}
 
@@ -2007,7 +2859,7 @@ async def admin_update_school(request: Request, school_id: int):
     user = require_user(request); require_admin(user)
     payload = await request.json()
     conn = db()
-    row = conn.execute("SELECT * FROM schools WHERE id=?", (school_id,)).fetchone()
+    row = conn.execute("SELECT * FROM schools WHERE id=%s", (school_id,)).fetchone()
     if not row:
         conn.close(); raise HTTPException(404)
         
@@ -2031,18 +2883,44 @@ async def admin_update_school(request: Request, school_id: int):
     full_addr = payload.get("full_address") or payload.get("address") or (" · ".join(parts) if parts else f"{city} - {state}")
 
     inep = payload.get("inep") or payload.get("code") or row["code"] or row["inep"] or ""
+
+    # Tenta extrair coordenadas: formato decimal, DMS, maps_link, ou usa valor anterior
+    lat, lon = None, None
     try:
-        lat = float(payload.get("lat") or payload.get("latitude") or row["lat"] or -22.868685)
-        lon = float(payload.get("lon") or payload.get("longitude") or row["lon"] or -43.788898)
+        if "lat" in payload or "latitude" in payload:
+            lat = float(payload.get("lat") or payload.get("latitude"))
+        if "lon" in payload or "longitude" in payload:
+            lon = float(payload.get("lon") or payload.get("longitude"))
     except (ValueError, TypeError):
-        lat, lon = row["lat"] or -22.868685, row["lon"] or -43.788898
+        pass
+
+    if lat is None or lon is None:
+        # Tenta converter de formato DMS
+        dms = payload.get("dms_coords") or payload.get("coordinates") or ""
+        if dms:
+            dms_result = convert_dms_to_decimal(dms)
+            if dms_result:
+                lat, lon = dms_result
+
+    if lat is None or lon is None:
+        # Se novo maps_link foi fornecido, tenta extrair dele
+        maps_link = payload.get("maps_link")
+        if maps_link:
+            coords = extract_coords_from_maps_link(maps_link)
+            if coords:
+                lat, lon = coords["lat"], coords["lon"]
+        # Se ainda não tem, usa valores anteriores
+        if lat is None:
+            lat = row["lat"] or -22.868685
+        if lon is None:
+            lon = row["lon"] or -43.788898
 
     conn.execute("""
         UPDATE schools SET 
-            name=?, inep=?, code=?, director=?, email=?, phone=?, ramal=?,
-            street=?, number=?, complement=?, neighborhood=?, city=?, state=?, cep=?,
-            address=?, full_address=?, lat=?, lon=?, maps_link=?, modality=?, school_type=?
-        WHERE id=?
+            name=%s, inep=%s, code=%s, director=%s, email=%s, phone=%s, ramal=%s,
+            street=%s, number=%s, complement=%s, neighborhood=%s, city=%s, state=%s, cep=%s,
+            address=%s, full_address=%s, lat=%s, lon=%s, maps_link=%s, modality=%s, school_type=%s
+        WHERE id=%s
     """, (
         payload.get("name", row["name"]), inep, inep,
         payload.get("director", row["director"]), payload.get("email", row["email"]),
@@ -2054,6 +2932,7 @@ async def admin_update_school(request: Request, school_id: int):
         payload.get("school_type", row["school_type"] or "Escola"),
         school_id
     ))
+    registrar(conn, request, user, "Editou unidade escolar", "school", school_id, payload.get("name") or row["name"])
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -2062,11 +2941,12 @@ async def admin_update_school(request: Request, school_id: int):
 def admin_toggle_school(request: Request, school_id: int):
     user = require_user(request); require_admin(user)
     conn = db()
-    row = conn.execute("SELECT * FROM schools WHERE id=?", (school_id,)).fetchone()
+    row = conn.execute("SELECT * FROM schools WHERE id=%s", (school_id,)).fetchone()
     if not row:
         conn.close(); raise HTTPException(404)
     new_active = 0 if row["active"] else 1
-    conn.execute("UPDATE schools SET active=? WHERE id=?", (new_active, school_id))
+    conn.execute("UPDATE schools SET active=%s WHERE id=%s", (new_active, school_id))
+    registrar(conn, request, user, "Ativou unidade escolar" if new_active else "Desativou unidade escolar", "school", school_id, row["name"])
     conn.commit(); conn.close()
     return {"ok": True, "active": bool(new_active)}
 
@@ -2075,11 +2955,12 @@ def admin_toggle_school(request: Request, school_id: int):
 def admin_delete_school(request: Request, school_id: int):
     user = require_user(request); require_admin(user)
     conn = db()
-    demands_c = conn.execute("SELECT COUNT(*) c FROM demands WHERE school_id=?", (school_id,)).fetchone()["c"]
-    users_c = conn.execute("SELECT COUNT(*) c FROM users WHERE school_id=?", (school_id,)).fetchone()["c"]
+    demands_c = conn.execute("SELECT COUNT(*) c FROM demands WHERE school_id=%s", (school_id,)).fetchone()["c"]
+    users_c = conn.execute("SELECT COUNT(*) c FROM users WHERE school_id=%s", (school_id,)).fetchone()["c"]
     if demands_c or users_c:
         conn.close(); raise HTTPException(409, "Unidade com demandas ou usuários vinculados. Desative em vez de excluir.")
-    conn.execute("DELETE FROM schools WHERE id=?", (school_id,))
+    conn.execute("DELETE FROM schools WHERE id=%s", (school_id,))
+    registrar(conn, request, user, "Excluiu unidade escolar", "school", school_id, row["name"])
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -2102,13 +2983,14 @@ async def admin_create_profile(request: Request):
     slug = (payload.get("slug") or label).strip().lower()
     slug = "".join(c if (c.isalnum() or c == "_") else "_" for c in slug).strip("_") or f"perfil_{secrets.token_hex(3)}"
     conn = db()
-    if conn.execute("SELECT id FROM access_profiles WHERE slug=?", (slug,)).fetchone():
+    if conn.execute("SELECT id FROM access_profiles WHERE slug=%s", (slug,)).fetchone():
         conn.close(); raise HTTPException(409, "Já existe um perfil com essa identificação")
     cur = conn.execute(
         """INSERT INTO access_profiles(slug,label,description,school_scoped,can_edit_analysis,can_manage_admin,can_view_reports,can_view_planning,is_system,created_at)
-           VALUES(?,?,?,?,?,?,?,?,0,?)""",
+           VALUES(%s,%s,%s,%s,%s,%s,%s,%s,0,%s) RETURNING id""",
         (slug, label, payload.get("description") or "", int(bool(payload.get("school_scoped"))), int(bool(payload.get("can_edit_analysis"))),
          int(bool(payload.get("can_manage_admin"))), int(bool(payload.get("can_view_reports"))), int(bool(payload.get("can_view_planning"))), now_iso()))
+    registrar(conn, request, user, "Criou perfil de acesso", "profile", cur.lastrowid, label)
     conn.commit(); conn.close()
     return {"ok": True, "id": cur.lastrowid, "slug": slug}
 
@@ -2118,16 +3000,17 @@ async def admin_update_profile(request: Request, profile_id: int):
     user = require_user(request); require_admin(user)
     payload = await request.json()
     conn = db()
-    row = conn.execute("SELECT * FROM access_profiles WHERE id=?", (profile_id,)).fetchone()
+    row = conn.execute("SELECT * FROM access_profiles WHERE id=%s", (profile_id,)).fetchone()
     if not row:
         conn.close(); raise HTTPException(404)
     conn.execute(
-        """UPDATE access_profiles SET label=?, description=?, school_scoped=?, can_edit_analysis=?, can_manage_admin=?,
-           can_view_reports=?, can_view_planning=?, active=? WHERE id=?""",
+        """UPDATE access_profiles SET label=%s, description=%s, school_scoped=%s, can_edit_analysis=%s, can_manage_admin=%s,
+           can_view_reports=%s, can_view_planning=%s, active=%s WHERE id=%s""",
         (payload.get("label") or row["label"], payload.get("description", row["description"]),
          int(bool(payload.get("school_scoped", row["school_scoped"]))), int(bool(payload.get("can_edit_analysis", row["can_edit_analysis"]))),
          int(bool(payload.get("can_manage_admin", row["can_manage_admin"]))), int(bool(payload.get("can_view_reports", row["can_view_reports"]))),
          int(bool(payload.get("can_view_planning", row["can_view_planning"]))), int(bool(payload.get("active", row["active"]))), profile_id))
+    registrar(conn, request, user, "Editou perfil de acesso", "profile", profile_id, payload.get("label") or row["label"])
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -2136,15 +3019,16 @@ async def admin_update_profile(request: Request, profile_id: int):
 def admin_delete_profile(request: Request, profile_id: int):
     user = require_user(request); require_admin(user)
     conn = db()
-    row = conn.execute("SELECT * FROM access_profiles WHERE id=?", (profile_id,)).fetchone()
+    row = conn.execute("SELECT * FROM access_profiles WHERE id=%s", (profile_id,)).fetchone()
     if not row:
         conn.close(); raise HTTPException(404)
     if row["is_system"]:
         conn.close(); raise HTTPException(409, "Perfis padrão do sistema não podem ser excluídos — apenas desativados ou editados.")
-    in_use = conn.execute("SELECT COUNT(*) c FROM users WHERE role=?", (row["slug"],)).fetchone()["c"]
+    in_use = conn.execute("SELECT COUNT(*) c FROM users WHERE role=%s", (row["slug"],)).fetchone()["c"]
     if in_use:
         conn.close(); raise HTTPException(409, f"Perfil em uso por {in_use} usuário(s). Reatribua-os antes de excluir.")
-    conn.execute("DELETE FROM access_profiles WHERE id=?", (profile_id,))
+    conn.execute("DELETE FROM access_profiles WHERE id=%s", (profile_id,))
+    registrar(conn, request, user, "Excluiu perfil de acesso", "profile", profile_id, row["label"])
     conn.commit(); conn.close()
     return {"ok": True}
 
@@ -2173,13 +3057,14 @@ async def admin_create_user(request: Request):
     profile = get_profile_by_slug(conn, role)
     if not profile:
         conn.close(); raise HTTPException(400, "Perfil de acesso inválido")
-    if conn.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone():
+    if conn.execute("SELECT id FROM users WHERE email=%s", (email,)).fetchone():
         conn.close(); raise HTTPException(409, "Já existe um usuário com esse e-mail")
     school_id = payload.get("school_id")
     if profile["school_scoped"] and not school_id:
         conn.close(); raise HTTPException(400, "Este perfil exige a seleção de uma unidade escolar")
-    cur = conn.execute("INSERT INTO users(name,email,password_hash,role,school_id,active) VALUES(?,?,?,?,?,1)",
+    cur = conn.execute("INSERT INTO users(name,email,password_hash,role,school_id,active) VALUES(%s,%s,%s,%s,%s,1) RETURNING id",
                         (name, email, hash_password(password), role, school_id or None))
+    registrar(conn, request, user, "Criou usuário", "user", cur.lastrowid, f"{name} <{email}>")
     conn.commit(); conn.close()
     return {"ok": True, "id": cur.lastrowid}
 
@@ -2189,7 +3074,7 @@ async def admin_update_user(request: Request, user_id: int):
     user = require_user(request); require_admin(user)
     payload = await request.json()
     conn = db()
-    row = conn.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    row = conn.execute("SELECT * FROM users WHERE id=%s", (user_id,)).fetchone()
     if not row:
         conn.close(); raise HTTPException(404)
     role = payload.get("role", row["role"])
@@ -2203,18 +3088,177 @@ async def admin_update_user(request: Request, user_id: int):
         conn.close(); raise HTTPException(400, "Você não pode desativar o seu próprio usuário")
     if user_id == user["id"] and not profile["can_manage_admin"]:
         conn.close(); raise HTTPException(400, "Você não pode remover sua própria permissão de administração")
-    conn.execute("UPDATE users SET name=?, email=?, role=?, school_id=?, active=? WHERE id=?",
+    conn.execute("UPDATE users SET name=%s, email=%s, role=%s, school_id=%s, active=%s WHERE id=%s",
                  (payload.get("name") or row["name"], payload.get("email") or row["email"], role, school_id or None,
                   int(bool(payload.get("active", row["active"]))), user_id))
     if payload.get("password"):
-        conn.execute("UPDATE users SET password_hash=? WHERE id=?", (hash_password(payload["password"]), user_id))
+        conn.execute("UPDATE users SET password_hash=%s WHERE id=%s", (hash_password(payload["password"]), user_id))
+    registrar(conn, request, user, "Editou usuário", "user", user_id, payload.get("email") or row["email"])
     conn.commit(); conn.close()
     return {"ok": True}
 
 
+# --- Identidade visual: logo do sistema --------------------------------------
+# A logo do cabecalho era um endereco fixo no template, apontando para o portal
+# da Prefeitura. Agora ela e uma configuracao: o arquivo vai para o Storage do
+# Supabase (bucket publico) e o endereco fica em app_settings, de onde o
+# template le. Sem nada configurado, volta a valer o endereco do portal.
+LOGO_PADRAO = "https://novoportal.itaguai.rj.gov.br/@@obter_logo_portal/logo25.png"
+LOGO_BUCKET = os.environ.get("SUPABASE_LOGO_BUCKET", "site-assets")
+LOGO_PASTA = "logo"
+LOGO_MIMES = {
+    "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp",
+    "image/gif": ".gif", "image/svg+xml": ".svg", "image/x-icon": ".ico",
+    "image/vnd.microsoft.icon": ".ico", "image/avif": ".avif",
+}
+LOGO_MAX_BYTES = 3 * 1024 * 1024
+
+
+def get_setting(conn: PGConnection, chave: str, padrao=None):
+    row = conn.execute("SELECT value FROM app_settings WHERE key=%s", (chave,)).fetchone()
+    return row["value"] if row and row["value"] is not None else padrao
+
+
+def set_setting(conn: PGConnection, chave: str, valor) -> None:
+    conn.execute(
+        """INSERT INTO app_settings(key, value, updated_at) VALUES(%s,%s,%s)
+           ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=EXCLUDED.updated_at""",
+        (chave, valor, now_iso()),
+    )
+
+
+def _storage_cfg():
+    """Endereco e chave do Supabase. Ausentes, o recurso fica indisponivel com um
+    aviso claro em vez de estourar um erro generico no meio do upload."""
+    base = (os.environ.get("SUPABASE_URL") or "").rstrip("/")
+    chave = os.environ.get("SUPABASE_SECRET_KEY") or ""
+    if not base or not chave:
+        raise HTTPException(503, "Armazenamento não configurado: defina SUPABASE_URL e SUPABASE_SECRET_KEY no .env e reinicie o sistema.")
+    return base, {"Authorization": f"Bearer {chave}", "apikey": chave}
+
+
+def storage_upload(caminho: str, conteudo: bytes, mime: str) -> str:
+    """Envia o arquivo ao bucket e devolve o endereco publico."""
+    base, headers = _storage_cfg()
+    r = httpx.post(f"{base}/storage/v1/object/{LOGO_BUCKET}/{caminho}",
+                   headers={**headers, "content-type": mime, "x-upsert": "true"},
+                   content=conteudo, timeout=60)
+    if r.status_code >= 300:
+        raise HTTPException(502, f"O Supabase recusou o envio ({r.status_code}). Verifique se o bucket '{LOGO_BUCKET}' existe e é público.")
+    return f"{base}/storage/v1/object/public/{LOGO_BUCKET}/{caminho}"
+
+
+def storage_delete(caminho: str) -> None:
+    """Remove um objeto do bucket. Falha aqui nao interrompe a troca da logo —
+    sobra um arquivo orfao, o que e bem menos grave do que travar a operacao."""
+    try:
+        base, headers = _storage_cfg()
+        httpx.request("DELETE", f"{base}/storage/v1/object/{LOGO_BUCKET}/{caminho}", headers=headers, timeout=30)
+    except Exception:
+        pass
+
+
+def logo_atual(conn: PGConnection) -> dict:
+    url = get_setting(conn, "logo_url")
+    row = conn.execute("SELECT updated_at FROM app_settings WHERE key='logo_url'").fetchone()
+    return {
+        "url": url or LOGO_PADRAO,
+        "is_default": not url,
+        "updated_at": row["updated_at"] if row else None,
+        "bucket": LOGO_BUCKET,
+        "max_mb": round(LOGO_MAX_BYTES / (1024 * 1024), 1),
+        "formatos": sorted({e.lstrip(".") for e in LOGO_MIMES.values()}),
+    }
+
+
+@app.get("/api/admin/logo")
+def admin_get_logo(request: Request):
+    user = require_user(request); require_admin(user)
+    conn = db(); dados = logo_atual(conn); conn.close()
+    return dados
+
+
+@app.post("/api/admin/logo")
+async def admin_upload_logo(request: Request, file: UploadFile = File(...)):
+    user = require_user(request); require_admin(user)
+    mime = (file.content_type or "").lower().split(";")[0].strip()
+    if mime not in LOGO_MIMES:
+        raise HTTPException(415, "Formato não aceito. Envie PNG, JPG, WEBP, GIF, SVG, ICO ou AVIF.")
+    conteudo = await file.read()
+    if not conteudo:
+        raise HTTPException(400, "O arquivo enviado está vazio.")
+    if len(conteudo) > LOGO_MAX_BYTES:
+        raise HTTPException(413, f"Arquivo acima de {LOGO_MAX_BYTES // (1024 * 1024)} MB.")
+
+    # Nome novo a cada envio: o endereco publico e cacheado com folga pelo CDN,
+    # entao reaproveitar o mesmo nome deixaria a logo antiga aparecendo.
+    caminho = f"{LOGO_PASTA}/logo-{datetime.now().strftime('%Y%m%d%H%M%S')}-{secrets.token_hex(4)}{LOGO_MIMES[mime]}"
+    url = storage_upload(caminho, conteudo, mime)
+
+    conn = db()
+    anterior = get_setting(conn, "logo_path")
+    set_setting(conn, "logo_url", url)
+    set_setting(conn, "logo_path", caminho)
+    registrar(conn, request, user, "Alterou a logo do sistema", "setting", "logo_url",
+              f"{file.filename or 'arquivo'} ({len(conteudo) // 1024} KB)")
+    conn.commit(); conn.close()
+
+    # So apaga o arquivo anterior depois que o novo ja esta gravado.
+    if anterior and anterior != caminho:
+        storage_delete(anterior)
+    return {"ok": True, "url": url}
+
+
+@app.delete("/api/admin/logo")
+def admin_reset_logo(request: Request):
+    user = require_user(request); require_admin(user)
+    conn = db()
+    anterior = get_setting(conn, "logo_path")
+    conn.execute("DELETE FROM app_settings WHERE key IN ('logo_url','logo_path')")
+    registrar(conn, request, user, "Restaurou a logo padrão do sistema", "setting", "logo_url")
+    conn.commit(); conn.close()
+    if anterior:
+        storage_delete(anterior)
+    return {"ok": True, "url": LOGO_PADRAO}
+
+
+@app.get("/api/admin/logs")
+async def admin_get_logs(request: Request, limit: int = 100, offset: int = 0, action: str = "", entity_type: str = ""):
+    user = require_user(request); require_admin(user)
+    conn = db()
+
+    where = []
+    params = []
+
+    if action:
+        where.append("action ILIKE %s")
+        params.append(f"%{action}%")
+
+    if entity_type:
+        where.append("entity_type ILIKE %s")
+        params.append(f"%{entity_type}%")
+
+    where_clause = " WHERE " + " AND ".join(where) if where else ""
+
+    # Total
+    total_row = conn.execute(f"SELECT COUNT(*) c FROM system_logs{where_clause}", params).fetchone()
+    total = total_row["c"] if total_row else 0
+
+    # Logs
+    params_with_limit = params + [limit, offset]
+    logs = conn.execute(f"""
+        SELECT id, user_id, user_name, action, entity_type, entity_id, details,
+               created_at, ip_address FROM system_logs{where_clause}
+        ORDER BY created_at DESC LIMIT %s OFFSET %s
+    """, params_with_limit).fetchall()
+
+    conn.close()
+    return {"logs": [dict(l) for l in logs], "total": total, "limit": limit, "offset": offset}
+
+
 @app.get("/health")
 def health():
-    return {"status":"ok", "database": str(DB_PATH.name), "time": now_iso()}
+    return {"status":"ok", "database": "supabase-postgres", "time": now_iso()}
 
 
 if __name__ == "__main__":
