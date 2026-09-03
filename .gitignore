@@ -3,6 +3,7 @@ __pycache__/
 agenda_integrada.db
 uploads/*
 !uploads/.gitkeep
+index.html.bak
 .env
 .DS_Store
 venv/

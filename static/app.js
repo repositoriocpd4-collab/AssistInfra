@@ -1605,6 +1605,7 @@
         text: `Serviço encerrado em ${fmtDateTime(d.updated_at)}. Arquivada em ${fmtDateTime(d.archived_at)}.`,
         notice: 'Esta demanda está arquivada: ela não aparece na Carteira de demandas, mas continua disponível para consulta e pode ser restaurada a qualquer momento.',
         actions: [
+          { label: 'Gerar PDF', act: 'pdf', kind: 'secondary', ic: 'download', needsEdit: false },
           { label: 'Restaurar do arquivo', act: 'unarchive', kind: 'primary', ic: 'refresh', needsEdit: true },
           { label: 'Ver histórico completo', act: 'history', kind: 'secondary', ic: 'clock', needsEdit: false }
         ]
@@ -1614,6 +1615,7 @@
         text: `Serviço encerrado em ${fmtDateTime(d.updated_at)}.`,
         notice: 'Com a demanda concluída, o andamento possível é destiná-la a um exercício futuro, em Planejamento, arquivá-la ou consultar o histórico completo.',
         actions: [
+          { label: 'Gerar PDF', act: 'pdf', kind: 'secondary', ic: 'download', needsEdit: false },
           { label: 'Arquivar demanda', act: 'archive', kind: 'primary', ic: 'archive', needsEdit: true },
           { label: 'Destinar a um exercício futuro', act: 'planning', kind: 'secondary', ic: 'calendar', needsEdit: true },
           { label: 'Ver histórico completo', act: 'history', kind: 'secondary', ic: 'clock', needsEdit: false }
@@ -2447,6 +2449,9 @@
           api(`/api/demands/${d.id}/unarchive`, { method: 'POST' })
             .then(() => { toast('Demanda restaurada', 'Ela voltou a aparecer na Carteira de demandas.'); reload(); })
             .catch(err => toast('Não foi possível restaurar a demanda', err.message, 'error'));
+        }
+        else if (what === 'pdf') {
+          window.open(`/api/demands/${d.id}/pdf`, '_blank');
         }
       }));
     };
@@ -4756,7 +4761,47 @@
     toast(large ? 'Texto ampliado' : 'Tamanho padrão', large ? 'A interface foi ampliada para facilitar a leitura.' : 'A interface voltou ao tamanho padrão.', 'success');
   });
   $('#userMenuButton')?.addEventListener('click', () => { const m = $('#userMenu'); m.hidden = !m.hidden; $('#notificationPanel').hidden = true });
-  $('#notificationButton')?.addEventListener('click', async () => { const p = $('#notificationPanel'); p.hidden = !p.hidden; $('#userMenu').hidden = true; if (!p.hidden) { const d = await api('/api/dashboard'); const n = []; if (d.stats.urgent) n.push([`${d.stats.urgent} demanda(s) urgente(s)`, `Prioridade P1 requer acompanhamento imediato.`]); if (d.stats.overdue) n.push([`${d.stats.overdue} prazo(s) vencido(s)`, `Revise prazos e registre reprogramações quando necessário.`]); if (d.stats.contract) n.push([`${d.stats.contract} aguardando contratação`, `Itens dependem de encaminhamento administrativo.`]); if (!n.length) n.push(['Nenhuma pendência crítica', 'Os principais indicadores estão sob controle.']); p.innerHTML = `<div class="notification-head"><strong>Notificações</strong><small class="text-muted">Agora</small></div>${n.map(x => `<div class="notification-item"><span class="n-dot"></span><div><strong>${esc(x[0])}</strong><small>${esc(x[1])}</small></div></div>`).join('')}`; $('#notificationDot').hidden = true; } });
+  // Cada notificação representa um grupo de demandas, não uma só — clicar
+  // abre a lista real para o usuário escolher qual demanda quer abrir. Com
+  // exatamente uma demanda no grupo, não há o que escolher: o item já é o link.
+  $('#notificationButton')?.addEventListener('click', async () => {
+    const p = $('#notificationPanel');
+    p.hidden = !p.hidden;
+    $('#userMenu').hidden = true;
+    if (p.hidden) return;
+    const today = new Date().toISOString().slice(0, 10);
+    let demands = [];
+    try { demands = await api('/api/demands'); } catch { }
+    const groups = [
+      { title: 'demanda(s) urgente(s)', hint: 'Prioridade P1 requer acompanhamento imediato.', color: 'red', filter: 'priority=P1',
+        items: demands.filter(d => d.priority === 'P1' && d.status !== 'Concluída') },
+      { title: 'prazo(s) vencido(s)', hint: 'Revise prazos e registre reprogramações quando necessário.', color: 'red', filter: 'overdue=1',
+        items: demands.filter(d => d.due_date && !['Concluída', 'Cancelada'].includes(d.status) && d.due_date < today) },
+      { title: 'aguardando contratação', hint: 'Itens dependem de encaminhamento administrativo.', color: 'violet', filter: 'status=Aguardando contratação',
+        items: demands.filter(d => ['Aguardando contratação', 'Aguardando empresa'].includes(d.status)) },
+    ].filter(g => g.items.length);
+    $('#notificationDot').hidden = true;
+    if (!groups.length) {
+      p.innerHTML = `<div class="notification-head"><strong>Notificações</strong><small class="text-muted">Agora</small></div><div class="notification-item"><span class="n-dot" style="background:var(--green)"></span><div><strong>Nenhuma pendência crítica</strong><small>Os principais indicadores estão sob controle.</small></div></div>`;
+      return;
+    }
+    const demandRow = d => `<a class="search-result" href="/demandas/${d.id}"><span class="priority-dot ${d.priority}"></span><div><strong>${esc(d.title)}</strong><small>${esc(d.code)} · ${esc(d.school_name || '—')}</small></div></a>`;
+    p.innerHTML = `<div class="notification-head"><strong>Notificações</strong><small class="text-muted">Agora</small></div>` + groups.map((g, i) => {
+      const label = `<span class="n-dot" style="background:var(--${g.color})"></span><div><strong>${g.items.length} ${esc(g.title)}</strong><small>${esc(g.hint)}</small></div>`;
+      if (g.items.length === 1) {
+        return `<a class="notification-item" href="/demandas/${g.items[0].id}">${label}</a>`;
+      }
+      return `<button type="button" class="notification-item notification-group" data-n-toggle="${i}">${label}${icon('chevron')}</button>
+        <div class="notification-sublist hidden" id="nSublist${i}">${g.items.slice(0, 6).map(demandRow).join('')}${g.items.length > 6 ? `<a class="notification-more" href="/demandas?${g.filter}">Ver todas as ${g.items.length}${icon('chevron')}</a>` : ''}</div>`;
+    }).join('');
+    $$('[data-n-toggle]', p).forEach(btn => btn.addEventListener('click', () => {
+      const sub = $('#nSublist' + btn.dataset.nToggle);
+      const wasOpen = !sub.classList.contains('hidden');
+      $$('.notification-sublist', p).forEach(s => s.classList.add('hidden'));
+      $$('.notification-group', p).forEach(b => b.classList.remove('expanded'));
+      if (!wasOpen) { sub.classList.remove('hidden'); btn.classList.add('expanded'); }
+    }));
+  });
   const SHORTCUTS = [
     { key: 'N', label: 'Registrar Demanda/CI', action: () => openDemandForm() },
     { key: 'P', label: 'Ir para o Painel', href: '/' },
