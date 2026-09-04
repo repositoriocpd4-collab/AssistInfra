@@ -31,7 +31,7 @@ BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.2.1"
 VISUAL_VERSION = "GOV.BR V3"
 
 app = FastAPI(title="Agenda Integrada — Infraestrutura e Gestão Escolar", version=APP_VERSION)
