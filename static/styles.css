@@ -927,7 +927,7 @@ svg {
    padding: 16px;
    margin-bottom: 18px;
    display: grid;
-   grid-template-columns: minmax(240px, 2fr) repeat(4, minmax(140px, 1fr)) auto;
+   grid-template-columns: minmax(240px, 2fr) minmax(80px, 0.5fr) minmax(80px, 0.5fr) repeat(3, minmax(130px, 1fr)) auto;
    gap: 12px;
    align-items: end
 }
@@ -937,6 +937,16 @@ svg {
    flex-direction: column;
    gap: 6px
 }
+
+/* Ano e Mês: campos compactos — metade da largura dos selects padrão */
+#fYear,
+#fMonth {
+   min-width: 0;
+   font-size: 12px;
+   padding: 8px 8px 8px 9px;
+   min-height: 38px;
+}
+
 
 .field label,
 .form-label {
@@ -1882,11 +1892,26 @@ svg {
    padding: 12px 15px;
    border-bottom: 1px solid var(--line);
    display: flex;
-   gap: 10px
+   align-items: center;
+   gap: 10px;
+   width: 100%;
+   border-left: 0;
+   border-right: 0;
+   border-top: 0;
+   background: none;
+   text-align: left;
+   font: inherit;
+   color: inherit;
+   text-decoration: none;
+   cursor: pointer
 }
 
-.notification-item:last-child {
+.notification-item:last-of-type {
    border-bottom: 0
+}
+
+.notification-item:hover {
+   background: var(--surface-soft)
 }
 
 .notification-item .n-dot {
@@ -1894,7 +1919,13 @@ svg {
    height: 8px;
    border-radius: 50%;
    background: var(--teal);
-   margin-top: 5px
+   margin-top: 0;
+   flex-shrink: 0
+}
+
+.notification-item>div {
+   flex: 1;
+   min-width: 0
 }
 
 .notification-item strong {
@@ -1907,6 +1938,57 @@ svg {
    color: var(--muted);
    font-size: 10px;
    margin-top: 3px
+}
+
+.notification-group svg {
+   width: 14px;
+   height: 14px;
+   color: var(--muted);
+   flex-shrink: 0;
+   transition: transform .15s ease
+}
+
+.notification-group.expanded svg {
+   transform: rotate(90deg)
+}
+
+.notification-sublist {
+   background: var(--surface-soft);
+   border-bottom: 1px solid var(--line)
+}
+
+.notification-sublist.hidden {
+   display: none
+}
+
+.notification-sublist .search-result {
+   padding: 10px 15px 10px 33px;
+   border-bottom: 1px solid var(--line)
+}
+
+.notification-sublist .search-result:last-child {
+   border-bottom: 0
+}
+
+.notification-more {
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   gap: 4px;
+   padding: 10px;
+   font-size: 11px;
+   font-weight: 700;
+   color: var(--primary);
+   text-decoration: none
+}
+
+.notification-more:hover {
+   background: var(--surface)
+}
+
+.notification-more svg {
+   width: 13px;
+   height: 13px
 }
 
 .user-menu {
@@ -2170,19 +2252,16 @@ svg {
 .login-brand {
    display: flex;
    align-items: center;
-   gap: 12px;
+   gap: 16px;
    position: relative;
    z-index: 1
 }
 
 .login-mark {
-   width: 45px;
-   height: 45px;
-   border-radius: 12px;
-   background: #16a4a0;
-   display: grid;
-   place-items: center;
-   font-weight: 900
+   width: 56px;
+   height: 56px;
+   object-fit: contain;
+   flex-shrink: 0
 }
 
 .login-brand strong,
@@ -3517,12 +3596,6 @@ body.text-large {
    padding: 46px 54px
 }
 
-.login-mark {
-   background: #fff;
-   color: var(--govbr-blue);
-   border-radius: 8px
-}
-
 .login-brand span,
 .hero-copy p,
 .login-foot {
@@ -3550,11 +3623,23 @@ body.text-large {
    border: 1px solid var(--govbr-border);
    border-radius: 12px;
    box-shadow: var(--govbr-shadow);
-   padding: 34px
+   padding: 40px
 }
 
 .login-card h2 {
+   font-size: 32px;
    color: var(--govbr-blue-dark)
+}
+
+.login-card input {
+   background: var(--govbr-light-blue);
+   border-color: transparent
+}
+
+.login-card input:focus {
+   background: #fff;
+   border-color: var(--govbr-blue);
+   box-shadow: 0 0 0 3px rgba(0, 90, 156, .12)
 }
 
 .demo-credentials button:hover {
@@ -6161,11 +6246,11 @@ body.dark-mode .route-map-controls input {
 }
 
 .data-table tbody tr.row-done {
-   background: var(--green-soft)
+   background: rgb(188, 231, 210)
 }
 
 .data-table tbody tr.row-done:hover {
-   background: var(--green-soft);
+   background: rgb(188, 231, 210);
    filter: brightness(.97)
 }
 
@@ -6490,13 +6575,18 @@ textarea:focus-visible,
 
    .data-table td[data-label]::before {
       content: attr(data-label);
-      font-size: 11px;
-      font-weight: 800;
+      font-size: 12px;
+      font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: .05em;
-      color: var(--muted);
+      letter-spacing: 0.05em;
+      color: var(--primary);
       text-align: left;
-      flex: 0 0 auto
+      flex: 0 0 auto;
+      padding: 4px 8px;
+      background: var(--surface-soft);
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
    }
 
    .data-table td.cell-title {
@@ -6509,10 +6599,34 @@ textarea:focus-visible,
       margin-bottom: 4px
    }
 
+   /* Ações: garante linha horizontal mesmo em modo cartão (mobile) */
+   .data-table td[data-label="Ações"] {
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+   }
+
+   .data-table td[data-label="Ações"] .table-actions-group {
+      display: inline-flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      flex-wrap: nowrap !important;
+      gap: 5px !important;
+   }
+
    body.dark-mode .data-table tbody tr {
       background: #1e1e1e;
       border-color: #333
    }
+}
+
+/* Regra global: .table-actions-group é SEMPRE horizontal — nunca empilha */
+.table-actions-group {
+   display: inline-flex;
+   flex-direction: row;
+   align-items: center;
+   flex-wrap: nowrap;
+   gap: 5px;
 }
 
 /* ============================================================
@@ -6862,10 +6976,6 @@ body.dark-mode .login-card {
 
 body.dark-mode .login-card h2 {
    color: #f2f4f7 !important
-}
-
-body.dark-mode .login-mark {
-   background: #1a1f27 !important
 }
 
 body.dark-mode .demo-credentials button {
@@ -7738,6 +7848,12 @@ body.dark-mode .stat-tile.stat-tile-alert .stat-tile-value {
    line-height: 1
 }
 
+/* Rótulo completo (desktop) x resumido (smartphone) — troca de verdade o
+   texto por CSS, sem reticências cortando a palavra no meio. */
+.chip-short {
+   display: none
+}
+
 .chip-v2.chip-red {
    border-color: #ffc8cf
 }
@@ -7914,11 +8030,45 @@ body.dark-mode .stat-tile.stat-tile-alert .stat-tile-value {
    }
 
    .quick-filters {
-      align-items: flex-start
+      align-items: center
    }
 
    .toggle-field {
       width: 100%
+   }
+
+   /* Nuvem de chips centralizada, mais compacta e com rótulo resumido — em
+      vez de uma fileira de pílulas largas quebrando torto pela tela. */
+   .chip-group {
+      width: 100%;
+      justify-content: center;
+      gap: 6px
+   }
+
+   .chip-v2 {
+      gap: 5px;
+      padding: 6px 10px 6px 8px;
+      font-size: 11px
+   }
+
+   .chip-v2 svg {
+      width: 13px;
+      height: 13px
+   }
+
+   .chip-v2 b {
+      min-width: 16px;
+      height: 16px;
+      padding: 0 4px;
+      font-size: 9.5px
+   }
+
+   .chip-full {
+      display: none
+   }
+
+   .chip-short {
+      display: inline
    }
 }
 
@@ -11810,6 +11960,30 @@ body.dark-mode .dv-now h2 {
    height: 13px
 }
 
+.dv-section-heading {
+   display: flex;
+   align-items: center;
+   gap: 12px;
+   margin-top: 26px;
+   margin-bottom: 2px
+}
+
+.dv-section-label {
+   font-size: 14.5px;
+   font-weight: 800;
+   color: var(--red);
+   text-transform: uppercase;
+   letter-spacing: .06em;
+   white-space: nowrap
+}
+
+.dv-section-line {
+   flex: 1;
+   height: 2px;
+   background: var(--red);
+   opacity: .4
+}
+
 .dv-panels {
    display: grid;
    grid-template-columns: repeat(auto-fit, minmax(262px, 1fr));
@@ -11849,6 +12023,10 @@ body.dark-mode .dv-now h2 {
 
 .dv-panel .dv-muted {
    color: var(--muted)
+}
+
+.dv-fact .dv-undefined {
+   color: var(--red)
 }
 
 .dv-kv {
@@ -13835,40 +14013,50 @@ body[data-page="demands"] #demandTable .data-table tbody tr:hover {
       0 14px 30px -16px rgba(13, 60, 117, .55)
 }
 
+body[data-page="demands"] #demandTable .data-table tbody tr.row-done,
+body[data-page="demands"] #demandTable .data-table tbody tr.row-done:hover {
+   background: rgb(188, 231, 210)
+}
+
+body.dark-mode[data-page="demands"] #demandTable .data-table tbody tr.row-done {
+   background: rgba(26, 124, 68, .28)
+}
+
 body[data-page="demands"] #demandTable .data-table td {
    border-bottom: 0;
-   padding: 16px 14px
+   padding: 10px 14px;
+   vertical-align: middle;
 }
 
 body[data-page="demands"] #demandTable .data-table td:first-child {
-   border-radius: 14px 0 0 14px
+   border-radius: 12px 0 0 12px;
 }
 
 body[data-page="demands"] #demandTable .data-table td:last-child {
-   border-radius: 0 14px 14px 0
+   border-radius: 0 12px 12px 0;
 }
 
 body[data-page="demands"] #demandTable .cell-title strong {
-   color: var(--primary-2)
+   color: var(--primary-2);
 }
 
 body.dark-mode[data-page="demands"] #demandTable .cell-title strong {
-   color: var(--ink)
+   color: var(--ink);
 }
 
-/* Botões de ação como quadrados arredondados */
+/* Botões de ação como cartões sutis e refinados */
 body[data-page="demands"] #demandTable .icon-btn {
-   width: 34px;
-   height: 34px;
-   border-radius: 10px;
+   width: 32px;
+   height: 32px;
+   border-radius: 8px;
    border: 1px solid rgba(13, 60, 117, .14);
-   background: rgba(255, 255, 255, .85);
-   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9)
+   background: rgba(255, 255, 255, .9);
+   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 body[data-page="demands"] #demandTable .icon-btn:hover {
    border-color: var(--govbr-blue);
-   background: #fff
+   background: #fff;
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -13888,13 +14076,199 @@ body[data-page="demands"] #demandTable .icon-btn:hover {
    }
 }
 
-/* Ações lado a lado: empilhadas, três ícones dobram a altura de cada linha */
+/* Ações perfeitamente alinhadas em linha horizontal, nunca empilhadas */
 body[data-page="demands"] #demandTable .data-table td[data-label="Ações"] {
-   white-space: nowrap
+   white-space: nowrap !important;
+   text-align: right;
+   width: 1%;
+   min-width: 165px;
+   vertical-align: middle;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Ações"] .table-actions-group {
+   display: inline-flex;
+   align-items: center;
+   justify-content: flex-end;
+   gap: 6px;
+   flex-wrap: nowrap;
 }
 
 body[data-page="demands"] #demandTable .data-table td[data-label="Ações"] .icon-btn+.icon-btn {
-   margin-left: 6px
+   margin-left: 0;
+}
+
+/* Calibração de espessuras, tipografia e acabamento fino de cada data-label */
+body[data-page="demands"] #demandTable .data-table td[data-label="ID"] {
+   font-weight: 650;
+   font-size: 13px;
+   color: #0b2f5c;
+   white-space: nowrap !important;
+   letter-spacing: -0.01em;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Demanda"] strong {
+   font-weight: 600;
+   font-size: 13.5px;
+   color: #0f172a;
+   letter-spacing: -0.01em;
+   display: block;
+   line-height: 1.3;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Demanda"] small {
+   font-size: 11px;
+   font-weight: 400;
+   color: #64748b;
+   margin-top: 2px;
+   display: block;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Categoria"],
+body[data-page="demands"] #demandTable .data-table td[data-label="Unidade Escolar"] {
+   font-weight: 500;
+   color: #334155;
+   font-size: 13px;
+   line-height: 1.35;
+}
+
+/* Pílula de prioridade refinada com ponto circular limpo */
+body[data-page="demands"] #demandTable .data-table td[data-label="Prioridade"] .badge {
+   display: inline-flex;
+   align-items: center;
+   gap: 6px;
+   font-weight: 750;
+   font-size: 12px;
+   padding: 4px 12px;
+   border-radius: 999px;
+   letter-spacing: -0.01em;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Prioridade"] .badge::before {
+   content: "";
+   width: 6px;
+   height: 6px;
+   border-radius: 50%;
+   background: currentColor;
+   flex-shrink: 0;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Prioridade"] .badge.P2 {
+   background: #fef3c7;
+   color: #b45309;
+   border: 1px solid #fde68a;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Prioridade"] .badge.P1 {
+   background: #fee2e2;
+   color: #b91c1c;
+   border: 1px solid #fca5a5;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Prioridade"] .badge.P3 {
+   background: #e0f2fe;
+   color: #0369a1;
+   border: 1px solid #bae6fd;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Prioridade"] .badge.P4 {
+   background: #f1f5f9;
+   color: #475569;
+   border: 1px solid #e2e8f0;
+}
+
+/* Status com ponto verde e tipografia bold */
+body[data-page="demands"] #demandTable .data-table td[data-label="Status"] .status-badge {
+   display: inline-flex;
+   align-items: center;
+   gap: 7px;
+   font-weight: 750;
+   font-size: 13px;
+   letter-spacing: -0.01em;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Status"] .status-badge.completed {
+   color: #166534;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Status"] .status-badge.completed::before {
+   content: "";
+   background: #16a34a;
+   width: 7px;
+   height: 7px;
+   border-radius: 50%;
+   display: inline-block;
+   flex-shrink: 0;
+}
+
+/* Prazo em negrito com cor escura */
+body[data-page="demands"] #demandTable .data-table td[data-label="Prazo"] .deadline {
+   font-weight: 750;
+   font-size: 13px;
+   color: #1e293b;
+   letter-spacing: -0.01em;
+}
+
+/* Botões de ação estilo cartões brancos refinados */
+body[data-page="demands"] #demandTable .data-table td[data-label="Ações"] {
+   white-space: nowrap;
+   text-align: right;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Ações"] .icon-btn {
+   width: 32px;
+   height: 32px;
+   border-radius: 8px;
+   background: #ffffff;
+   border: 1px solid rgba(0, 0, 0, 0.08);
+   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   padding: 0;
+   color: #0284c7;
+   transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Ações"] .icon-btn:hover {
+   transform: translateY(-1px);
+   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+   border-color: rgba(0, 0, 0, 0.18);
+   background: #ffffff;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Ações"] .icon-btn svg {
+   width: 16px;
+   height: 16px;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Ações"] .icon-btn[data-archive-demand],
+body[data-page="demands"] #demandTable .data-table td[data-label="Ações"] .icon-btn[data-unarchive-demand] {
+   color: #0d9488;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Ações"] .icon-btn.btn-pdf {
+   color: #0369a1;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Ações"] .icon-btn.btn-pdf:hover {
+   color: #075985;
+   border-color: #0284c7;
+   background: #f0f9ff;
+}
+
+body[data-page="demands"] #demandTable .data-table td[data-label="Ações"] .icon-btn[data-delete-demand],
+body[data-page="demands"] #demandTable .data-table td[data-label="Ações"] .icon-btn[style*="red"] {
+   color: #dc2626 !important;
+}
+
+/* Fundo da linha concluída verde suave com cantos arredondados */
+body[data-page="demands"] #demandTable .data-table tbody tr.row-done,
+body[data-page="demands"] #demandTable .data-table tbody tr.row-done:hover {
+   background: #bce7d2 !important;
+}
+
+body.dark-mode[data-page="demands"] #demandTable .data-table tbody tr.row-done {
+   background: rgba(26, 124, 68, .28) !important;
 }
 
 /* Aviso e ações do estado concluído */
@@ -14079,6 +14453,14 @@ body[data-page="dashboard"] .data-table tbody tr {
 
 body.dark-mode[data-page="dashboard"] .data-table tbody tr {
    background: rgba(36, 40, 46, .7)
+}
+
+body[data-page="dashboard"] .data-table tbody tr.row-done {
+   background: rgb(188, 231, 210)
+}
+
+body.dark-mode[data-page="dashboard"] .data-table tbody tr.row-done {
+   background: rgba(26, 124, 68, .28)
 }
 
 body[data-page="dashboard"] .data-table td {
@@ -14285,4 +14667,465 @@ body.dark-mode[data-page="dashboard"] .stat-tile-value {
    mínimo de 4,5 exigido para texto normal. */
 body[data-page="demands"] .chip-v2[data-chip-status="Aguardando contratação"] {
    background: linear-gradient(160deg, #9c6b43 0%, #7a5230 100%)
+}
+
+/* Destaca nos selects de Categoria e Status as opções que têm alguma demanda,
+   para o usuário saber imediatamente onde há volume sem abrir uma a uma. */
+select.select option.opt-has-count {
+   background-color: #c81e32 !important;
+   background: #c81e32 !important;
+   color: #ffffff !important;
+   font-weight: 700
+}
+
+/* Demandas arquivadas: mesma cor de "concluida" por baixo, mas visualmente
+   recolhidas (opacidade reduzida) e com uma etiqueta explicita ao lado do
+   status, para nao serem confundidas com demandas concluidas "correntes". */
+.data-table tbody tr.row-archived {
+   opacity: .65
+}
+
+.data-table tbody tr.row-archived:hover {
+   opacity: .9
+}
+
+.archived-tag {
+   display: inline-flex;
+   align-items: center;
+   gap: 4px;
+   margin-left: 8px;
+   padding: 2px 8px 2px 6px;
+   border-radius: 999px;
+   background: var(--gray-soft);
+   color: var(--muted);
+   font-size: 10px;
+   font-weight: 700;
+   text-transform: uppercase;
+   letter-spacing: .03em;
+   white-space: nowrap;
+   vertical-align: middle
+}
+
+.archived-tag svg {
+   width: 11px;
+   height: 11px
+}
+
+body.dark-mode .archived-tag {
+   background: #2a2a2a;
+   color: #b4b4b4
+}
+
+/* ==========================================================================
+   TOUR GUIADO PELO SISTEMA
+   Espião (spotlight) sobre a própria interface: destaca um elemento real do
+   menu/cabeçalho por vez, com um cartão de instrução ao lado.
+   ========================================================================== */
+.tour-overlay {
+   position: fixed;
+   inset: 0;
+   z-index: 19999;
+   background: transparent;
+   cursor: default
+}
+
+.tour-highlight {
+   position: fixed;
+   z-index: 20000;
+   border-radius: 10px;
+   box-shadow: 0 0 0 4px rgba(255, 255, 255, .85), 0 0 0 9999px rgba(6, 16, 30, .55);
+   pointer-events: none;
+   transition: top .25s ease, left .25s ease, width .25s ease, height .25s ease
+}
+
+.tour-arrow {
+   position: fixed;
+   z-index: 20000;
+   width: 0;
+   height: 0;
+   pointer-events: none;
+   transition: top .25s ease, left .25s ease
+}
+
+.tour-arrow-left {
+   border-top: 8px solid transparent;
+   border-bottom: 8px solid transparent;
+   border-right: 8px solid var(--surface)
+}
+
+.tour-arrow-right {
+   border-top: 8px solid transparent;
+   border-bottom: 8px solid transparent;
+   border-left: 8px solid var(--surface)
+}
+
+.tour-arrow-top {
+   border-left: 8px solid transparent;
+   border-right: 8px solid transparent;
+   border-bottom: 8px solid var(--surface)
+}
+
+.tour-arrow-bottom {
+   border-left: 8px solid transparent;
+   border-right: 8px solid transparent;
+   border-top: 8px solid var(--surface)
+}
+
+.tour-card {
+   position: fixed;
+   z-index: 20001;
+   width: 320px;
+   max-width: calc(100vw - 24px);
+   background: var(--surface);
+   color: var(--ink);
+   border-radius: var(--radius);
+   box-shadow: var(--shadow-lg);
+   padding: 22px;
+   transition: top .25s ease, left .25s ease
+}
+
+.tour-card .tour-icon {
+   width: 44px;
+   height: 44px;
+   border-radius: 50%;
+   background: var(--teal-soft);
+   color: var(--teal-2);
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   margin-bottom: 14px
+}
+
+.tour-card .tour-icon svg {
+   width: 22px;
+   height: 22px
+}
+
+.tour-card h3 {
+   margin: 0 0 8px;
+   color: var(--teal-2);
+   font-size: 1.05rem;
+   font-weight: 700
+}
+
+.tour-card p {
+   margin: 0 0 18px;
+   color: var(--muted);
+   font-size: .92rem;
+   line-height: 1.5
+}
+
+.tour-progress {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   margin-bottom: 16px
+}
+
+.tour-step-label {
+   font-size: .68rem;
+   letter-spacing: .05em;
+   text-transform: uppercase;
+   color: var(--muted);
+   font-weight: 700
+}
+
+.tour-dots {
+   display: flex;
+   align-items: center;
+   gap: 5px
+}
+
+.tour-dots span {
+   width: 6px;
+   height: 6px;
+   border-radius: 50%;
+   background: var(--line-strong);
+   transition: all .2s ease
+}
+
+.tour-dots span.active {
+   background: var(--primary);
+   width: 16px;
+   border-radius: 4px
+}
+
+.tour-footer {
+   display: flex;
+   align-items: center;
+   justify-content: space-between;
+   gap: 12px
+}
+
+.tour-skip {
+   background: none;
+   border: none;
+   color: var(--muted);
+   font-size: .85rem;
+   cursor: pointer;
+   text-decoration: underline;
+   padding: 4px 0
+}
+
+.tour-skip:hover {
+   color: var(--ink)
+}
+
+.tour-next {
+   background: linear-gradient(135deg, var(--primary), var(--teal));
+   color: #fff;
+   border: none;
+   border-radius: 999px;
+   padding: 10px 20px;
+   font-weight: 600;
+   font-size: .9rem;
+   cursor: pointer;
+   display: flex;
+   align-items: center;
+   gap: 6px;
+   white-space: nowrap
+}
+
+.tour-next:hover {
+   filter: brightness(1.08)
+}
+
+.tour-next svg {
+   width: 16px;
+   height: 16px
+}
+
+.tour-close {
+   position: absolute;
+   top: 14px;
+   right: 14px;
+   background: none;
+   border: none;
+   color: var(--muted);
+   cursor: pointer;
+   line-height: 0;
+   padding: 2px
+}
+
+.tour-close:hover {
+   color: var(--ink)
+}
+
+.tour-close svg {
+   width: 16px;
+   height: 16px
+}
+
+@media (max-width:480px) {
+   .tour-card {
+      width: calc(100vw - 24px);
+      padding: 18px
+   }
+}
+
+/* ==========================================================================
+   PWA — instalação (Android/iOS) e aviso de nova versão
+   Mesmo cartão-base para os dois avisos; nunca aparecem ao mesmo tempo (a
+   atualização tem prioridade — ver pwa.js).
+   ========================================================================== */
+.pwa-banner {
+   position: fixed;
+   left: 16px;
+   right: 16px;
+   bottom: 16px;
+   z-index: 130;
+   margin: 0 auto;
+   max-width: 460px;
+   background: var(--surface);
+   color: var(--ink);
+   border-radius: 16px;
+   box-shadow: var(--shadow-lg);
+   padding: 18px;
+   display: flex;
+   align-items: flex-start;
+   gap: 12px;
+   opacity: 0;
+   transform: translateY(16px);
+   transition: opacity .22s ease, transform .22s ease
+}
+
+.pwa-banner.show {
+   opacity: 1;
+   transform: none
+}
+
+.pwa-banner-icon {
+   flex-shrink: 0;
+   width: 40px;
+   height: 40px;
+   border-radius: 11px;
+   overflow: hidden;
+   background: var(--teal-soft);
+   color: var(--teal-2);
+   display: flex;
+   align-items: center;
+   justify-content: center
+}
+
+.pwa-banner-icon img {
+   width: 100%;
+   height: 100%;
+   object-fit: cover
+}
+
+.pwa-update .pwa-banner-icon {
+   background: var(--blue-soft);
+   color: var(--blue)
+}
+
+.pwa-banner-copy {
+   flex: 1;
+   min-width: 0
+}
+
+.pwa-banner-copy strong {
+   display: block;
+   font-size: 14px;
+   margin-bottom: 4px
+}
+
+.pwa-banner-copy p {
+   margin: 0;
+   font-size: 12.5px;
+   line-height: 1.55;
+   color: var(--muted)
+}
+
+.pwa-version-new {
+   color: var(--red)
+}
+
+.pwa-inline-icon {
+   display: inline-flex;
+   vertical-align: -5px
+}
+
+.pwa-inline-icon svg {
+   width: 16px;
+   height: 16px
+}
+
+.pwa-banner-actions {
+   display: flex;
+   flex-direction: column;
+   gap: 6px;
+   flex-shrink: 0
+}
+
+.pwa-banner-actions .btn {
+   padding: 8px 14px;
+   font-size: 12.5px;
+   white-space: nowrap
+}
+
+.pwa-banner-actions .btn svg {
+   width: 15px;
+   height: 15px
+}
+
+.pwa-banner-close {
+   position: absolute;
+   top: 10px;
+   right: 10px;
+   background: none;
+   border: none;
+   color: var(--muted);
+   cursor: pointer;
+   padding: 2px;
+   line-height: 0
+}
+
+.pwa-banner-close svg {
+   width: 15px;
+   height: 15px
+}
+
+@media (max-width:480px) {
+   .pwa-banner {
+      flex-direction: column;
+      align-items: stretch;
+      max-width: none
+   }
+
+   .pwa-banner-actions {
+      flex-direction: row;
+      justify-content: flex-end
+   }
+}
+
+/* ==========================================================================
+   BARRA DE NAVEGAÇÃO INFERIOR (mobile)
+   Atalho de app nativo para os três destinos comuns a todos os perfis; o
+   menu lateral (hamburger) continua com a lista completa de navegação.
+   ========================================================================== */
+.mobile-tabbar {
+   display: none
+}
+
+@media (max-width:900px) {
+   body[data-page] {
+      padding-bottom: calc(58px + env(safe-area-inset-bottom))
+   }
+
+   .mobile-tabbar {
+      display: flex;
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 55;
+      background: #005A9C;
+      border-top: 1px solid rgba(255, 255, 255, .15);
+      padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+      box-shadow: 0 -8px 24px rgba(0, 35, 75, .25)
+   }
+
+   .mobile-tab {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 6px 4px;
+      border-radius: 10px;
+      color: rgba(255, 255, 255, .82);
+      text-decoration: none;
+      font-size: 10.5px;
+      font-weight: 700;
+      transition: background-color .15s ease, color .15s ease
+   }
+
+   .mobile-tab svg {
+      width: 21px;
+      height: 21px;
+      color: #fff;
+      stroke: #fff
+   }
+
+   .mobile-tab span {
+      color: rgba(255, 255, 255, .82)
+   }
+
+   .mobile-tab:hover {
+      background: rgba(255, 255, 255, .1)
+   }
+
+   .mobile-tab.active {
+      color: #fff;
+      background: rgba(255, 255, 255, .18)
+   }
+
+   .mobile-tab.active span {
+      color: #fff
+   }
+
+   .mobile-tab.active svg {
+      color: #fff;
+      stroke: #fff
+   }
 }

@@ -31,13 +31,76 @@ BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = BASE_DIR / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.1"
 VISUAL_VERSION = "GOV.BR V3"
 
 app = FastAPI(title="Agenda Integrada — Infraestrutura e Gestão Escolar", version=APP_VERSION)
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get("AGENDA_SECRET", "troque-esta-chave-em-producao-2026"), same_site="lax")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+
+
+@app.get("/sw.js")
+def service_worker():
+    """Service Worker do PWA, servido na raiz (não em /static) para que seu
+    escopo cubra o site inteiro. O nome do cache carrega APP_VERSION — uma
+    única fonte de verdade, reaproveitada por /api/about — para que o próprio
+    ciclo de ativação descarte caches de versões antigas (ver seção 9 do
+    pedido de PWA: nada de arquivo antigo sobrevivendo a um deploy novo).
+
+    De propósito NÃO chama skipWaiting() no install: o novo worker fica
+    "esperando" até o usuário clicar em "Atualizar" (pwa.js manda
+    {type:'SKIP_WAITING'} por postMessage). Sem isso a troca de versão seria
+    automática e o usuário perderia o aviso e o controle sobre quando atualizar.
+    """
+    js = f"""const STATIC_CACHE = 'agenda-static-v{APP_VERSION}';
+
+self.addEventListener('activate', (event) => {{
+  event.waitUntil((async () => {{
+    const keys = await caches.keys();
+    await Promise.all(
+      keys.filter((k) => k.startsWith('agenda-static-') && k !== STATIC_CACHE).map((k) => caches.delete(k))
+    );
+    await self.clients.claim();
+  }})());
+}});
+
+self.addEventListener('message', (event) => {{
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+}});
+
+self.addEventListener('fetch', (event) => {{
+  const req = event.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+
+  // Navegação (HTML) e chamadas de API sempre vão para a rede: são dados de
+  // sessão, permissão e demandas, nunca podem ficar presos numa versão velha.
+  if (req.mode === 'navigate' || url.pathname.startsWith('/api/')) return;
+
+  // Estáticos versionados (styles.css?v=..., app.js?v=...) mudam de URL a
+  // cada deploy (asset_v deriva do mtime do arquivo), então cache-first aqui
+  // é seguro e evita uma ida à rede a cada navegação.
+  if (url.pathname.startsWith('/static/')) {{
+    event.respondWith((async () => {{
+      // Qualquer falha no Cache Storage (privado, cota, navegador restrito)
+      // não pode derrubar o carregamento do arquivo — cai para a rede direto.
+      try {{
+        const cache = await caches.open(STATIC_CACHE);
+        const cached = await cache.match(req);
+        if (cached) return cached;
+        const res = await fetch(req);
+        if (res.ok) {{ try {{ await cache.put(req, res.clone()); }} catch (e) {{}} }}
+        return res;
+      }} catch (err) {{
+        return fetch(req);
+      }}
+    }})());
+  }}
+}});
+"""
+    return Response(content=js, media_type="application/javascript; charset=utf-8")
 
 PRIORITIES = {
     "P1": {"label": "Urgente", "rank": 1},
@@ -79,8 +142,6 @@ CPDTI_CATEGORIES = [
     ("Computador", "monitor", "Desktop da secretaria, da sala de aula ou do laboratório."),
     ("Notebook", "monitor", "Notebook institucional com defeito ou sem funcionar."),
     ("Tablet", "clipboard", "Tablet de uso pedagógico ou administrativo."),
-    ("Câmeras", "camera", "Câmera de segurança, gravador ou monitoramento."),
-    ("Alarme", "bell", "Central de alarme, sensor ou sirene."),
     ("Câmeras & Alarmes", "camera", "Câmera de segurança, central de alarme, sensor ou sirene."),
     ("Voip", "message", "Ramal, telefone IP ou central telefônica."),
     ("Wi-Fi", "globe", "Sinal sem fio, roteador ou ponto de acesso."),
@@ -595,6 +656,7 @@ def init_db() -> None:
     conn.execute("ALTER TABLE demands ADD COLUMN IF NOT EXISTS prov_priority TEXT")
     conn.execute("ALTER TABLE demands ADD COLUMN IF NOT EXISTS prov_note TEXT")
     conn.execute("ALTER TABLE demands ADD COLUMN IF NOT EXISTS prov_notify_school INTEGER NOT NULL DEFAULT 0")
+    conn.execute("ALTER TABLE demands ADD COLUMN IF NOT EXISTS archived_at TEXT")
 
     conn.execute("ALTER TABLE attachments ADD COLUMN IF NOT EXISTS category TEXT")
 
@@ -860,6 +922,7 @@ def render(request: Request, template: str, **context):
     base = {
         "request": request,
         "asset_v": asset_version(),
+        "app_version": APP_VERSION,
         "logo_url": logo_url,
         "user": user,
         "priorities": priorities,
@@ -1009,11 +1072,19 @@ def api_dashboard(request: Request):
 def _dashboard_payload(user: dict) -> dict:
     """Monta os dados do Painel. Extraido de /api/dashboard para que o PDF do
     Painel saia exatamente com os mesmos numeros da tela, sem uma segunda
-    consulta que pudesse divergir com o tempo."""
+    consulta que pudesse divergir com o tempo.
+
+    Antes disso eram 6 consultas sequenciais ao Postgres remoto (recent,
+    attention, category_rows, status_rows, cost_top_rows, cada uma ida-e-volta
+    ao Supabase). Como todas derivam do mesmo conjunto de demandas já trazido
+    na primeira consulta, passaram a ser calculadas aqui em Python — sobra
+    só mais uma consulta (nomes das escolas) no lugar de cinco."""
     scope, params = demand_scope_sql(user)
     conn = db()
     rows = conn.execute(f"SELECT d.* FROM demands d WHERE 1=1 {scope}", params).fetchall()
     data = [dict(r) for r in rows]
+    school_names = {r["id"]: r["name"] for r in conn.execute("SELECT id, name FROM schools").fetchall()}
+    conn.close()
     today = date.today()
 
     def count_status(keyword):
@@ -1039,14 +1110,32 @@ def _dashboard_payload(user: dict) -> dict:
         "open_cost": sum(d["cost_estimate"] or 0 for d in open_data),
         "execution": round((completed / total * 100), 1) if total else 0,
     }
-    recent = conn.execute(f"""SELECT d.*, s.name school_name FROM demands d JOIN schools s ON s.id=d.school_id
-                              WHERE 1=1 {scope} ORDER BY d.updated_at DESC LIMIT 6""", params).fetchall()
-    attention = conn.execute(f"""SELECT d.*, s.name school_name FROM demands d JOIN schools s ON s.id=d.school_id
-                                 WHERE d.status NOT IN ('Concluída','Cancelada') {scope}
-                                 ORDER BY CASE d.priority WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END,
-                                          d.due_date ASC NULLS FIRST LIMIT 5""", params).fetchall()
-    category_rows = conn.execute(f"SELECT d.category, COUNT(*) qty FROM demands d WHERE 1=1 {scope} GROUP BY d.category ORDER BY qty DESC LIMIT 6", params).fetchall()
-    status_rows = conn.execute(f"SELECT d.status, COUNT(*) qty FROM demands d WHERE 1=1 {scope} GROUP BY d.status ORDER BY qty DESC LIMIT 7", params).fetchall()
+    def with_school(d):
+        return {**d, "school_name": school_names.get(d["school_id"])}
+
+    recent = sorted(
+        (d for d in data if not d["archived_at"]),
+        key=lambda d: d["updated_at"], reverse=True
+    )[:6]
+    recent = [with_school(d) for d in recent]
+
+    priority_rank = {"P1": 1, "P2": 2, "P3": 3}
+    attention = sorted(
+        (d for d in data if d["status"] not in ("Concluída", "Cancelada")),
+        key=lambda d: (priority_rank.get(d["priority"], 4), 0 if not d["due_date"] else 1, d["due_date"] or "")
+    )[:5]
+    attention = [with_school(d) for d in attention]
+
+    def top_counts(field, limit):
+        counts = {}
+        for d in data:
+            counts[d[field]] = counts.get(d[field], 0) + 1
+        rows = sorted(({field: k, "qty": v} for k, v in counts.items()), key=lambda x: -x["qty"])
+        return rows[:limit]
+
+    category_rows = top_counts("category", 6)
+    status_rows = top_counts("status", 7)
+
     # Detalhamento do "Custo em aberto" para o botão "Ver detalhes" do Painel — campos aditivos,
     # não alteram nenhum campo que já era retornado por este endpoint.
     cost_by_cat = {}
@@ -1057,11 +1146,13 @@ def _dashboard_payload(user: dict) -> dict:
         ({"category": k, "cost": v} for k, v in cost_by_cat.items() if v),
         key=lambda x: -x["cost"]
     )
-    cost_top_rows = conn.execute(f"""SELECT d.*, s.name school_name FROM demands d JOIN schools s ON s.id=d.school_id
-                                     WHERE d.status NOT IN ('Concluída','Cancelada') AND d.cost_estimate > 0 {scope}
-                                     ORDER BY d.cost_estimate DESC LIMIT 8""", params).fetchall()
-    conn.close()
-    return {"stats": stats, "recent": [dict(x) for x in recent], "attention": [dict(x) for x in attention], "categories": [dict(x) for x in category_rows], "status_breakdown": [dict(x) for x in status_rows], "cost_breakdown": cost_breakdown, "cost_top": [dict(x) for x in cost_top_rows]}
+    cost_top_rows = sorted(
+        (d for d in data if d["status"] not in ("Concluída", "Cancelada") and (d["cost_estimate"] or 0) > 0),
+        key=lambda d: d["cost_estimate"], reverse=True
+    )[:8]
+    cost_top_rows = [with_school(d) for d in cost_top_rows]
+
+    return {"stats": stats, "recent": recent, "attention": attention, "categories": category_rows, "status_breakdown": status_rows, "cost_breakdown": cost_breakdown, "cost_top": cost_top_rows}
 
 
 @app.get("/api/demands/category-counts")
@@ -1070,18 +1161,39 @@ def api_demand_category_counts(request: Request):
     scope, params = demand_scope_sql(user)
     conn = db()
     rows = conn.execute(f"SELECT d.category, COUNT(*) qty FROM demands d WHERE 1=1 {scope} GROUP BY d.category", params).fetchall()
+    status_rows = conn.execute(f"SELECT d.status, COUNT(*) qty FROM demands d WHERE 1=1 {scope} GROUP BY d.status", params).fetchall()
     conn.close()
-    return {"counts": {r["category"]: r["qty"] for r in rows}}
+    return {
+        "counts": {r["category"]: r["qty"] for r in rows},
+        "status_counts": {r["status"]: r["qty"] for r in status_rows}
+    }
+
+
+@app.get("/api/demands/status-counts")
+def api_demand_status_counts(request: Request):
+    user = require_user(request)
+    scope, params = demand_scope_sql(user)
+    conn = db()
+    rows = conn.execute(f"SELECT d.status, COUNT(*) qty FROM demands d WHERE 1=1 {scope} GROUP BY d.status", params).fetchall()
+    conn.close()
+    return {"counts": {r["status"]: r["qty"] for r in rows}}
 
 
 @app.get("/api/demands")
-def api_demands(request: Request, q: str = "", status: str = "", priority: str = "", category: str = "", year: str = "", overdue: int = 0, due_soon: int = 0, unassigned: int = 0):
+def api_demands(request: Request, q: str = "", status: str = "", priority: str = "", category: str = "", year: str = "", month: str = "", overdue: int = 0, due_soon: int = 0, unassigned: int = 0, archived: str = ""):
     user = require_user(request)
     where = ["1=1"]
     params: list = []
     if user["perm"]["school_scoped"] and user.get("school_id"):
         where.append("d.school_id=%s")
         params.append(user["school_id"])
+    # Demandas arquivadas saem da listagem padrao para nao poluir a Carteira de
+    # demandas, mas continuam encontraveis: uma busca por texto (q) sempre as
+    # inclui, e archived=all traz tudo quando o toggle "Exibir arquivadas" esta ligado.
+    if archived == "only":
+        where.append("d.archived_at IS NOT NULL")
+    elif archived != "all" and not q:
+        where.append("d.archived_at IS NULL")
     if q:
         where.append("(lower(d.title) LIKE %s OR lower(d.code) LIKE %s OR lower(s.name) LIKE %s)")
         like = f"%{q.lower()}%"
@@ -1094,6 +1206,8 @@ def api_demands(request: Request, q: str = "", status: str = "", priority: str =
         where.append("d.category=%s"); params.append(category)
     if year:
         where.append("substr(d.created_at,1,4)=%s"); params.append(str(year))
+    if month:
+        where.append("substr(d.created_at,6,2)=%s"); params.append(month.zfill(2))
     if overdue:
         where.append("d.due_date IS NOT NULL AND d.due_date::date < CURRENT_DATE AND d.status NOT IN ('Concluída','Cancelada')")
     if due_soon:
@@ -1123,6 +1237,160 @@ def api_demand_detail(request: Request, demand_id: int):
     planning = conn.execute("""SELECT p.* FROM planning_items p JOIN planning_links l ON l.planning_id=p.id WHERE l.demand_id=%s""", (demand_id,)).fetchall()
     conn.close()
     return {"demand": dict(row), "updates": [dict(x) for x in updates], "attachments": [dict(x) for x in attachments], "planning": [dict(x) for x in planning]}
+
+
+@app.get("/api/demands/{demand_id}/pdf")
+def api_demand_pdf(request: Request, demand_id: int):
+    user = require_user(request)
+    conn = db()
+    row = conn.execute("SELECT d.*, s.name school_name FROM demands d JOIN schools s ON s.id=d.school_id WHERE d.id=%s", (demand_id,)).fetchone()
+    if not row:
+        conn.close(); raise HTTPException(404, "Demanda não encontrada")
+    if user["perm"]["school_scoped"] and row["school_id"] != user.get("school_id"):
+        conn.close(); raise HTTPException(403)
+    updates = conn.execute("SELECT * FROM demand_updates WHERE demand_id=%s ORDER BY created_at ASC", (demand_id,)).fetchall()
+    conn.close()
+
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import cm
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+        from reportlab.lib import colors
+    except ImportError:
+        raise HTTPException(500, "Geração de PDF indisponível: instale as dependências com 'pip install -r requirements.txt' (pacote reportlab) e reinicie o sistema.")
+    from xml.sax.saxutils import escape as _xesc
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=1.5*cm, rightMargin=1.5*cm,
+        topMargin=1.3*cm, bottomMargin=1.5*cm,
+        title=f"Demanda {row['code']} — {row['title']}"
+    )
+    largura = _pdf_largura_util(doc)
+    styles = getSampleStyleSheet()
+    base = styles["Normal"]
+
+    s_sec = ParagraphStyle("dsec", parent=base, fontName="Helvetica-Bold", fontSize=11,
+                           leading=14, textColor=colors.HexColor(_PDF_BLUE_DARK),
+                           spaceBefore=14, spaceAfter=4)
+    s_label = ParagraphStyle("dlabel", parent=base, fontName="Helvetica-Bold", fontSize=9,
+                             leading=11, textColor=colors.HexColor(_PDF_MUTED))
+    s_value = ParagraphStyle("dvalue", parent=base, fontSize=10, leading=13,
+                             textColor=colors.HexColor(_PDF_BLUE_DARK))
+    s_desc = ParagraphStyle("ddesc", parent=base, fontSize=10, leading=14,
+                            textColor=colors.black, spaceAfter=6)
+    s_hist_date = ParagraphStyle("dhd", parent=base, fontName="Helvetica-Bold", fontSize=8.5,
+                                 leading=11, textColor=colors.HexColor(_PDF_BLUE))
+    s_hist_msg = ParagraphStyle("dhm", parent=base, fontSize=9.5, leading=13,
+                                textColor=colors.black, leftIndent=6, spaceAfter=3)
+    s_divider_lbl = ParagraphStyle("ddl", parent=base, fontSize=8, leading=10,
+                                   textColor=colors.HexColor(_PDF_MUTED))
+
+    def campo(label, valor):
+        return [Paragraph(_xesc(label), s_label), Paragraph(_xesc(str(valor or "—")), s_value)]
+
+    def linha_divisora():
+        t = Table([[""]], colWidths=[largura])
+        t.setStyle(TableStyle([
+            ("LINEBELOW", (0, 0), (-1, -1), 0.5, colors.HexColor(_PDF_LINE)),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        return t
+
+    def _fdt(iso):
+        if not iso:
+            return "—"
+        try:
+            return str(iso)[:16].replace("T", " às ")
+        except Exception:
+            return str(iso)
+
+    # --- Cabeçalho institucional padrão ---
+    meta = [
+        row["school_name"],
+        f"Gerado em {datetime.now().strftime('%d/%m/%Y às %H:%M')}",
+        user.get("name", ""),
+    ]
+    story = _pdf_cabecalho(largura, "Demanda Concluída", meta, compacto=True)
+
+    # --- Dados da demanda ---
+    story.append(Paragraph("Dados da demanda", s_sec))
+    story.append(linha_divisora())
+
+    col = largura / 2 - 0.2*cm
+    grid_dados = [
+        [campo("Código", row["code"]),                         campo("Status", row["status"])],
+        [campo("Unidade Escolar", row["school_name"]),         campo("Categoria", row.get("category", ""))],
+        [campo("Prioridade", row.get("priority", "")),         campo("Responsável", row.get("responsible", ""))],
+        [campo("Prazo", _fdt(row.get("due_date", ""))),        campo("Setor", row.get("sector", ""))],
+    ]
+    if row.get("cost_estimate"):
+        try:
+            custo = f"{float(row['cost_estimate']):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        except Exception:
+            custo = str(row["cost_estimate"])
+        grid_dados.append([campo("Custo estimado (R$)", custo),
+                           campo("Tipo de providência", row.get("prov_action_type", ""))])
+    if row.get("archived_at"):
+        grid_dados.append([campo("Arquivada em", _fdt(row["archived_at"])), [""]])
+
+    tbl_dados = Table([[c1, c2] for c1, c2 in grid_dados], colWidths=[col, col])
+    tbl_dados.setStyle(TableStyle([
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 2),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
+        ("TOPPADDING",    (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+    ]))
+    story.append(tbl_dados)
+    story.append(Spacer(1, 0.3*cm))
+
+    story.append(Paragraph("Título", s_label))
+    story.append(Paragraph(_xesc(row["title"]), s_value))
+    story.append(Spacer(1, 0.25*cm))
+
+    if row.get("description"):
+        story.append(Paragraph("Descrição / objeto da demanda", s_label))
+        story.append(Paragraph(_xesc(row["description"]).replace("\n", "<br/>"), s_desc))
+
+    if row.get("impact"):
+        story.append(Paragraph("Impacto relatado", s_label))
+        story.append(Paragraph(_xesc(row["impact"]).replace("\n", "<br/>"), s_desc))
+
+    if row.get("technical_opinion"):
+        story.append(Paragraph("Parecer técnico", s_label))
+        story.append(Paragraph(_xesc(row["technical_opinion"]).replace("\n", "<br/>"), s_desc))
+
+    # --- Histórico de andamentos ---
+    story.append(Spacer(1, 0.2*cm))
+    story.append(Paragraph("Histórico de andamentos", s_sec))
+    story.append(linha_divisora())
+
+    if updates:
+        for u in updates:
+            date_str = _fdt(u["created_at"])
+            kind = str(u["kind"] or "")
+            author = str(u["author"] or "")
+            msg = _xesc(str(u["message"] or "")).replace("\n", "<br/>")
+            story.append(Paragraph(
+                f"{_xesc(date_str)}  ·  <b>{_xesc(kind)}</b>  ·  {_xesc(author)}",
+                s_hist_date))
+            story.append(Paragraph(msg, s_hist_msg))
+            story.append(linha_divisora())
+    else:
+        story.append(Paragraph("Nenhum andamento registrado.", s_divider_lbl))
+
+    doc.build(story, onFirstPage=_pdf_rodape, onLaterPages=_pdf_rodape)
+    buf.seek(0)
+    filename = f"demanda_{row['code']}.pdf"
+    return Response(
+        content=buf.read(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename={filename}"}
+    )
 
 
 @app.post("/api/demands")
@@ -1247,6 +1515,71 @@ async def update_demand(request: Request, demand_id: int):
 
     conn.commit(); conn.close()
     return {"ok": True}
+
+
+@app.post("/api/demands/{demand_id}/archive")
+async def archive_demand(request: Request, demand_id: int):
+    user = require_user(request)
+    if not user["perm"]["can_edit_analysis"]:
+        raise HTTPException(403, "Permissão insuficiente para arquivar demandas")
+    conn = db()
+    d = conn.execute("SELECT id, code, status, archived_at, school_id FROM demands WHERE id=%s", (demand_id,)).fetchone()
+    if not d:
+        conn.close(); raise HTTPException(404)
+    if user["perm"]["school_scoped"] and d["school_id"] != user.get("school_id"):
+        conn.close(); raise HTTPException(403)
+    if d["status"] != "Concluída":
+        conn.close(); raise HTTPException(400, "Só é possível arquivar demandas concluídas")
+    if not d["archived_at"]:
+        ts = now_iso()
+        conn.execute("UPDATE demands SET archived_at=%s WHERE id=%s", (ts, demand_id))
+        conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(%s,%s,%s,%s,%s)",
+                      (demand_id, "Arquivamento", "Demanda arquivada. Continua disponível para consulta a qualquer momento.", user["name"], ts))
+        registrar(conn, request, user, "Arquivou demanda", "demand", demand_id, d["code"])
+        conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+@app.post("/api/demands/{demand_id}/unarchive")
+async def unarchive_demand(request: Request, demand_id: int):
+    user = require_user(request)
+    if not user["perm"]["can_edit_analysis"]:
+        raise HTTPException(403, "Permissão insuficiente para restaurar demandas")
+    conn = db()
+    d = conn.execute("SELECT id, code, archived_at, school_id FROM demands WHERE id=%s", (demand_id,)).fetchone()
+    if not d:
+        conn.close(); raise HTTPException(404)
+    if user["perm"]["school_scoped"] and d["school_id"] != user.get("school_id"):
+        conn.close(); raise HTTPException(403)
+    if d["archived_at"]:
+        conn.execute("UPDATE demands SET archived_at=NULL WHERE id=%s", (demand_id,))
+        conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(%s,%s,%s,%s,%s)",
+                      (demand_id, "Arquivamento", "Demanda restaurada do arquivo.", user["name"], now_iso()))
+        registrar(conn, request, user, "Restaurou demanda arquivada", "demand", demand_id, d["code"])
+        conn.commit()
+    conn.close()
+    return {"ok": True}
+
+
+@app.post("/api/demands/archive-completed")
+async def archive_completed_demands(request: Request):
+    user = require_user(request)
+    if not user["perm"]["can_edit_analysis"]:
+        raise HTTPException(403, "Permissão insuficiente para arquivar demandas")
+    scope, params = demand_scope_sql(user)
+    conn = db()
+    rows = conn.execute(f"SELECT id, code FROM demands d WHERE d.status='Concluída' AND d.archived_at IS NULL {scope}", params).fetchall()
+    ts = now_iso()
+    for r in rows:
+        conn.execute("UPDATE demands SET archived_at=%s WHERE id=%s", (ts, r["id"]))
+        conn.execute("INSERT INTO demand_updates(demand_id,kind,message,author,created_at) VALUES(%s,%s,%s,%s,%s)",
+                      (r["id"], "Arquivamento", "Demanda arquivada em lote junto com as demais demandas concluídas.", user["name"], ts))
+    if rows:
+        registrar(conn, request, user, "Arquivou demandas concluídas em lote", "demand", None, f"{len(rows)} demanda(s)")
+        conn.commit()
+    conn.close()
+    return {"ok": True, "count": len(rows)}
 
 
 @app.delete("/api/demands/{demand_id}")
@@ -3262,4 +3595,8 @@ def health():
 
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="127.0.0.1", port=int(os.environ.get("AGENDA_PORT", os.environ.get("PORT", "8017"))), reload=False)
+    # Em produção (Render, Railway, etc.) a variável PORT é injetada
+    # pela plataforma; localmente usa AGENDA_PORT ou 8017.
+    port = int(os.environ.get("PORT", os.environ.get("AGENDA_PORT", "8017")))
+    host = "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1"
+    uvicorn.run("app:app", host=host, port=port, reload=False)
