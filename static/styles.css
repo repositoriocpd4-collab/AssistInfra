@@ -927,7 +927,7 @@ svg {
    padding: 16px;
    margin-bottom: 18px;
    display: grid;
-   grid-template-columns: minmax(240px, 2fr) repeat(4, minmax(140px, 1fr)) auto;
+   grid-template-columns: minmax(240px, 2fr) minmax(80px, 0.5fr) minmax(80px, 0.5fr) repeat(3, minmax(130px, 1fr)) auto;
    gap: 12px;
    align-items: end
 }
@@ -937,6 +937,16 @@ svg {
    flex-direction: column;
    gap: 6px
 }
+
+/* Ano e Mês: campos compactos — metade da largura dos selects padrão */
+#fYear,
+#fMonth {
+   min-width: 0;
+   font-size: 12px;
+   padding: 8px 8px 8px 9px;
+   min-height: 38px;
+}
+
 
 .field label,
 .form-label {
@@ -11950,6 +11960,30 @@ body.dark-mode .dv-now h2 {
    height: 13px
 }
 
+.dv-section-heading {
+   display: flex;
+   align-items: center;
+   gap: 12px;
+   margin-top: 26px;
+   margin-bottom: 2px
+}
+
+.dv-section-label {
+   font-size: 14.5px;
+   font-weight: 800;
+   color: var(--red);
+   text-transform: uppercase;
+   letter-spacing: .06em;
+   white-space: nowrap
+}
+
+.dv-section-line {
+   flex: 1;
+   height: 2px;
+   background: var(--red);
+   opacity: .4
+}
+
 .dv-panels {
    display: grid;
    grid-template-columns: repeat(auto-fit, minmax(262px, 1fr));
@@ -14635,11 +14669,13 @@ body[data-page="demands"] .chip-v2[data-chip-status="Aguardando contratação"] 
    background: linear-gradient(160deg, #9c6b43 0%, #7a5230 100%)
 }
 
-/* Destaca no select de Categoria as opcoes que tem alguma demanda no filtro
-   atual, para o usuario nao precisar abrir cada uma para saber onde ha volume. */
+/* Destaca nos selects de Categoria e Status as opções que têm alguma demanda,
+   para o usuário saber imediatamente onde há volume sem abrir uma a uma. */
 select.select option.opt-has-count {
-   background: var(--red);
-   color: #fff
+   background-color: #c81e32 !important;
+   background: #c81e32 !important;
+   color: #ffffff !important;
+   font-weight: 700
 }
 
 /* Demandas arquivadas: mesma cor de "concluida" por baixo, mas visualmente
@@ -15043,10 +15079,10 @@ body.dark-mode .archived-tag {
       right: 0;
       bottom: 0;
       z-index: 55;
-      background: var(--surface);
-      border-top: 1px solid var(--line);
+      background: #005A9C;
+      border-top: 1px solid rgba(255, 255, 255, .15);
       padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
-      box-shadow: 0 -8px 24px rgba(12, 35, 64, .08)
+      box-shadow: 0 -8px 24px rgba(0, 35, 75, .25)
    }
 
    .mobile-tab {
@@ -15054,21 +15090,42 @@ body.dark-mode .archived-tag {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 2px;
+      gap: 3px;
       padding: 6px 4px;
       border-radius: 10px;
-      color: var(--muted);
+      color: rgba(255, 255, 255, .82);
       text-decoration: none;
       font-size: 10.5px;
-      font-weight: 700
+      font-weight: 700;
+      transition: background-color .15s ease, color .15s ease
    }
 
    .mobile-tab svg {
       width: 21px;
-      height: 21px
+      height: 21px;
+      color: #fff;
+      stroke: #fff
+   }
+
+   .mobile-tab span {
+      color: rgba(255, 255, 255, .82)
+   }
+
+   .mobile-tab:hover {
+      background: rgba(255, 255, 255, .1)
    }
 
    .mobile-tab.active {
-      color: var(--primary)
+      color: #fff;
+      background: rgba(255, 255, 255, .18)
+   }
+
+   .mobile-tab.active span {
+      color: #fff
+   }
+
+   .mobile-tab.active svg {
+      color: #fff;
+      stroke: #fff
    }
 }

@@ -1317,10 +1317,23 @@
       <section class="panel"><div class="panel-header"><div><h2>Atividade recente</h2><p>Últimas demandas atualizadas.</p></div><a class="link-btn" href="/demandas">Abrir lista completa</a></div>${renderDemandTable(data.recent, true)}</section>
       <section class="panel mt-16"><div class="panel-header"><div><h2>Indicador de execução</h2><p>Percentual das demandas registradas que já foram concluídas.</p></div><strong class="text-teal mono">${s.execution}%</strong></div><div class="panel-body"><div class="bar-track" style="height:14px"><div class="bar-fill" style="width:${Math.min(100, s.execution)}%"></div></div></div></section>`;
     $$('[data-open-demand]', content).forEach(b => b.addEventListener('click', openDemandForm));
-    $$('[data-dashboard-filter]').forEach(card => card.addEventListener('click', () => {
-      const f = card.dataset.dashboardFilter;
-      location.href = f ? `/demandas?${f}` : '/demandas';
-    }));
+    const goToFilteredDemands = (filterStr) => {
+      const params = new URLSearchParams(filterStr || '');
+      params.set('month', '');
+      location.href = `/demandas?${params.toString()}`;
+    };
+    $$('.stat-group', content).forEach(group => {
+      group.style.cursor = 'pointer';
+      group.addEventListener('click', e => {
+        if (e.target.closest('.btn-cost-detail')) return;
+        const tile = e.target.closest('[data-dashboard-filter]') || group.querySelector('[data-dashboard-filter]');
+        if (tile) goToFilteredDemands(tile.dataset.dashboardFilter);
+      });
+    });
+    $$('[data-dashboard-filter]', content).forEach(card => {
+      if (card.closest('.stat-group')) return;
+      card.addEventListener('click', () => goToFilteredDemands(card.dataset.dashboardFilter));
+    });
     $('.btn-cost-detail', content)?.addEventListener('click', () => openCostDetail(data));
 
     // Personalizar painel: abrir/fechar o popover e mostrar/ocultar cada grupo, com
@@ -1377,7 +1390,10 @@
     `;
     modal({ title: 'Custo em Aberto — Detalhamento', subtitle: 'Estimativa do que ainda não foi concluído', mode: 'drawer', body });
     $$('#modalRoot [data-dashboard-filter]').forEach(row => row.addEventListener('click', () => {
-      location.href = `/demandas?${row.dataset.dashboardFilter}`;
+      const f = row.dataset.dashboardFilter;
+      const params = new URLSearchParams(f || '');
+      params.set('month', '');
+      location.href = `/demandas?${params.toString()}`;
     }));
   }
 
@@ -1419,12 +1435,24 @@
     const [schools, dash, catCounts] = await Promise.all([loadSchools(), api('/api/dashboard'), api('/api/demands/category-counts')]);
     const ds = dash.stats;
     const counts = catCounts.counts || {};
-    const filters = { q: query.get('q') || '', status: query.get('status') || '', priority: query.get('priority') || '', category: query.get('category') || '', year: query.get('year') || '2026', overdue: query.get('overdue') === '1', due_soon: query.get('due_soon') === '1', unassigned: query.get('unassigned') === '1' };
+    const statusCounts = catCounts.status_counts || {};
+    const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+    const hasOtherFilters = query.has('unassigned') || query.has('status') || query.has('priority') || query.has('category') || query.has('overdue') || query.has('due_soon') || query.has('q');
+    const defaultMonth = hasOtherFilters ? '' : currentMonth;
+    const filters = { q: query.get('q') || '', status: query.get('status') || '', priority: query.get('priority') || '', category: query.get('category') || '', year: query.get('year') || '2026', month: query.has('month') ? query.get('month') : defaultMonth, overdue: query.get('overdue') === '1', due_soon: query.get('due_soon') === '1', unassigned: query.get('unassigned') === '1' };
     content.innerHTML = pageHeader('Demandas Escolares', 'Gerencie, filtre e acompanhe todas as solicitações de infraestrutura.', `<a class="btn btn-secondary" href="/api/export/demands.csv" data-tooltip="Baixar a lista filtrada em CSV">${icon('download')}Exportar CSV</a><a class="btn btn-secondary" href="/api/export/demands.pdf" data-tooltip="Baixar a lista em PDF">${icon('file')}Gerar um PDF</a><button class="btn btn-primary" data-open-demand data-tooltip="Abrir o assistente de registro">${icon('plus')}Registrar Demanda/CI</button>`) +
       `<section class="filters-card">
         <div class="field"><label>Buscar</label><div class="search-field">${icon('search')}<input class="input" id="fQ" value="${esc(filters.q)}" placeholder="Código, demanda ou escola..."></div></div>
         <div class="field"><label>Ano</label><select class="select" id="fYear"><option value="">Todos</option>${[2026, 2025, 2024].map(y => `<option ${String(y) === filters.year ? 'selected' : ''}>${y}</option>`).join('')}</select></div>
-        <div class="field"><label>Status</label><select class="select" id="fStatus"><option value="">Todos</option>${ctx.statuses.map(x => `<option ${x === filters.status ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>
+        <div class="field"><label>M\u00eas</label><select class="select" id="fMonth"><option value="">Todos</option>${[
+          ['01','Janeiro'],['02','Fevereiro'],['03','Mar\u00e7o'],['04','Abril'],
+          ['05','Maio'],['06','Junho'],['07','Julho'],['08','Agosto'],
+          ['09','Setembro'],['10','Outubro'],['11','Novembro'],['12','Dezembro']
+        ].map(([v,l]) => `<option value="${v}" ${v === filters.month ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+        <div class="field"><label>Status</label><select class="select" id="fStatus"><option value="">Todos</option>${ctx.statuses.map(x => {
+          const qty = statusCounts[x] || 0;
+          return `<option value="${esc(x)}" ${x === filters.status ? 'selected' : ''}${qty ? ' class="opt-has-count"' : ''}>${esc(x)} (${num(qty)})</option>`;
+        }).join('')}</select></div>
         <div class="field"><label>Prioridade</label><select class="select" id="fPriority"><option value="">Todas</option>${Object.keys(ctx.priorities).map(x => `<option value="${x}" ${x === filters.priority ? 'selected' : ''}>${x} · ${priorityLabel(x)}</option>`).join('')}</select></div>
         <div class="field"><label>Categoria</label><select class="select" id="fCategory"><option value="">Todas</option>${ctx.categories.map(x => `<option value="${esc(x)}" ${x === filters.category ? 'selected' : ''}${counts[x] ? ' class="opt-has-count"' : ''}>${esc(x)} (${num(counts[x] || 0)})</option>`).join('')}</select></div>
         <button class="btn btn-secondary" id="clearFilters">${icon('filter')}Limpar</button>
@@ -1457,7 +1485,7 @@
       (b.dataset.chipStatus || '') === $('#fStatus').value && (b.dataset.chipPriority || '') === $('#fPriority').value));
     const load = async () => {
       const params = new URLSearchParams();
-      const map = { q: $('#fQ').value, status: $('#fStatus').value, priority: $('#fPriority').value, category: $('#fCategory').value, year: $('#fYear').value };
+      const map = { q: $('#fQ').value, status: $('#fStatus').value, priority: $('#fPriority').value, category: $('#fCategory').value, year: $('#fYear').value, month: $('#fMonth').value };
       Object.entries(map).forEach(([k, v]) => { if (v) params.set(k, v) });
       if (filters.overdue) params.set('overdue', '1');
       if (filters.due_soon) params.set('due_soon', '1');
@@ -1506,8 +1534,8 @@
     });
     document.addEventListener('click', e => { if (!e.target.closest('.th-filter-menu') && !e.target.closest('[data-th-filter]')) closeThMenu(); });
     let timer; $('#fQ').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(load, 250) });
-    ['#fYear', '#fStatus', '#fPriority', '#fCategory'].forEach(id => $(id).addEventListener('change', load));
-    $('#clearFilters').addEventListener('click', () => { filters.overdue = false; filters.due_soon = false; filters.unassigned = false;['#fQ', '#fStatus', '#fPriority', '#fCategory'].forEach(id => $(id).value = ''); $('#fYear').value = '2026'; $('#overdueChip')?.remove(); $('#dueSoonChip')?.remove(); $('#unassignedChip')?.remove(); load(); });
+    ['#fYear', '#fMonth', '#fStatus', '#fPriority', '#fCategory'].forEach(id => $(id).addEventListener('change', load));
+    $('#clearFilters').addEventListener('click', () => { filters.overdue = false; filters.due_soon = false; filters.unassigned = false;['#fQ', '#fStatus', '#fPriority', '#fCategory'].forEach(id => $(id).value = ''); $('#fMonth').value = String(new Date().getMonth() + 1).padStart(2, '0'); $('#fYear').value = '2026'; $('#overdueChip')?.remove(); $('#dueSoonChip')?.remove(); $('#unassignedChip')?.remove(); load(); });
     quickChips.forEach(b => b.addEventListener('click', () => {
       const status = b.dataset.chipStatus || '';
       const priority = b.dataset.chipPriority || '';
@@ -1815,6 +1843,11 @@
         ${travado ? `<p class="dv-panel-locked">${icon('info')}<span>${esc(semAcao)}</span></p>`
         : (canEdit ? `<button type="button" class="dv-panel-foot" data-dv-action="wizard">Registrar andamento${icon('chevron')}</button>` : '')}
       </section>
+    </div>
+
+    <div class="dv-section-heading">
+      <span class="dv-section-label">Área dos Gestores - Infraestrutura</span>
+      <div class="dv-section-line"></div>
     </div>
 
     <div class="dv-panels">
@@ -2210,7 +2243,7 @@
             <span class="pw-field-label">Disponibilidade de material</span>
             <p class="pw-field-hint">Se precisar comprar, a demanda é sinalizada para o Planejamento 2027.</p>
             <div class="toggle-row">
-              <button type="button" class="toggle-btn tg-ok ${!st.needsMaterial ? 'active' : ''}" data-pw-material="0">${icon('check-circle')}Sim, tem material</button>
+              <button type="button" class="toggle-btn tg-ok ${!st.needsMaterial ? 'active' : ''}" data-pw-material="0">${icon('check-circle')}Sim, tem Material/Ferramenta</button>
               <button type="button" class="toggle-btn tg-buy ${st.needsMaterial ? 'active' : ''}" data-pw-material="1">${icon('cart')}Precisa comprar</button>
             </div>
             <div class="pw-grid-2 mt-12 ${st.needsMaterial ? '' : 'hidden'}" id="pwMaterialPanel">
@@ -2633,6 +2666,7 @@
     const [schools, allDemands, dash, catCounts] = await Promise.all([loadSchools(), api('/api/demands'), api('/api/dashboard'), api('/api/demands/category-counts')]);
     const ds = dash.stats;
     const counts = catCounts.counts || {};
+    const statusCounts = catCounts.status_counts || {};
     const schoolsById = new Map(schools.map(s => [s.id, s]));
     const filters = { q: query.get('q') || '', year: query.get('year') || '2026', status: query.get('status') || '', priority: query.get('priority') || '', category: query.get('category') || '' };
     let showCompleted = true, critical = false;
@@ -2641,7 +2675,10 @@
       + `<section class="filters-card">
         <div class="field"><label>Buscar</label><div class="search-field">${icon('search')}<input class="input" id="fQ" value="${esc(filters.q)}" placeholder="Código, demanda ou escola..."></div></div>
         <div class="field"><label>Ano</label><select class="select" id="fYear"><option value="">Todos</option>${[2026, 2025, 2024].map(y => `<option ${String(y) === filters.year ? 'selected' : ''}>${y}</option>`).join('')}</select></div>
-        <div class="field"><label>Status</label><select class="select" id="fStatus"><option value="">Todos</option>${ctx.statuses.map(x => `<option ${x === filters.status ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>
+        <div class="field"><label>Status</label><select class="select" id="fStatus"><option value="">Todos</option>${ctx.statuses.map(x => {
+          const qty = statusCounts[x] || 0;
+          return `<option value="${esc(x)}" ${x === filters.status ? 'selected' : ''}${qty ? ' class="opt-has-count"' : ''}>${esc(x)} (${num(qty)})</option>`;
+        }).join('')}</select></div>
         <div class="field"><label>Prioridade</label><select class="select" id="fPriority"><option value="">Todas</option>${Object.keys(ctx.priorities).map(x => `<option value="${x}" ${x === filters.priority ? 'selected' : ''}>${x} · ${priorityLabel(x)}</option>`).join('')}</select></div>
         <div class="field"><label>Categoria</label><select class="select" id="fCategory"><option value="">Todas</option>${ctx.categories.map(x => `<option value="${esc(x)}" ${x === filters.category ? 'selected' : ''}${counts[x] ? ' class="opt-has-count"' : ''}>${esc(x)} (${num(counts[x] || 0)})</option>`).join('')}</select></div>
         <button class="btn btn-secondary" id="clearFilters">${icon('filter')}Limpar</button>
@@ -4340,7 +4377,6 @@
         </div>`;
 
       const entrada = $('#logoInput', body);
-      $('#logoDrop', body).addEventListener('click', e => { e.preventDefault(); entrada.click(); });
       entrada.addEventListener('change', () => {
         const f = entrada.files[0];
         if (!f) return;

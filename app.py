@@ -1161,12 +1161,26 @@ def api_demand_category_counts(request: Request):
     scope, params = demand_scope_sql(user)
     conn = db()
     rows = conn.execute(f"SELECT d.category, COUNT(*) qty FROM demands d WHERE 1=1 {scope} GROUP BY d.category", params).fetchall()
+    status_rows = conn.execute(f"SELECT d.status, COUNT(*) qty FROM demands d WHERE 1=1 {scope} GROUP BY d.status", params).fetchall()
     conn.close()
-    return {"counts": {r["category"]: r["qty"] for r in rows}}
+    return {
+        "counts": {r["category"]: r["qty"] for r in rows},
+        "status_counts": {r["status"]: r["qty"] for r in status_rows}
+    }
+
+
+@app.get("/api/demands/status-counts")
+def api_demand_status_counts(request: Request):
+    user = require_user(request)
+    scope, params = demand_scope_sql(user)
+    conn = db()
+    rows = conn.execute(f"SELECT d.status, COUNT(*) qty FROM demands d WHERE 1=1 {scope} GROUP BY d.status", params).fetchall()
+    conn.close()
+    return {"counts": {r["status"]: r["qty"] for r in rows}}
 
 
 @app.get("/api/demands")
-def api_demands(request: Request, q: str = "", status: str = "", priority: str = "", category: str = "", year: str = "", overdue: int = 0, due_soon: int = 0, unassigned: int = 0, archived: str = ""):
+def api_demands(request: Request, q: str = "", status: str = "", priority: str = "", category: str = "", year: str = "", month: str = "", overdue: int = 0, due_soon: int = 0, unassigned: int = 0, archived: str = ""):
     user = require_user(request)
     where = ["1=1"]
     params: list = []
@@ -1192,6 +1206,8 @@ def api_demands(request: Request, q: str = "", status: str = "", priority: str =
         where.append("d.category=%s"); params.append(category)
     if year:
         where.append("substr(d.created_at,1,4)=%s"); params.append(str(year))
+    if month:
+        where.append("substr(d.created_at,6,2)=%s"); params.append(month.zfill(2))
     if overdue:
         where.append("d.due_date IS NOT NULL AND d.due_date::date < CURRENT_DATE AND d.status NOT IN ('Concluída','Cancelada')")
     if due_soon:
